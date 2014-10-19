@@ -1,4 +1,4 @@
 function-composer
 =================
 
-Easily compose functions with multiple type signatures
+Compose functions with multiple type signatures
