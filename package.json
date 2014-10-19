@@ -11,16 +11,8 @@
   },
   "keywords": [
     "function",
-    "mathematics",
-    "functions",
-    "numeric",
-    "parser",
-    "expression",
-    "number",
-    "bignumber",
-    "complex",
-    "matrix",
-    "unit"
+    "compose",
+    "signature"
   ],
   "dependencies": {},
   "devDependencies": {
