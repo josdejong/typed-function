@@ -3,7 +3,7 @@
 
 ## not yet released, version 0.1.0
 
-- Implemented support for functions with one argument
+- Implemented support for functions with zero, one, or multiple arguments.
 
 
 ## 2014-10-19, version 0.0.1
