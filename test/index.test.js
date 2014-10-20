@@ -86,4 +86,6 @@ describe('parse', function() {
     assert.throws(function () {fn(1, 2)}, /TypeError: Wrong number of arguments/); // TODO: should be changed into an ArgumentsError?
   });
 
+
+  // TODO: test compose.types
 });
