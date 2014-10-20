@@ -1,22 +1,3 @@
-function-composer
-=================
-
-Compose functions with multiple type signatures.
-
-Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
-
-# Load
-
-Install via npm:
-
-    npm install function-composer
-
-
-# Usage
-
-Example usage:
-
-```js
 var compose = require('../index');
 
 // compose a new function
@@ -43,4 +24,3 @@ try {
 catch (err) {
   console.log(err.toString()); // outputs: 'TypeError: Wrong function signature'
 }
-```
