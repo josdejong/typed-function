@@ -1,6 +1,42 @@
 'use strict';
 
-var types = require('./lib/types');
+//var types = require('./lib/types');
+
+exports.type = function(x) {
+  var type = typeof x;
+
+  if (type === 'object') {
+    if (x === null)           return 'null';
+    if (Array.isArray(x))     return 'array';
+    if (x instanceof Date)    return 'date';
+    if (x instanceof Function)return 'function';
+    if (x instanceof RegExp)  return 'regexp';
+
+    // These should not be used in practice
+    if (x instanceof Boolean) return 'boolean';
+    if (x instanceof Number)  return 'number';
+    if (x instanceof String)  return 'string';
+  }
+
+  return type;
+};
+
+var types = {
+  'boolean': 'typeof x === \'boolean\'',
+  'number': 'typeof x === \'number\'',
+  'string': 'typeof x === \'string\'',
+  'function': 'typeof x === \'function\'',
+  'null': 'x === null',
+  'object': 'typeof x === \'object\'', // Important: object must be checked last, as may types are an Object too
+  'array': 'Array.isArray(x)',
+  'date': 'x instanceof Date',
+  'regexp': 'x instanceof RegExp'
+};
+
+// order types such that 'object' is last
+function typeOrder(a, b) {
+  return a === 'object' ? 1 : b === 'object' ? -1 : 0
+}
 
 /**
  * Compose a function from sub-functions each handling a single type signature.
@@ -14,7 +50,6 @@ function compose(functions) {
   var normFunctions = {};
 
   // TODO: instead of nested switches, do a direct lookup in a flat map. Only problem is how to handle any type arguments *
-
 
   // analise all signatures
   var argumentCount = 0;
@@ -57,20 +92,39 @@ function compose(functions) {
   console.log('parameters', JSON.stringify(parameters, null, 2)); // TODO: cleanup
   console.log();
 
-  function switchTypes(signature, args) {
+  function switchTypes(signature, args, prefix) {
     if (signature.fn !== null) {
-      return 'return functions[\'' + signature.signature + '\'](' + args.join(', ') +');\n';
+      return prefix + 'return signatures[\'' + signature.signature + '\'](' + args.join(', ') +');\n';
     }
     else {
-      return 'switch(type(arg' + args.length + ')) {\n' +
-          Object.keys(signature.types).map(function (type) {
-            return 'case \'' + type + '\':\n' +
-                switchTypes(signature.types[type], args.concat('arg' + args.length)) +
-                'break;\n';
-          }).join('') +
-          'default:\n' +
-          'throw new TypeError(type(arg' + args.length + ') + \' not supported\');\n' +
-          '}\n';
+      var nextPrefix = prefix + '  ';
+//      return prefix + 'switch(type(arg' + args.length + ')) {\n' +
+//          Object.keys(signature.types).map(function (type) {
+//            return prefix + '  case \'' + type + '\':\n' +
+//                switchTypes(signature.types[type], args.concat('arg' + args.length), nextPrefix) +
+//                nextPrefix + 'break;\n\n';
+//          }).join('') +
+//          prefix + '  default:\n' +
+//          prefix + '  throw new TypeError(type(arg' + args.length + ') + \' not supported\');\n' +
+//          prefix + '}\n';
+
+
+      return Object.keys(signature.types)
+          .sort(typeOrder)
+          .map(function (type) {
+            if (!types[type]) {
+              throw new Error('Unknown type "' + type + '"');
+            }
+
+            var arg = 'arg' + args.length;
+            var test = types[type].replace(/\w*/g, function (word) {
+              return word == 'x' ? arg : word
+            });
+
+            return prefix + 'if (' + test +') {\n' +
+                switchTypes(signature.types[type], args.concat('arg' + args.length), nextPrefix) +
+                prefix + '}\n';
+          }).join('');
     }
   }
 
@@ -80,16 +134,19 @@ function compose(functions) {
   }
 
   // TODO: test if we can improve the performance by creating local variables pointing to the actual functions
-  var code = '(function (type, functions) {\n' +
-      'return function (' + args.join(',') + ') {\n' +
-      'switch(arguments.length) {\n' +
+  var code = '(function (type, signatures) {\n' +
+      'return function (' + args.join(', ') + ') {\n' +
+      '  switch(arguments.length) {\n' +
       Object.keys(parameters).map(function (count) {
         var signature = parameters[count];
         var args = [];
-        return 'case ' + count + ':\n' + switchTypes(signature, args) + ' break;\n';
+        return '    case ' + count + ':\n' +
+            switchTypes(signature, args, '      ') +
+            '      break;\n\n';
       }).join('') +
-      'default: throw new TypeError(\'Wrong number of arguments\');\n' + // TODO: change this into an ArgumentsError?
-      '}\n' +
+      '    default: throw new TypeError(\'Wrong number of arguments\');\n' + // TODO: change this into an ArgumentsError?
+      '  }\n' +
+      '  throw new TypeError(\'Wrong function signature\');\n' +
       '}\n' +
       '})\n';
 
@@ -97,6 +154,8 @@ function compose(functions) {
 
   var fn = eval(code)(types.type, normFunctions);
 
+  console.log('fn'
+      , fn.toString())
   // attach the original functions
   fn.signatures = normFunctions;
 

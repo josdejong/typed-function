@@ -50,7 +50,7 @@ describe('parse', function() {
       'string': function (value) {
         return 'string:' + value;
       },
-      'number, boolean': function (a, b) { // mind space after the comma, should be normalized
+      'number, boolean': function (a, b) { // mind space after the comma, should be normalized by composer
         return 'number,boolean:' + a + ',' + b;
       }
     };
@@ -73,7 +73,7 @@ describe('parse', function() {
       }
     });
 
-    assert.throws(function () {fn(new Date())}, /TypeError: date not supported/);
+    assert.throws(function () {fn(new Date())}, /TypeError: Wrong function signature/);
   });
 
   it('should throw an error when providing a wrong number of arguments', function() {
