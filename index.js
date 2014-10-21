@@ -1,25 +1,7 @@
 'use strict';
 
-exports.type = function(x) {
-  var type = typeof x;
-
-  if (type === 'object') {
-    if (x === null)           return 'null';
-    if (Array.isArray(x))     return 'array';
-    if (x instanceof Date)    return 'date';
-    if (x instanceof Function)return 'function';
-    if (x instanceof RegExp)  return 'regexp';
-
-    // These should not be used in practice
-    if (x instanceof Boolean) return 'boolean';
-    if (x instanceof Number)  return 'number';
-    if (x instanceof String)  return 'string';
-  }
-
-  return type;
-};
-
-var types = {
+// data type tests
+compose.types = {
   'boolean': 'typeof x === \'boolean\'',
   'number': 'typeof x === \'number\'',
   'string': 'typeof x === \'string\'',
@@ -30,6 +12,13 @@ var types = {
   'date': 'x instanceof Date',
   'regexp': 'x instanceof RegExp'
 };
+
+// type conversions
+compose.conversions = [
+  {from: 'boolean', to: 'number', conversion: '+x'},
+  {from: 'boolean', to: 'string', conversion: 'x+\'\''},
+  {from: 'number',  to: 'string', conversion: 'x+\'\''}
+];
 
 // order types such that 'object' is last
 function compareTypes(a, b) {
@@ -43,12 +32,17 @@ function compareNumbers(a, b) {
 
 /**
  * Compose a function from sub-functions each handling a single type signature.
+ * @param {string} [name]  An optional name for the function
  * @param {Object.<string, function>} functions
  *            A map with the type signature as key and the sub-function as value
  * @return {function} Returns the composed function
  */
-function compose(functions) {
+function compose(name, functions) {
   // TODO: add support for named functions
+  if (!functions) {
+    functions = name;
+    name = null;
+  }
 
   var normFunctions = {};
 
@@ -65,14 +59,14 @@ function compose(functions) {
     argumentCount = Math.max(argumentCount, params.length);
 
     // get the entry for this number of arguments
-    if (!parameters[params.length]) {
-      parameters[params.length] = {
+    var obj = parameters[params.length];
+    if (!obj) {
+      obj = parameters[params.length] = {
         signature: [],
         fn: null,
         types: {}
       };
     }
-    var obj = parameters[params.length];
 
     // loop over all parameters, create a nested structure
     while(params.length > 0) {
@@ -100,12 +94,12 @@ function compose(functions) {
       return Object.keys(signature.types)
           .sort(compareTypes)
           .map(function (type) {
-            if (!types[type]) {
+            if (!compose.types[type]) {
               throw new Error('Unknown type "' + type + '"');
             }
 
             var arg = 'arg' + args.length;
-            var test = types[type].replace(/\w*/g, function (word) {
+            var test = compose.types[type].replace(/\w*/g, function (word) {
               return word == 'x' ? arg : word
             });
 
@@ -124,7 +118,7 @@ function compose(functions) {
 
   var counts = Object.keys(parameters);
   var code = '(function (type, signatures) {\n' +
-      'return function (' + args.join(', ') + ') {\n' +
+      'return function ' + (name || '') + '(' + args.join(', ') + ') {\n' +
       counts
           .sort(compareNumbers)
           .map(function (count, index) {
@@ -145,7 +139,7 @@ function compose(functions) {
 
   //console.log('code', code); // TODO: cleanup
 
-  var fn = eval(code)(types.type, normFunctions);
+  var fn = eval(code)(compose.types.type, normFunctions);
 
   //console.log('fn', fn.toString()) // TODO: cleanup
 
@@ -154,8 +148,5 @@ function compose(functions) {
 
   return fn;
 }
-
-// expose all types (you can add more)
-compose.types = types;
 
 module.exports = compose;

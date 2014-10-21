@@ -18,6 +18,17 @@ describe('parse', function() {
     assert.strictEqual(fn.signatures[''], fns['']);
   });
 
+  it('should create a named function', function() {
+    var fn = compose('myFunction',  {
+      '': function () {
+        return 'noargs';
+      }
+    });
+
+    assert.equal(fn(), 'noargs');
+    assert.equal(fn.name, 'myFunction');
+  });
+
   it('should compose a function with one argument', function() {
     var fns = {
       'number': function (value) {

@@ -45,10 +45,16 @@ catch (err) {
 }
 ```
 
+# API
+
+```js
+compose(signatures: Object.<string, function>) : function
+compose(name: string, signatures: Object.<string, function>) : function
+```
+
 
 # Roadmap
 
-- Create named functions.
 - Add new types (already possible but not yet documented)
 - Automatic casting, for example from boolean to number.
 - Extend function signatures:
