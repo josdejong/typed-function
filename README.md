@@ -44,3 +44,16 @@ catch (err) {
   console.log(err.toString()); // outputs: 'TypeError: Wrong function signature'
 }
 ```
+
+
+# Roadmap
+
+- Create named functions.
+- Add new types (already possible but not yet documented)
+- Automatic casting, for example from boolean to number.
+- Extend function signatures:
+  - Any type arguments like `*, boolean`.
+  - Ellipsis like `string, ...`.
+  - Optional arguments like `number?, array`.
+- Create a good benchmark, to get insight in the overhead.
+- Add a bundle for use in the browser.

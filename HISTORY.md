@@ -1,7 +1,7 @@
 # History
 
 
-## not yet released, version 0.1.0
+## 2014-10-21, version 0.1.0
 
 - Implemented support for functions with zero, one, or multiple arguments.
 
