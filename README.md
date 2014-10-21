@@ -55,5 +55,6 @@ catch (err) {
   - Any type arguments like `'*, boolean'`.
   - Ellipsis like `'string, ...'`.
   - Optional arguments like `'number?, array'`.
+  - Multiple types per argument like `number | string, number'`.
 - Create a good benchmark, to get insight in the overhead.
 - Add a bundle for use in the browser.
