@@ -4,6 +4,15 @@ var compose = require('../index');
 
 describe('parse', function() {
 
+  it('should compose an empty function', function() {
+    var fn = compose({});
+    assert.throws(function () {
+      fn();
+    }, /TypeError: Wrong function signature/);
+    assert(fn.signatures instanceof Object);
+    assert.deepEqual(fn.signatures, []);
+  });
+
   it('should compose a function with zero arguments', function() {
     var fns = {
       '': function () {

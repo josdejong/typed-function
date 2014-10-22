@@ -87,13 +87,15 @@ function compose(name, functions) {
   //console.log('parameters', JSON.stringify(parameters, null, 2)); // TODO: cleanup
 
   function switchTypes(signature, args, prefix) {
+    var code = [];
+
     if (signature.fn !== null) {
-      return prefix + 'return signatures[\'' + signature.signature + '\'](' + args.join(', ') +');\n';
+      code.push(prefix + 'return signatures[\'' + signature.signature + '\'](' + args.join(', ') +');');
     }
     else {
-      return Object.keys(signature.types)
+      Object.keys(signature.types)
           .sort(compareTypes)
-          .map(function (type) {
+          .forEach(function (type) {
             if (!compose.types[type]) {
               throw new Error('Unknown type "' + type + '"');
             }
@@ -103,12 +105,13 @@ function compose(name, functions) {
               return word == 'x' ? arg : word
             });
 
-            return prefix + 'if (' + test +') {\n' +
-                switchTypes(signature.types[type], args.concat('arg' + args.length), prefix + '  ') +
-                prefix + '}\n';
+            code.push(prefix + 'if (' + test +') {');
+            code = code.concat(switchTypes(signature.types[type], args.concat('arg' + args.length), prefix + '  '));
+            code.push(prefix + '}');
           })
-          .join('');
     }
+
+    return code;
   }
 
   var args = [];
@@ -117,29 +120,33 @@ function compose(name, functions) {
   }
 
   var counts = Object.keys(parameters);
-  var code = '(function (type, signatures) {\n' +
-      'return function ' + (name || '') + '(' + args.join(', ') + ') {\n' +
-      counts
-          .sort(compareNumbers)
-          .map(function (count, index) {
-            var signature = parameters[count];
-            var args = [];
-            var statement = (index == 0) ? 'if' : 'else if';
-            return '  ' + statement + ' (arguments.length == ' + count +  ') {\n' +
-                switchTypes(signature, args, '    ') +
-                '  }\n' +
-                ((index == counts - 1) ? ('  else {\n' +
-                '    throw new TypeError(\'Wrong number of arguments\');\n' + // TODO: output the allowed numbers
-                '  }\n') : '');
-          })
-          .join('') +
-      '  throw new TypeError(\'Wrong function signature\');\n' + // TODO: output the actual signature
-      '}\n' +
-      '})\n';
+  var code = [];
+  code.push('(function (type, signatures) {');
+  code.push('return function ' + (name || '') + '(' + args.join(', ') + ') {');
 
-  //console.log('code', code); // TODO: cleanup
+  counts
+      .sort(compareNumbers)
+      .forEach(function (count, index) {
+        var signature = parameters[count];
+        var args = [];
+        var statement = (index == 0) ? 'if' : 'else if';
+        code.push('  ' + statement + ' (arguments.length == ' + count +  ') {');
+        code = code.concat(switchTypes(signature, args, '    '));
 
-  var fn = eval(code)(compose.types.type, normFunctions);
+        code.push('  }');
+        if (index == counts - 1) {
+          code.push('  else {');
+          code.push('    throw new TypeError(\'Wrong number of arguments\');'); // TODO: output the allowed numbers
+          code.push('  }');
+        }
+      });
+  code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the actual signature
+  code.push('}');
+  code.push( '})');
+
+  //console.log('code', code.join('\n')); // TODO: cleanup
+
+  var fn = eval(code.join('\n'))(compose.types.type, normFunctions);
 
   //console.log('fn', fn.toString()) // TODO: cleanup
 

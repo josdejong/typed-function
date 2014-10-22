@@ -47,10 +47,17 @@ catch (err) {
 
 # API
 
+## Construction
+
 ```js
 compose(signatures: Object.<string, function>) : function
 compose(name: string, signatures: Object.<string, function>) : function
 ```
+
+## Properties
+
+- `compose.types: Object`  
+  A map with built-in type checking expressions.
 
 
 # Roadmap
