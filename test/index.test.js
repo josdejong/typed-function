@@ -131,8 +131,6 @@ describe('parse', function() {
       }
     });
 
-    console.log(fn.toString())
-
     assert.equal(fn(true, false), 'string, number');
     assert.equal(fn(true, 2), 'string, number');
     assert.equal(fn(true, 'foo'), 'string, string');

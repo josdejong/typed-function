@@ -31,11 +31,6 @@ function compareNumbers(a, b) {
   return a > b;
 }
 
-function A() {}
-
-console.log(['number', 'object', 'boolean', 'a'].sort(compareTypes))
-
-
 // replace all words in a string
 function replaceWord(text, match, replacement) {
   return text.replace(/\w*/g, function (word) {
@@ -106,8 +101,6 @@ function compose(name, functions) {
       code.push(prefix + 'return signatures[\'' + signature.signature + '\'](' + args.join(', ') +');');
     }
     else {
-      var addedConversions = {}; // to keep track of the type conversions already added
-
       Object.keys(signature.types)
           .sort(compareTypes)
           .forEach(function (type) {
@@ -121,28 +114,30 @@ function compose(name, functions) {
             code.push(prefix + 'if (' + test +') {');
             code = code.concat(switchTypes(signature.types[type], args.concat(arg), prefix + '  '));
             code.push(prefix + '}');
-
-            // add entries for type conversions
-            compose.conversions
-                .filter(function (conversion) {
-                  return conversion.to == type &&
-                      !signature.types[conversion.from] &&
-                      !addedConversions[conversion.from];
-                })
-                .forEach(function (conversion) {
-                  addedConversions[conversion.from] = true;
-                  if (!compose.tests[conversion.from]) {
-                    throw new Error('Unknown type "' + conversion.from + '"');
-                  }
-                  var test = replaceWord(compose.tests[conversion.from], 'x', 'arg' + args.length);
-                  var arg  = replaceWord(conversion.equation, 'x', 'arg' + args.length);
-
-                  code.push(prefix + 'if (' + test +') {');
-                  code = code.concat(switchTypes(signature.types[type], args.concat(arg), prefix + '  '));
-                  code.push(prefix + '}');
-                });
           });
 
+      // add entries for type conversions
+      var added = {};
+      compose.conversions
+          .filter(function (conversion) {
+            return signature.types[conversion.to] &&
+                !signature.types[conversion.from];
+          })
+          .forEach(function (conversion) {
+            if (!added[conversion.from]) {
+              added[conversion.from] = true;
+
+              if (!compose.tests[conversion.from]) {
+                throw new Error('Unknown type "' + conversion.from + '"');
+              }
+              var test = replaceWord(compose.tests[conversion.from], 'x', 'arg' + args.length);
+              var arg  = replaceWord(conversion.equation, 'x', 'arg' + args.length);
+
+              code.push(prefix + 'if (' + test +') {');
+              code = code.concat(switchTypes(signature.types[conversion.to], args.concat(arg), prefix + '  '));
+              code.push(prefix + '}');
+            }
+          });
 
     }
 
