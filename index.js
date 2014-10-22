@@ -1,26 +1,27 @@
 'use strict';
 
 // data type tests
-compose.types = {
+compose.tests = {
+  'null': 'x === null',
   'boolean': 'typeof x === \'boolean\'',
   'number': 'typeof x === \'number\'',
   'string': 'typeof x === \'string\'',
   'function': 'typeof x === \'function\'',
-  'null': 'x === null',
-  'object': 'typeof x === \'object\'', // Important: object must be checked last, as may types are an Object too
   'array': 'Array.isArray(x)',
   'date': 'x instanceof Date',
-  'regexp': 'x instanceof RegExp'
+  'regexp': 'x instanceof RegExp',
+  'object': 'typeof x === \'object\''
 };
 
-// type conversions
+// type conversions. Order is important!
 compose.conversions = [
-  {from: 'boolean', to: 'number', conversion: '+x'},
-  {from: 'boolean', to: 'string', conversion: 'x+\'\''},
-  {from: 'number',  to: 'string', conversion: 'x+\'\''}
+  {from: 'boolean', to: 'number', equation: '+x'},
+  {from: 'boolean', to: 'string', equation: 'x + \'\''},
+  {from: 'number',  to: 'string', equation: 'x + \'\''}
 ];
 
-// order types such that 'object' is last
+// order types
+// object must be ordered last as other types may be an object too.
 function compareTypes(a, b) {
   return a === 'object' ? 1 : b === 'object' ? -1 : 0
 }
@@ -28,6 +29,18 @@ function compareTypes(a, b) {
 // order numbers
 function compareNumbers(a, b) {
   return a > b;
+}
+
+function A() {}
+
+console.log(['number', 'object', 'boolean', 'a'].sort(compareTypes))
+
+
+// replace all words in a string
+function replaceWord(text, match, replacement) {
+  return text.replace(/\w*/g, function (word) {
+    return word == match ? replacement : word
+  });
 }
 
 /**
@@ -93,22 +106,44 @@ function compose(name, functions) {
       code.push(prefix + 'return signatures[\'' + signature.signature + '\'](' + args.join(', ') +');');
     }
     else {
+      var addedConversions = {}; // to keep track of the type conversions already added
+
       Object.keys(signature.types)
           .sort(compareTypes)
           .forEach(function (type) {
-            if (!compose.types[type]) {
+            if (!compose.tests[type]) {
               throw new Error('Unknown type "' + type + '"');
             }
 
             var arg = 'arg' + args.length;
-            var test = compose.types[type].replace(/\w*/g, function (word) {
-              return word == 'x' ? arg : word
-            });
+            var test = replaceWord(compose.tests[type], 'x', arg);
 
             code.push(prefix + 'if (' + test +') {');
-            code = code.concat(switchTypes(signature.types[type], args.concat('arg' + args.length), prefix + '  '));
+            code = code.concat(switchTypes(signature.types[type], args.concat(arg), prefix + '  '));
             code.push(prefix + '}');
-          })
+
+            // add entries for type conversions
+            compose.conversions
+                .filter(function (conversion) {
+                  return conversion.to == type &&
+                      !signature.types[conversion.from] &&
+                      !addedConversions[conversion.from];
+                })
+                .forEach(function (conversion) {
+                  addedConversions[conversion.from] = true;
+                  if (!compose.tests[conversion.from]) {
+                    throw new Error('Unknown type "' + conversion.from + '"');
+                  }
+                  var test = replaceWord(compose.tests[conversion.from], 'x', 'arg' + args.length);
+                  var arg  = replaceWord(conversion.equation, 'x', 'arg' + args.length);
+
+                  code.push(prefix + 'if (' + test +') {');
+                  code = code.concat(switchTypes(signature.types[type], args.concat(arg), prefix + '  '));
+                  code.push(prefix + '}');
+                });
+          });
+
+
     }
 
     return code;
@@ -124,6 +159,7 @@ function compose(name, functions) {
   code.push('(function (type, signatures) {');
   code.push('return function ' + (name || '') + '(' + args.join(', ') + ') {');
 
+  // create if statements checking the number of arguments
   counts
       .sort(compareNumbers)
       .forEach(function (count, index) {
@@ -134,21 +170,18 @@ function compose(name, functions) {
         code = code.concat(switchTypes(signature, args, '    '));
 
         code.push('  }');
-        if (index == counts - 1) {
+        if (index == counts.length - 1) {
           code.push('  else {');
           code.push('    throw new TypeError(\'Wrong number of arguments\');'); // TODO: output the allowed numbers
           code.push('  }');
         }
       });
+
   code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the actual signature
   code.push('}');
   code.push( '})');
 
-  //console.log('code', code.join('\n')); // TODO: cleanup
-
-  var fn = eval(code.join('\n'))(compose.types.type, normFunctions);
-
-  //console.log('fn', fn.toString()) // TODO: cleanup
+  var fn = eval(code.join('\n'))(compose.tests.type, normFunctions);
 
   // attach the original functions
   fn.signatures = normFunctions;

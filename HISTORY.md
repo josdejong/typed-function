@@ -4,6 +4,7 @@
 ## not-yet-released, version 0.1.1
 
 - Implemented support for named functions.
+- Implemented support for type conversions.
 
 
 ## 2014-10-21, version 0.1.0
