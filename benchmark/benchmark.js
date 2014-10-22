@@ -38,6 +38,8 @@ var composed = compose({
   'string,boolean': direct
 });
 
+console.log(composed.toString())
+
 var directResult = benchmark('Direct', function () {
   var i, r, d = new Date();
   for (i = 0; i < I_MAX; i++) {

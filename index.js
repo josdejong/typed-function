@@ -1,27 +1,7 @@
 'use strict';
 
-// data type tests
-compose.tests = {
-  'null': 'x === null',
-  'boolean': 'typeof x === \'boolean\'',
-  'number': 'typeof x === \'number\'',
-  'string': 'typeof x === \'string\'',
-  'function': 'typeof x === \'function\'',
-  'array': 'Array.isArray(x)',
-  'date': 'x instanceof Date',
-  'regexp': 'x instanceof RegExp',
-  'object': 'typeof x === \'object\''
-};
-
-// type conversions. Order is important!
-compose.conversions = [
-  {from: 'boolean', to: 'number', equation: '+x'},
-  {from: 'boolean', to: 'string', equation: 'x + \'\''},
-  {from: 'number',  to: 'string', equation: 'x + \'\''}
-];
-
 // order types
-// object must be ordered last as other types may be an object too.
+// object will be ordered last as other types may be an object too.
 function compareTypes(a, b) {
   return a === 'object' ? 1 : b === 'object' ? -1 : 0
 }
@@ -38,6 +18,26 @@ function replaceWord(text, match, replacement) {
   });
 }
 
+function inlineFunction(fn, param) {
+  var str = fn.toString();
+
+  var match = /\((\w*)\)\s*{\s*("use strict";)?\s*return\s*(.*)}/.exec(str);
+  var arg = match && match[1];
+  var body = match && match[3];
+
+  if (arg && body) {
+    return body.replace(/\w*/g, function (word) {
+      return word == arg ? param : word
+    });
+  }
+  else {
+    // no inlining possible, return a self invoking function.
+    console.log('WARNING: failed to inline function ' + str + '. ' +
+        'This works fine but costs a little performance');
+    return null;
+  }
+}
+
 /**
  * Compose a function from sub-functions each handling a single type signature.
  * @param {string} [name]  An optional name for the function
@@ -46,7 +46,6 @@ function replaceWord(text, match, replacement) {
  * @return {function} Returns the composed function
  */
 function compose(name, functions) {
-  // TODO: add support for named functions
   if (!functions) {
     functions = name;
     name = null;
@@ -101,15 +100,16 @@ function compose(name, functions) {
       code.push(prefix + 'return signatures[\'' + signature.signature + '\'](' + args.join(', ') +');');
     }
     else {
+      // add entries for the provided types
       Object.keys(signature.types)
           .sort(compareTypes)
           .forEach(function (type) {
             if (!compose.tests[type]) {
               throw new Error('Unknown type "' + type + '"');
             }
-
             var arg = 'arg' + args.length;
-            var test = replaceWord(compose.tests[type], 'x', arg);
+            //var test = inlineFunction(compose.tests[type], arg);
+            var test = 'tests[\'' + type + '\'](' + arg + ')';
 
             code.push(prefix + 'if (' + test +') {');
             code = code.concat(switchTypes(signature.types[type], args.concat(arg), prefix + '  '));
@@ -130,11 +130,13 @@ function compose(name, functions) {
               if (!compose.tests[conversion.from]) {
                 throw new Error('Unknown type "' + conversion.from + '"');
               }
-              var test = replaceWord(compose.tests[conversion.from], 'x', 'arg' + args.length);
-              var arg  = replaceWord(conversion.equation, 'x', 'arg' + args.length);
+              var arg = 'arg' + args.length;
+              var convertedArg = replaceWord(conversion.equation, 'x', arg);
+              //var test = inlineFunction(compose.tests[conversion.from], arg);
+              var test = 'tests[\'' + conversion.from + '\'](' + arg + ')';
 
               code.push(prefix + 'if (' + test +') {');
-              code = code.concat(switchTypes(signature.types[conversion.to], args.concat(arg), prefix + '  '));
+              code = code.concat(switchTypes(signature.types[conversion.to], args.concat(convertedArg), prefix + '  '));
               code.push(prefix + '}');
             }
           });
@@ -151,7 +153,7 @@ function compose(name, functions) {
 
   var counts = Object.keys(parameters);
   var code = [];
-  code.push('(function (type, signatures) {');
+  code.push('(function (type, signatures, tests, conversions) {');
   code.push('return function ' + (name || '') + '(' + args.join(', ') + ') {');
 
   // create if statements checking the number of arguments
@@ -176,12 +178,30 @@ function compose(name, functions) {
   code.push('}');
   code.push( '})');
 
-  var fn = eval(code.join('\n'))(compose.tests.type, normFunctions);
+  var fn = eval(code.join('\n'))(compose.tests.type, normFunctions, compose.tests, compose.conversions);
 
   // attach the original functions
   fn.signatures = normFunctions;
 
   return fn;
 }
+
+// data type tests
+compose.tests = {
+  'null':     function (x) {return x === null},
+  'boolean':  function (x) {return typeof x === 'boolean'},
+  'number':   function (x) {return typeof x === 'number'},
+  'string':   function (x) {return typeof x === 'string'},
+  'function': function (x) {return typeof x === 'function'},
+  'array':    function (x) {return Array.isArray(x)},
+  'date':     function (x) {return x instanceof Date},
+  'regexp':   function (x) {return x instanceof RegExp},
+  'object':   function (x) {return typeof x === 'object'}
+};
+
+// type conversions
+// order is important
+// TODO: replace equations with functions
+compose.conversions = [];
 
 module.exports = compose;

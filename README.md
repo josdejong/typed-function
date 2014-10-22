@@ -56,8 +56,11 @@ compose(name: string, signatures: Object.<string, function>) : function
 
 ## Properties
 
-- `compose.types: Object`  
+- `compose.tests: Object`  
   A map with built-in type checking expressions.
+- `compose.conversions: Array`  
+  An Array with built-in conversions. Empty by default. Can be used for example 
+  to defined conversions from `boolean` to `number`.
 
 
 # Roadmap

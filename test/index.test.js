@@ -103,64 +103,6 @@ describe('parse', function() {
     assert.equal(fn(new Date()), 'date');
   });
 
-  it('should add conversions to a function with one argument', function() {
-    var fn = compose({
-      'string': function (a) {
-        return a;
-      }
-    });
-
-    assert.equal(fn(2), '2');
-    assert.equal(fn(false), 'false');
-    assert.equal(fn('foo'), 'foo');
-  });
-
-  it('should add conversions to a function with multiple arguments', function() {
-    // note: we add 'string, string' first, and `string, number` afterwards,
-    //       to test whether the conversions are correctly ordered.
-    var fn = compose({
-      'string, string': function (a, b) {
-        assert.equal(typeof a, 'string');
-        assert.equal(typeof b, 'string');
-        return 'string, string';
-      },
-      'string, number': function (a, b) {
-        assert.equal(typeof a, 'string');
-        assert.equal(typeof b, 'number');
-        return 'string, number';
-      }
-    });
-
-    assert.equal(fn(true, false), 'string, number');
-    assert.equal(fn(true, 2), 'string, number');
-    assert.equal(fn(true, 'foo'), 'string, string');
-    assert.equal(fn(2, false), 'string, number');
-    assert.equal(fn(2, 3), 'string, number');
-    assert.equal(fn(2, 'foo'), 'string, string');
-    assert.equal(fn('foo', true), 'string, number');
-    assert.equal(fn('foo', 2), 'string, number');
-    assert.equal(fn('foo', 'foo'), 'string, string');
-  });
-
-  it('should add non-conflicting conversions to a function with one argument', function() {
-    var fn = compose({
-      'number': function (a) {
-        return a;
-      },
-      'string': function (a) {
-        return a;
-      }
-    });
-
-    // booleans should be converted to number
-    assert.equal(fn(false), 0);
-    assert.equal(fn(true), 1);
-
-    // numbers and strings should be left as is
-    assert.equal(fn(2), 2);
-    assert.equal(fn('foo'), 'foo');
-  });
-
   it('should throw an error when providing an unsupported type of argument', function() {
     var fn = compose({
       'number': function (value) {
@@ -181,6 +123,78 @@ describe('parse', function() {
     assert.throws(function () {fn(1, 2)}, /TypeError: Wrong number of arguments/); // TODO: should be changed into an ArgumentsError?
   });
 
+  describe('conversions' , function () {
 
-  // TODO: test compose.types
+    before(function () {
+      compose.conversions = [
+        {from: 'boolean', to: 'number', equation: '+x'},
+        {from: 'boolean', to: 'string', equation: 'x + \'\''},
+        {from: 'number',  to: 'string', equation: 'x + \'\''}
+      ];
+    });
+
+    after(function () {
+      compose.conversions = [];
+    });
+
+    it('should add conversions to a function with one argument', function() {
+      var fn = compose({
+        'string': function (a) {
+          return a;
+        }
+      });
+
+      assert.equal(fn(2), '2');
+      assert.equal(fn(false), 'false');
+      assert.equal(fn('foo'), 'foo');
+    });
+
+    it('should add conversions to a function with multiple arguments', function() {
+      // note: we add 'string, string' first, and `string, number` afterwards,
+      //       to test whether the conversions are correctly ordered.
+      var fn = compose({
+        'string, string': function (a, b) {
+          assert.equal(typeof a, 'string');
+          assert.equal(typeof b, 'string');
+          return 'string, string';
+        },
+        'string, number': function (a, b) {
+          assert.equal(typeof a, 'string');
+          assert.equal(typeof b, 'number');
+          return 'string, number';
+        }
+      });
+
+      assert.equal(fn(true, false), 'string, number');
+      assert.equal(fn(true, 2), 'string, number');
+      assert.equal(fn(true, 'foo'), 'string, string');
+      assert.equal(fn(2, false), 'string, number');
+      assert.equal(fn(2, 3), 'string, number');
+      assert.equal(fn(2, 'foo'), 'string, string');
+      assert.equal(fn('foo', true), 'string, number');
+      assert.equal(fn('foo', 2), 'string, number');
+      assert.equal(fn('foo', 'foo'), 'string, string');
+    });
+
+    it('should add non-conflicting conversions to a function with one argument', function() {
+      var fn = compose({
+        'number': function (a) {
+          return a;
+        },
+        'string': function (a) {
+          return a;
+        }
+      });
+
+      // booleans should be converted to number
+      assert.equal(fn(false), 0);
+      assert.equal(fn(true), 1);
+
+      // numbers and strings should be left as is
+      assert.equal(fn(2), 2);
+      assert.equal(fn('foo'), 'foo');
+    });
+  });
+
+  // TODO: test compose.tests
 });
