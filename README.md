@@ -11,14 +11,14 @@ Features:
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
-# Load
+## Load
 
 Install via npm:
 
     npm install function-composer
 
 
-# Usage
+## Usage
 
 Example usage:
 
@@ -52,7 +52,7 @@ catch (err) {
 ```
 
 
-# Performance
+## Performance
 
 Type checking input arguments adds some overhead to a function. For very small
 functions this overhead can be larger than the function execution itself is, 
@@ -61,16 +61,16 @@ You need to keep in mind though that you probably would have to do the type
 checking done by `function-composer` anyway.
 
 
-# API
+## API
 
-## Construction
+### Construction
 
 ```js
 compose(signatures: Object.<string, function>) : function
 compose(name: string, signatures: Object.<string, function>) : function
 ```
 
-## Properties
+### Properties
 
 - `compose.tests: Object`  
   A map with type checking tests. Add custom types like:
@@ -99,9 +99,9 @@ compose(name: string, signatures: Object.<string, function>) : function
   ```
 
 
-# Roadmap
+## Roadmap
 
-## Version 1
+### Version 1
 
 - Extend function signatures:
   - Any type arguments like `'*, boolean'`
@@ -110,7 +110,7 @@ compose(name: string, signatures: Object.<string, function>) : function
   - Multiple types per argument like `number | string, number'`
 - Create a good benchmark, to get insight in the overhead.
 
-## Version 2
+### Version 2
 
 - Extend function signatures:
   - Constants like `'"linear" | "cubic"'`.
@@ -119,7 +119,7 @@ compose(name: string, signatures: Object.<string, function>) : function
   - Array definitions like `'Array.<Person>'`
 
 
-# Minify
+## Minify
 
 To generate the minified version of the library, run:
 
