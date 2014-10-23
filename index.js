@@ -11,33 +11,6 @@ function compareNumbers(a, b) {
   return a > b;
 }
 
-// replace all words in a string
-function replaceWord(text, match, replacement) {
-  return text.replace(/\w*/g, function (word) {
-    return word == match ? replacement : word
-  });
-}
-
-function inlineFunction(fn, param) {
-  var str = fn.toString();
-
-  var match = /\((\w*)\)\s*{\s*("use strict";)?\s*return\s*(.*)}/.exec(str);
-  var arg = match && match[1];
-  var body = match && match[3];
-
-  if (arg && body) {
-    return body.replace(/\w*/g, function (word) {
-      return word == arg ? param : word
-    });
-  }
-  else {
-    // no inlining possible, return a self invoking function.
-    console.log('WARNING: failed to inline function ' + str + '. ' +
-        'This works fine but costs a little performance');
-    return null;
-  }
-}
-
 /**
  * Compose a function from sub-functions each handling a single type signature.
  * @param {string} [name]  An optional name for the function
@@ -52,7 +25,19 @@ function compose(name, signatures) {
   }
 
   var normalized = {};  // normalized function signatures
-  var defs = {};        // function definitions (local shortcuts to functions)
+  var defs = {   // function definitions (local shortcuts to functions)
+    signature: [],
+    test: [],
+    convert: []
+  };
+  function addDef(fn, type) {
+    var index = defs[type].indexOf(fn);
+    if (index == -1) {
+      index = defs[type].length;
+      defs[type].push(fn);
+    }
+    return type + index;
+  }
 
   // analise all signatures
   var argumentCount = 0;
@@ -92,13 +77,12 @@ function compose(name, signatures) {
     obj.fn = fn;
   });
 
-  //console.log('parameters', JSON.stringify(parameters, null, 2)); // TODO: cleanup
-
   function switchTypes(signature, args, prefix) {
     var code = [];
 
     if (signature.fn !== null) {
-      code.push(prefix + 'return signatures[\'' + signature.signature + '\'](' + args.join(', ') +');');
+      var def = addDef(signature.fn, 'signature');
+      code.push(prefix + 'return ' + def + '(' + args.join(', ') +'); // signature: ' + signature.signature);
     }
     else {
       // add entries for the provided types
@@ -109,10 +93,9 @@ function compose(name, signatures) {
               throw new Error('Unknown type "' + type + '"');
             }
             var arg = 'arg' + args.length;
-            //var test = inlineFunction(compose.tests[type], arg);
-            var test = 'tests[\'' + type + '\'](' + arg + ')';
+            var def = addDef(compose.tests[type], 'test') + '(' + arg + ')';
 
-            code.push(prefix + 'if (' + test +') {');
+            code.push(prefix + 'if (' + def + ') { // type: ' + type);
             code = code.concat(switchTypes(signature.types[type], args.concat(arg), prefix + '  '));
             code.push(prefix + '}');
           });
@@ -132,12 +115,11 @@ function compose(name, signatures) {
                 throw new Error('Unknown type "' + conversion.from + '"');
               }
               var arg = 'arg' + args.length;
-              var convertedArg = replaceWord(conversion.equation, 'x', arg);
-              //var test = inlineFunction(compose.tests[conversion.from], arg);
-              var test = 'tests[\'' + conversion.from + '\'](' + arg + ')';
+              var test = addDef(compose.tests[conversion.from], 'test') + '(' + arg + ')';
+              var convert = addDef(conversion.convert, 'convert') + '(' + arg + ')';
 
-              code.push(prefix + 'if (' + test +') {');
-              code = code.concat(switchTypes(signature.types[conversion.to], args.concat(convertedArg), prefix + '  '));
+              code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
+              code = code.concat(switchTypes(signature.types[conversion.to], args.concat(convert), prefix + '  '));
               code.push(prefix + '}');
             }
           });
@@ -152,12 +134,9 @@ function compose(name, signatures) {
     args.push('arg' + i);
   }
 
-  var counts = Object.keys(parameters);
   var code = [];
-  code.push('(function (type, signatures, tests, conversions) {');
+  var counts = Object.keys(parameters);
   code.push('return function ' + (name || '') + '(' + args.join(', ') + ') {');
-
-  // create if statements checking the number of arguments
   counts
       .sort(compareNumbers)
       .forEach(function (count, index) {
@@ -174,12 +153,21 @@ function compose(name, signatures) {
           code.push('  }');
         }
       });
-
   code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the actual signature
   code.push('}');
-  code.push( '})');
 
-  var fn = eval(code.join('\n'))(compose.tests.type, normalized, compose.tests, compose.conversions);
+  var factory = [];
+  factory.push('(function (defs) {');
+  Object.keys(defs).forEach(function (type) {
+    defs[type].forEach(function
+        (def, index) {
+      factory.push('var ' + type + index + ' = defs[\'' + type + '\'][' + index + '];');
+    });
+  });
+  factory = factory.concat(code);
+  factory.push( '})');
+
+  var fn = eval(factory.join('\n'))(defs);
 
   // attach the original functions
   fn.signatures = normalized;
@@ -202,7 +190,6 @@ compose.tests = {
 
 // type conversions
 // order is important
-// TODO: replace equations with functions
 compose.conversions = [];
 
 module.exports = compose;

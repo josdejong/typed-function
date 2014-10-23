@@ -50,34 +50,9 @@ catch (err) {
 
 Type checking input arguments adds some overhead to a function. For very small
 functions this overhead can be larger than the function execution itself is, 
-but for any non-trivial function the overhead is typically very small. However,
-you need to keep in mind that you would have to the type checking done by
-`function-composer` anyway.
-
-
-To give a rough idea of the overhead:
-
-```
-// adding extensive type checking on top of the following function 
-// makes it up to 10 times slower
-function increment() {
-  return count++;
-}
-
-// adding extensive type checking on top of the following function 
-// makes it about 20% slower
-function reverse(text) {
-  var rev = '';
-  var i = text.length;
-  while (i > 0) {
-    rev += text.substring(i-1, i);
-    i--;
-  }
-  return rev;
-}
-
-// adding extensive type checking on top of non-trivial functions is negligible
-```
+but for any non-trivial function the overhead is typically neglectable.
+You need to keep in mind though that you probably would have to do the type
+checking done by `function-composer` anyway.
 
 
 # API

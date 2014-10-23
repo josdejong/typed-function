@@ -2,9 +2,27 @@ var compose = require('../index');
 
 // define type conversions that we want to support
 compose.conversions = [
-  {from: 'boolean', to: 'number', equation: '+x'},
-  {from: 'boolean', to: 'string', equation: 'x + \'\''},
-  {from: 'number',  to: 'string', equation: 'x + \'\''}
+  {
+    from: 'boolean',
+    to: 'number',
+    convert: function (x) {
+      return +x;
+    }
+  },
+  {
+    from: 'boolean',
+    to: 'string',
+    convert: function (x) {
+      return x + '';
+    }
+  },
+  {
+    from: 'number',
+    to: 'string',
+    convert: function (x) {
+      return x + '';
+    }
+  }
 ];
 
 // compose a new function
