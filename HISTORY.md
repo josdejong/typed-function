@@ -1,7 +1,7 @@
 # History
 
 
-## not-yet-released, version 0.2.0
+## 2014-10-23, version 0.2.0
 
 - Implemented support for named functions.
 - Implemented support for type conversions.
