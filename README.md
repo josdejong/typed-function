@@ -109,7 +109,6 @@ compose(name: string, signatures: Object.<string, function>) : function
   - Optional arguments like `'number?, array'`
   - Multiple types per argument like `number | string, number'`
 - Create a good benchmark, to get insight in the overhead.
-- Add a bundle and minified version for use in the browser.
 
 ## Version 2
 
@@ -118,3 +117,10 @@ compose(name: string, signatures: Object.<string, function>) : function
   - Object definitions like `'{name: string, age: number}'`
   - Object definitions like `'Object.<string, Person>'`
   - Array definitions like `'Array.<Person>'`
+
+
+# Minify
+
+To generate the minified version of the library, run:
+
+    npm run minify
