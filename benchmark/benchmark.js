@@ -21,14 +21,30 @@ function benchmark(name, test) {
 }
 
 
-var count = 0;
-function direct() {
-  var args = Array.prototype.slice.apply(arguments);
-  args.forEach(function (arg) {
-    count = count + (arg && arg.length) ? arg.length : 1;
-  });
-  return count;
+//var count = 0;
+//function direct() {
+//  var args = Array.prototype.slice.apply(arguments);
+//  args.forEach(function (arg) {
+//    count = count + (arg && arg.length) ? arg.length : 1;
+//  });
+//  return count;
+//}
+
+function direct(text) {
+  var reverse = '';
+  var i = text.length;
+  while (i > 0) {
+    reverse += text.substring(i-1, i);
+    i--;
+  }
+  return reverse;
 }
+
+//var count = 0;
+//function direct() {
+//  return count++;
+//}
+
 var composed = compose({
   'number': direct,
   'number,boolean': direct,
@@ -38,13 +54,13 @@ var composed = compose({
   'string,boolean': direct
 });
 
-console.log(composed.toString())
+//console.log(composed.toString())
 
 var directResult = benchmark('Direct', function () {
   var i, r, d = new Date();
   for (i = 0; i < I_MAX; i++) {
     r = direct(1, d);
-    r = direct('hi', false);
+    r = direct('hello you there', false);
     r = direct(2, 4);
   }
 
@@ -55,7 +71,7 @@ var composedResult = benchmark('Composed', function () {
   var i, r, d = new Date();
   for (i = 0; i < I_MAX; i++) {
     r = composed(1, d);
-    r = composed('hi', false);
+    r = composed('hello you there', false);
     r = composed(2, 4);
   }
 
@@ -64,9 +80,12 @@ var composedResult = benchmark('Composed', function () {
 
 
 var overhead = ((composedResult.duration - directResult.duration) / composedResult.repetitions);
-console.log('Overhead: ' + parseFloat(overhead.toPrecision(4)).toExponential() + ' ms per call');
+var percentage = overhead / (directResult.duration / directResult.repetitions) * 100;
+console.log('Overhead: ' + percentage.toPrecision(4) + '%, ' +
+    parseFloat(overhead.toPrecision(4)).toExponential() + ' ms per call');
 
-// Output on FireFox:
-//    Direct: 3e+6 calls, 2219 ms, 7.397e-4 ms per call
-//    Composed: 3e+6 calls, 2221 ms, 7.403e-4 ms per call
-//    Overhead: 6.667e-7 ms per call
+// Output is for example:
+//   Direct: 3e+6 calls, 1865 ms, 6.217e-4 ms per call
+//   Composed: 3e+6 calls, 1982 ms, 6.607e-4 ms per call
+//   Overhead: 6.3%, 3.9e-5 ms per call
+

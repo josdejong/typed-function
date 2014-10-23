@@ -76,6 +76,8 @@ describe('parse', function() {
     };
     var fn = compose(fns);
 
+    console.log(fn.toString())
+
     assert.equal(fn(2), 'number:2');
     assert.equal(fn('foo'), 'string:foo');
     assert.equal(fn(2, false), 'number,boolean:2,false');

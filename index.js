@@ -41,28 +41,29 @@ function inlineFunction(fn, param) {
 /**
  * Compose a function from sub-functions each handling a single type signature.
  * @param {string} [name]  An optional name for the function
- * @param {Object.<string, function>} functions
+ * @param {Object.<string, function>} signatures
  *            A map with the type signature as key and the sub-function as value
  * @return {function} Returns the composed function
  */
-function compose(name, functions) {
-  if (!functions) {
-    functions = name;
+function compose(name, signatures) {
+  if (!signatures) {
+    signatures = name;
     name = null;
   }
 
-  var normFunctions = {};
+  var normalized = {};  // normalized function signatures
+  var defs = {};        // function definitions (local shortcuts to functions)
 
   // analise all signatures
   var argumentCount = 0;
   var parameters = {};
-  Object.keys(functions).forEach(function (signature) {
-    var fn = functions[signature];
+  Object.keys(signatures).forEach(function (signature) {
+    var fn = signatures[signature];
     var params = (signature !== '') ? signature.split(',').map(function (param) {
       return param.trim();
     }) : [];
     var normSignature = params.join(',');
-    normFunctions[normSignature] = fn;
+    normalized[normSignature] = fn;
     argumentCount = Math.max(argumentCount, params.length);
 
     // get the entry for this number of arguments
@@ -178,10 +179,10 @@ function compose(name, functions) {
   code.push('}');
   code.push( '})');
 
-  var fn = eval(code.join('\n'))(compose.tests.type, normFunctions, compose.tests, compose.conversions);
+  var fn = eval(code.join('\n'))(compose.tests.type, normalized, compose.tests, compose.conversions);
 
   // attach the original functions
-  fn.signatures = normFunctions;
+  fn.signatures = normalized;
 
   return fn;
 }
