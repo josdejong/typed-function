@@ -98,14 +98,14 @@ compose(name: string, signatures: Object.<string, function>) : function
   });
   ```
 
-### Generated functions
+### Output
 
-The functions generated via `compose({...})` have:
+The functions generated with `compose({...})` have:
 
-- A `toString` function which give well readable code, giving insight in
+- A `toString()` function which give well readable code, giving insight in
   what the function exactly does.
-- A property `signatures: Object`, which holds a map with the (normalized)
-  signatures which where passed via the `compose` function.
+- A property `signatures`, which holds a map with the (normalized)
+  signatures as key and the original sub-functions as value.
 
 
 ## Roadmap
