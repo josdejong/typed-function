@@ -1,4 +1,4 @@
-var compose = require('../index');
+var compose = require('../function-composer');
 
 // create a prototype
 function Person(params) {

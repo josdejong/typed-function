@@ -1,4 +1,4 @@
-var compose = require('../index');
+var compose = require('../function-composer');
 
 // define type conversions that we want to support
 compose.conversions = [

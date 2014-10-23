@@ -1,6 +1,6 @@
 // test parse
 var assert = require('assert');
-var compose = require('../index');
+var compose = require('../function-composer');
 
 describe('parse', function() {
 

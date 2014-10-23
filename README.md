@@ -1,7 +1,13 @@
 function-composer
 =================
 
-Compose functions with multiple type signatures. Adds type-checking of input arguments.
+Compose functions with multiple type signatures.
+
+Features:
+
+- Compose multiple functions with different signatures into one.
+- Type-checking of input arguments.
+- Automatic type conversion of arguments.
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
@@ -67,19 +73,48 @@ compose(name: string, signatures: Object.<string, function>) : function
 ## Properties
 
 - `compose.tests: Object`  
-  A map with built-in type checking expressions.
+  A map with type checking tests. Add custom types like:
+
+  ```js
+  function Person(...) {
+    ...
+  }
+
+  compose.tests['Person'] = function (x) {
+    return x instanceof Person;
+  };
+  ```
+
 - `compose.conversions: Array`  
   An Array with built-in conversions. Empty by default. Can be used for example 
-  to defined conversions from `boolean` to `number`.
+  to defined conversions from `boolean` to `number`. For example:
+
+  ```js
+  compose.conversions.push({
+    from: 'boolean',
+    to: 'number',
+    convert: function (x) {
+      return +x;
+  });
+  ```
 
 
 # Roadmap
 
-- Add new types (already possible but not yet documented)
+## Version 1
+
 - Extend function signatures:
-  - Any type arguments like `'*, boolean'`.
-  - Ellipsis like `'string, ...'`.
-  - Optional arguments like `'number?, array'`.
-  - Multiple types per argument like `number | string, number'`.
+  - Any type arguments like `'*, boolean'`
+  - Ellipsis like `'string, ...'`
+  - Optional arguments like `'number?, array'`
+  - Multiple types per argument like `number | string, number'`
 - Create a good benchmark, to get insight in the overhead.
-- Add a bundle for use in the browser.
+- Add a bundle and minified version for use in the browser.
+
+## Version 2
+
+- Extend function signatures:
+  - Constants like `'"linear" | "cubic"'`.
+  - Object definitions like `'{name: string, age: number}'`
+  - Object definitions like `'Object.<string, Person>'`
+  - Array definitions like `'Array.<Person>'`

@@ -11,15 +11,16 @@
   },
   "keywords": [
     "function",
+    "arguments",
     "compose",
-    "signature"
+    "types"
   ],
   "dependencies": {},
   "devDependencies": {
     "istanbul": "^0.3.2",
     "mocha": "^1.21.5"
   },
-  "main": "./index",
+  "main": "./function-composer",
   "scripts": {
     "test": "mocha test --recursive",
     "coverage": "istanbul cover _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\""

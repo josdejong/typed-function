@@ -1,4 +1,4 @@
-var compose = require('../index');
+var compose = require('../function-composer');
 
 var I_MAX = 1e6;
 

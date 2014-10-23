@@ -5,6 +5,7 @@
 
 - Implemented support for named functions.
 - Implemented support for type conversions.
+- Implemented support for custom types.
 
 
 ## 2014-10-21, version 0.1.0

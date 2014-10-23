@@ -1,4 +1,4 @@
-var compose = require('../index');
+var compose = require('../function-composer');
 
 // compose a new function
 var fn = compose({
