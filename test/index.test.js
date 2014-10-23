@@ -88,19 +88,19 @@ describe('parse', function() {
 
   it('should correctly recognize Date from Object (both are an Object)', function() {
     var fns = {
-      'object': function (value) {
+      'Object': function (value) {
         assert(value instanceof Object);
-        return 'object';
+        return 'Object';
       },
-      'date': function (value) {
+      'Date': function (value) {
         assert(value instanceof Date);
-        return 'date';
+        return 'Date';
       }
     };
     var fn = compose(fns);
 
-    assert.equal(fn({foo: 'bar'}), 'object');
-    assert.equal(fn(new Date()), 'date');
+    assert.equal(fn({foo: 'bar'}), 'Object');
+    assert.equal(fn(new Date()), 'Date');
   });
 
   it('should throw an error when providing an unsupported type of argument', function() {
@@ -120,7 +120,35 @@ describe('parse', function() {
       }
     });
 
-    assert.throws(function () {fn(1, 2)}, /TypeError: Wrong number of arguments/); // TODO: should be changed into an ArgumentsError?
+    assert.throws(function () {fn(1, 2)}, /TypeError: Wrong number of arguments/);
+  });
+
+  it('should throw an error when composing with an unknown type', function() {
+    assert.throws(function () {
+      var fn = compose({
+        'foo': function (value) {
+          return 'number:' + value;
+        }
+      });
+    }, /Error: Unknown type "foo"/);
+  });
+
+  it('should give a hint when composing with a wrongly cased type', function() {
+    assert.throws(function () {
+      var fn = compose({
+        'array': function (value) {
+          return 'array:' + value;
+        }
+      });
+    }, /Error: Unknown type "array". Did you mean "Array"?/);
+
+    assert.throws(function () {
+      var fn = compose({
+        'Function': function (value) {
+          return 'Function:' + value;
+        }
+      });
+    }, /Error: Unknown type "Function". Did you mean "function"?/);
   });
 
   describe('conversions' , function () {

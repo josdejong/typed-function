@@ -3,7 +3,7 @@
 // order types
 // object will be ordered last as other types may be an object too.
 function compareTypes(a, b) {
-  return a === 'object' ? 1 : b === 'object' ? -1 : 0
+  return a === 'Object' ? 1 : b === 'Object' ? -1 : 0
 }
 
 // order numbers
@@ -89,11 +89,8 @@ function compose(name, signatures) {
       Object.keys(signature.types)
           .sort(compareTypes)
           .forEach(function (type) {
-            if (!compose.tests[type]) {
-              throw new Error('Unknown type "' + type + '"');
-            }
             var arg = 'arg' + args.length;
-            var def = addDef(compose.tests[type], 'test') + '(' + arg + ')';
+            var def = addDef(getTest(type), 'test') + '(' + arg + ')';
 
             code.push(prefix + 'if (' + def + ') { // type: ' + type);
             code = code.concat(switchTypes(signature.types[type], args.concat(arg), prefix + '  '));
@@ -111,11 +108,8 @@ function compose(name, signatures) {
             if (!added[conversion.from]) {
               added[conversion.from] = true;
 
-              if (!compose.tests[conversion.from]) {
-                throw new Error('Unknown type "' + conversion.from + '"');
-              }
               var arg = 'arg' + args.length;
-              var test = addDef(compose.tests[conversion.from], 'test') + '(' + arg + ')';
+              var test = addDef(getTest(conversion.from), 'test') + '(' + arg + ')';
               var convert = addDef(conversion.convert, 'convert') + '(' + arg + ')';
 
               code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
@@ -182,11 +176,27 @@ compose.tests = {
   'number':   function (x) {return typeof x === 'number'},
   'string':   function (x) {return typeof x === 'string'},
   'function': function (x) {return typeof x === 'function'},
-  'array':    function (x) {return Array.isArray(x)},
-  'date':     function (x) {return x instanceof Date},
-  'regexp':   function (x) {return x instanceof RegExp},
-  'object':   function (x) {return typeof x === 'object'}
+  'Array':    function (x) {return Array.isArray(x)},
+  'Date':     function (x) {return x instanceof Date},
+  'RegExp':   function (x) {return x instanceof RegExp},
+  'Object':   function (x) {return typeof x === 'object'}
 };
+
+function getTest(type) {
+  var test = compose.tests[type];
+  if (!test) {
+    var matches = Object.keys(compose.tests)
+        .filter(function (t) {
+          return t.toLowerCase() == type.toLowerCase();
+        })
+        .map(function (t) {
+          return '"' + t + '"';
+        });
+    throw new Error('Unknown type "' + type + '"' +
+    (matches.length ? ('. Did you mean ' + matches.join(', or ') + '?') : ''));
+  }
+  return test;
+}
 
 // type conversions
 // order is important

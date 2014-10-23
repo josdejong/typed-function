@@ -1,7 +1,7 @@
 function-composer
 =================
 
-Compose functions with multiple type signatures.
+Compose functions with multiple type signatures. Adds type-checking of input arguments.
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
@@ -50,7 +50,7 @@ catch (err) {
 
 Type checking input arguments adds some overhead to a function. For very small
 functions this overhead can be larger than the function execution itself is, 
-but for any non-trivial function the overhead is typically neglectable.
+but for any non-trivial function the overhead is typically small to neglectable.
 You need to keep in mind though that you probably would have to do the type
 checking done by `function-composer` anyway.
 
