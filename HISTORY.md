@@ -6,6 +6,7 @@
 - Implemented support for named functions.
 - Implemented support for type conversions.
 - Implemented support for custom types.
+- Library packaged as UMD, usable with CommonJS (node.js), AMD, and browser globals.
 
 
 ## 2014-10-21, version 0.1.0

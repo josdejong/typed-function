@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>function-composer | basic usage</title>
+  <script src="../function-composer.js"></script>
+</head>
+<body>
+<script>
+  // compose a new function
+  var fn = compose({
+    'number': function (a) {
+      return 'a is a number';
+    },
+    'number, boolean': function (a, b) {
+      return 'a is a number, b is a boolean';
+    },
+    'number, number': function (a, b) {
+      return 'a is a number, b is a number';
+    }
+  });
+
+  // use the function
+  document.write(fn(2, true) + '<br>');      // outputs 'a is a number, b is a boolean'
+  document.write(fn(2) + '<br>');            // outputs 'a is a number'
+
+  // calling the function with a non-supported type signature will throw an error
+  try {
+    fn('hello world');
+  }
+  catch (err) {
+    document.write(err.toString() + '<br>'); // outputs: 'TypeError: Wrong function signature'
+  }
+</script>
+</body>
+</html>
