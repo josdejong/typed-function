@@ -19,9 +19,16 @@
   'use strict';
 
   // order types
-  // object will be ordered last as other types may be an object too.
+  // anytype (*) will be ordered last, and then object, as other types may be
+  // an object too.
   function compareTypes(a, b) {
-    return a === 'Object' ? 1 : b === 'Object' ? -1 : 0
+    if (a === '*') return 1;
+    if (b === '*') return -1;
+
+    if (a === 'Object') return 1;
+    if (b === 'Object') return -1;
+
+    return 0;
   }
 
   // order numbers
@@ -106,13 +113,26 @@
         // add entries for the provided types
         Object.keys(signature.types)
             .sort(compareTypes)
-            .forEach(function (type) {
+            .forEach(function (type, index) {
               var arg = 'arg' + args.length;
-              var def = addDef(getTest(type), 'test') + '(' + arg + ')';
 
-              code.push(prefix + 'if (' + def + ') { // type: ' + type);
-              code = code.concat(switchTypes(signature.types[type], args.concat(arg), prefix + '  '));
-              code.push(prefix + '}');
+              var before;
+              var after;
+              var nextPrefix = prefix + '  ';
+              if (type == '*') {
+                before = (index > 0 ? 'else {' : '');
+                after  = (index > 0 ? '}' : '');
+                if (index == 0) {nextPrefix = prefix;}
+              }
+              else {
+                var def = addDef(getTest(type), 'test') + '(' + arg + ')';
+                before = 'if (' + def + ') { // type: ' + type;
+                after  = '}';
+              }
+
+              if (before) code.push(prefix + before);
+              code = code.concat(switchTypes(signature.types[type], args.concat(arg), nextPrefix));
+              if (after) code.push(prefix + after);
             });
 
         // add entries for type conversions
@@ -135,7 +155,6 @@
                 code.push(prefix + '}');
               }
             });
-
       }
 
       return code;

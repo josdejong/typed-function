@@ -98,11 +98,27 @@ compose(name: string, signatures: Object.<string, function>) : function
   });
   ```
 
+### Types
+
+function-composer has the following built-in types:
+
+- `null`
+- `boolean`
+- `number`
+- `string`
+- `function`
+- `Array`
+- `Date`
+- `RegExp`
+- `Object`
+- `*` (any type)
+
+
 ### Output
 
 The functions generated with `compose({...})` have:
 
-- A `toString()` function which give well readable code, giving insight in
+- A `toString()` function which returns well readable code, giving insight in
   what the function exactly does.
 - A property `signatures`, which holds a map with the (normalized)
   signatures as key and the original sub-functions as value.
@@ -117,7 +133,10 @@ The functions generated with `compose({...})` have:
   - Ellipsis like `'string, ...'`
   - Optional arguments like `'number?, array'`
   - Multiple types per argument like `number | string, number'`
+- Detailed error messages.
 - Create a good benchmark, to get insight in the overhead.
+- Allow conversions not to be able to convert any input (for example string to
+  number is not always possible).
 
 ### Version 2
 

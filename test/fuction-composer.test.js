@@ -14,17 +14,17 @@ describe('parse', function() {
   });
 
   it('should compose a function with zero arguments', function() {
-    var fns = {
+    var signatures = {
       '': function () {
         return 'noargs';
       }
     };
-    var fn = compose(fns);
+    var fn = compose(signatures);
 
     assert.equal(fn(), 'noargs');
     assert(fn.signatures instanceof Object);
     assert.strictEqual(Object.keys(fn.signatures).length, 1);
-    assert.strictEqual(fn.signatures[''], fns['']);
+    assert.strictEqual(fn.signatures[''], signatures['']);
   });
 
   it('should create a named function', function() {
@@ -39,7 +39,7 @@ describe('parse', function() {
   });
 
   it('should compose a function with one argument', function() {
-    var fns = {
+    var signatures = {
       'number': function (value) {
         return 'number:' + value;
       },
@@ -50,20 +50,20 @@ describe('parse', function() {
         return 'boolean:' + value;
       }
     };
-    var fn = compose(fns);
+    var fn = compose(signatures);
 
     assert.equal(fn(2), 'number:2');
     assert.equal(fn('foo'), 'string:foo');
     assert.equal(fn(false), 'boolean:false');
     assert(fn.signatures instanceof Object);
     assert.strictEqual(Object.keys(fn.signatures).length, 3);
-    assert.strictEqual(fn.signatures['number'], fns['number']);
-    assert.strictEqual(fn.signatures['string'], fns['string']);
-    assert.strictEqual(fn.signatures['boolean'], fns['boolean']);
+    assert.strictEqual(fn.signatures['number'], signatures['number']);
+    assert.strictEqual(fn.signatures['string'], signatures['string']);
+    assert.strictEqual(fn.signatures['boolean'], signatures['boolean']);
   });
 
   it('should compose a function with multiple arguments', function() {
-    var fns = {
+  var signatures = {
       'number': function (value) {
         return 'number:' + value;
       },
@@ -74,20 +74,103 @@ describe('parse', function() {
         return 'number,boolean:' + a + ',' + b;
       }
     };
-    var fn = compose(fns);
+    var fn = compose(signatures);
 
     assert.equal(fn(2), 'number:2');
     assert.equal(fn('foo'), 'string:foo');
     assert.equal(fn(2, false), 'number,boolean:2,false');
     assert(fn.signatures instanceof Object);
     assert.strictEqual(Object.keys(fn.signatures).length, 3);
-    assert.strictEqual(fn.signatures['number'], fns['number']);
-    assert.strictEqual(fn.signatures['string'], fns['string']);
-    assert.strictEqual(fn.signatures['number,boolean'], fns['number, boolean']);
+    assert.strictEqual(fn.signatures['number'], signatures['number']);
+    assert.strictEqual(fn.signatures['string'], signatures['string']);
+    assert.strictEqual(fn.signatures['number,boolean'], signatures['number, boolean']);
+  });
+
+  describe('anytype', function () {
+
+    it('should compose a function with one anytype argument', function() {
+      var fn = compose({
+        '*': function (value) {
+          return 'anytype:' + value;
+        },
+        'string': function (value) {
+          return 'string:' + value;
+        },
+        'boolean': function (value) {
+          return 'boolean:' + value;
+        }
+      });
+
+      assert(fn.signatures instanceof Object);
+      assert.strictEqual(Object.keys(fn.signatures).length, 3);
+      assert.equal(fn(2), 'anytype:2');
+      assert.equal(fn([1,2,3]), 'anytype:1,2,3');
+      assert.equal(fn('foo'), 'string:foo');
+      assert.equal(fn(false), 'boolean:false');
+    });
+
+    it('should compose a function with multiple anytype arguments (1)', function() {
+      var fn = compose({
+        '*,boolean': function () {
+          return 'anytype,boolean';
+        },
+        '*,string': function () {
+          return 'anytype,string';
+        }
+      });
+
+      assert(fn.signatures instanceof Object);
+      assert.strictEqual(Object.keys(fn.signatures).length, 2);
+      assert.equal(fn([],true), 'anytype,boolean');
+      assert.equal(fn(2,'foo'), 'anytype,string');
+      assert.throws(function () {fn([], new Date())}, /Wrong function signature/)
+      assert.throws(function () {fn(2, 2)}, /Wrong function signature/)
+    });
+
+    it('should compose a function with multiple anytype arguments (2)', function() {
+      var fn = compose({
+        '*,boolean': function () {
+          return 'anytype,boolean';
+        },
+        '*,number': function () {
+          return 'anytype,number';
+        },
+        'string,*': function () {
+          return 'string,anytype';
+        }
+      });
+
+      assert(fn.signatures instanceof Object);
+      assert.strictEqual(Object.keys(fn.signatures).length, 3);
+      assert.equal(fn([],true), 'anytype,boolean');
+      assert.equal(fn([],2), 'anytype,number');
+      assert.equal(fn('foo', 2), 'string,anytype');
+      assert.throws(function () {fn([], new Date())}, /Wrong function signature/)
+      assert.throws(function () {fn([], 'foo')}, /Wrong function signature/)
+    });
+
+    it('should compose a function with multiple anytype arguments (3)', function() {
+      var fn = compose({
+        'string,*': function () {
+          return 'string,anytype';
+        },
+        '*': function () {
+          return 'anytype';
+        }
+      });
+
+      assert(fn.signatures instanceof Object);
+      assert.strictEqual(Object.keys(fn.signatures).length, 2);
+      assert.equal(fn('foo', 2), 'string,anytype');
+      assert.equal(fn('foo'), 'anytype');
+      assert.equal(fn([]), 'anytype');
+      assert.throws(function () {fn([], 'foo')}, /Wrong function signature/)
+    });
+
   });
 
   it('should correctly recognize Date from Object (both are an Object)', function() {
-    var fns = {
+    var signatures = {
       'Object': function (value) {
         assert(value instanceof Object);
         return 'Object';
@@ -97,7 +180,7 @@ describe('parse', function() {
         return 'Date';
       }
     };
-    var fn = compose(fns);
+    var fn = compose(signatures);
 
     assert.equal(fn({foo: 'bar'}), 'Object');
     assert.equal(fn(new Date()), 'Date');

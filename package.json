@@ -23,7 +23,7 @@
   },
   "main": "./function-composer",
   "scripts": {
-    "minify": "uglifyjs function-composer.js -o function-composer.min.js",
+    "minify": "uglifyjs function-composer.js -o function-composer.min.js -c -m",
     "test": "mocha test --recursive",
     "coverage": "istanbul cover _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\""
   },

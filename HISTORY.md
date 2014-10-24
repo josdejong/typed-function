@@ -1,6 +1,11 @@
 # History
 
 
+## not yet released, version 0.3.0
+
+- Implemented support for anytype arguments (denoted with `*`).
+
+
 ## 2014-10-23, version 0.2.0
 
 - Implemented support for named functions.
