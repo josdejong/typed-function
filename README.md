@@ -65,6 +65,8 @@ checking done by `function-composer` anyway.
 
 ### Construction
 
+A function is constructed as:
+
 ```js
 compose(signatures: Object.<string, function>) : function
 compose(name: string, signatures: Object.<string, function>) : function
@@ -111,7 +113,7 @@ function-composer has the following built-in types:
 - `Date`
 - `RegExp`
 - `Object`
-- `*` (any type)
+- `*` (anytype)
 
 
 ### Output

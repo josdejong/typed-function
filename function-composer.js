@@ -37,36 +37,64 @@
   }
 
   /**
-   * Compose a function from sub-functions each handling a single type signature.
-   * @param {string} [name]  An optional name for the function
-   * @param {Object.<string, function>} signatures
-   *            A map with the type signature as key and the sub-function as value
-   * @return {function} Returns the composed function
+   * Collection with function definitions (local shortcuts to functions)
+   * @constructor
    */
-  function compose(name, signatures) {
-    if (!signatures) {
-      signatures = name;
-      name = null;
-    }
+  function Defs() {}
 
-    var normalized = {};  // normalized function signatures
-    var defs = {   // function definitions (local shortcuts to functions)
-      signature: [],
-      test: [],
-      convert: []
-    };
-    function addDef(fn, type) {
-      var index = defs[type].indexOf(fn);
-      if (index == -1) {
-        index = defs[type].length;
-        defs[type].push(fn);
-      }
-      return type + index;
-    }
+  /**
+   * Add a function definition.
+   * @param {function} fn
+   * @param {string} [type='fn']
+   * @returns {string} Returns the function name, for example 'fn0' or 'signature2'
+   */
+  Defs.prototype.add = function (fn, type) {
+    type = type || 'fn';
+    if (!this[type]) this[type] = [];
 
-    // analise all signatures
-    var argumentCount = 0;
-    var parameters = {};
+    var index = this[type].indexOf(fn);
+    if (index == -1) {
+      index = this[type].length;
+      this[type].push(fn);
+    }
+    return type + index;
+  };
+
+  /**
+   * Create code lines for all definitions
+   * @param [name='defs']
+   * @returns {Array} Returns the code lines containing all function definitions
+   */
+  Defs.prototype.code = function (name) {
+    var me = this;
+    var code = [];
+    name = name || 'defs';
+
+    Object.keys(this).forEach(function (type) {
+      var def = me[type];
+      def.forEach(function (def, index) {
+        code.push('var ' + type + index + ' = ' + name + '[\'' + type + '\'][' + index + '];');
+      });
+    });
+
+    return code;
+  };
+
+  /**
+   * Analyze a flat map with signatures
+   * @param {Object.<string, function>} signatures
+   * @return {{tree: Object, signatures: Object.<string, function>, args: Array.<Array>}}
+   *    Returns an object with properties:
+   *    - `tree`: nested map with all supported types per parameter
+   *    - `signatures`: flat map with normalized signatures
+   *    - `args`: array with arrays with the supported types
+   */
+  function analyse(signatures) {
+    // analyse all signatures
+    var normalized = {}; // normalized signatures
+    var tree = {};
+    var args = [];
+
     Object.keys(signatures).forEach(function (signature) {
       var fn = signatures[signature];
       var params = (signature !== '') ? signature.split(',').map(function (param) {
@@ -74,12 +102,17 @@
       }) : [];
       var normSignature = params.join(',');
       normalized[normSignature] = fn;
-      argumentCount = Math.max(argumentCount, params.length);
 
-      // get the entry for this number of arguments
-      var obj = parameters[params.length];
+      // add types of this signature to args
+      params.forEach(function (param, i) {
+        if (!args[i]) args[i] = [];
+        if (args[i].indexOf(param) == -1) args[i].push(param);
+      });
+
+      // get the parameter entry for this number of arguments
+      var obj = tree[params.length];
       if (!obj) {
-        obj = parameters[params.length] = {
+        obj = tree[params.length] = {
           signature: [],
           fn: null,
           types: {}
@@ -102,11 +135,36 @@
       obj.fn = fn;
     });
 
+    return {
+      tree: tree,
+      signatures: normalized,
+      args: args
+    }
+  }
+
+  /**
+   * Compose a function from sub-functions each handling a single type signature.
+   * @param {string} [name]  An optional name for the function
+   * @param {Object.<string, function>} signatures
+   *            A map with the type signature as key and the sub-function as value
+   * @return {function} Returns the composed function
+   */
+  function compose(name, signatures) {
+    if (!signatures) {
+      signatures = name;
+      name = null;
+    }
+
+    var structure = analyse(signatures);
+
+    // collected function definitions (local shortcuts to functions)
+    var defs = new Defs();
+
     function switchTypes(signature, args, prefix) {
       var code = [];
 
       if (signature.fn !== null) {
-        var def = addDef(signature.fn, 'signature');
+        var def = defs.add(signature.fn, 'signature');
         code.push(prefix + 'return ' + def + '(' + args.join(', ') +'); // signature: ' + signature.signature);
       }
       else {
@@ -125,7 +183,7 @@
                 if (index == 0) {nextPrefix = prefix;}
               }
               else {
-                var def = addDef(getTest(type), 'test') + '(' + arg + ')';
+                var def = defs.add(getTest(type), 'test') + '(' + arg + ')';
                 before = 'if (' + def + ') { // type: ' + type;
                 after  = '}';
               }
@@ -147,8 +205,8 @@
                 added[conversion.from] = true;
 
                 var arg = 'arg' + args.length;
-                var test = addDef(getTest(conversion.from), 'test') + '(' + arg + ')';
-                var convert = addDef(conversion.convert, 'convert') + '(' + arg + ')';
+                var test = defs.add(getTest(conversion.from), 'test') + '(' + arg + ')';
+                var convert = defs.add(conversion.convert, 'convert') + '(' + arg + ')';
 
                 code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
                 code = code.concat(switchTypes(signature.types[conversion.to], args.concat(convert), prefix + '  '));
@@ -161,17 +219,17 @@
     }
 
     var args = [];
-    for (var i = 0; i < argumentCount; i++) {
+    for (var i = 0; i < structure.args.length; i++) {
       args.push('arg' + i);
     }
 
     var code = [];
-    var counts = Object.keys(parameters);
+    var counts = Object.keys(structure.tree);
     code.push('return function ' + (name || '') + '(' + args.join(', ') + ') {');
     counts
         .sort(compareNumbers)
         .forEach(function (count, index) {
-          var signature = parameters[count];
+          var signature = structure.tree[count];
           var args = [];
           var statement = (index == 0) ? 'if' : 'else if';
           code.push('  ' + statement + ' (arguments.length == ' + count +  ') {');
@@ -189,19 +247,14 @@
 
     var factory = [];
     factory.push('(function (defs) {');
-    Object.keys(defs).forEach(function (type) {
-      defs[type].forEach(function
-          (def, index) {
-        factory.push('var ' + type + index + ' = defs[\'' + type + '\'][' + index + '];');
-      });
-    });
+    factory = factory.concat(defs.code('defs'));
     factory = factory.concat(code);
-    factory.push( '})');
+    factory.push('})');
 
     var fn = eval(factory.join('\n'))(defs);
 
     // attach the original functions
-    fn.signatures = normalized;
+    fn.signatures = structure.signatures; // normalized signatures
 
     return fn;
   }
