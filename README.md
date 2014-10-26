@@ -74,15 +74,16 @@ compose(name: string, signatures: Object.<string, function>) : function
 
 ### Properties
 
-- `compose.tests: Object`  
-  A map with type checking tests. Add custom types like:
+- `compose.types: Object`
+  A map with the object types as key and a type checking test as value.
+  Custom types can be added like:
 
   ```js
   function Person(...) {
     ...
   }
 
-  compose.tests['Person'] = function (x) {
+  compose.types['Person'] = function (x) {
     return x instanceof Person;
   };
   ```

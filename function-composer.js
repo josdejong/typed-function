@@ -150,15 +150,14 @@
    * @return {function} Returns the composed function
    */
   function compose(name, signatures) {
+    // handle arguments
     if (!signatures) {
       signatures = name;
       name = null;
     }
 
-    var structure = analyse(signatures);
-
-    // collected function definitions (local shortcuts to functions)
     var defs = new Defs();
+    var structure = analyse(signatures);
 
     function switchTypes(signature, args, prefix) {
       var code = [];
@@ -260,7 +259,7 @@
   }
 
   // data type tests
-  compose.tests = {
+  compose.types = {
     'null':     function (x) {return x === null},
     'boolean':  function (x) {return typeof x === 'boolean'},
     'number':   function (x) {return typeof x === 'number'},
@@ -273,9 +272,9 @@
   };
 
   function getTest(type) {
-    var test = compose.tests[type];
+    var test = compose.types[type];
     if (!test) {
-      var matches = Object.keys(compose.tests)
+      var matches = Object.keys(compose.types)
           .filter(function (t) {
             return t.toLowerCase() == type.toLowerCase();
           })

@@ -7,7 +7,7 @@ function Person(params) {
 }
 
 // register a test for this new type
-compose.tests['Person'] = function (x) {
+compose.types['Person'] = function (x) {
   return x instanceof Person;
 };
 
