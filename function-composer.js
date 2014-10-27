@@ -81,21 +81,13 @@
   };
 
   /**
-   * Analyze a flat map with signatures
-   * @param {Object.<string, function>} signatures
-   * @return {{tree: Object, signatures: Object.<string, function>, args: Array.<Array>}}
-   *    Returns an object with properties:
-   *    - `tree`: nested map with all supported types per parameter
-   *    - `signatures`: flat map with normalized signatures
-   *    - `args`: array with arrays with the supported types
+   * split all raw signatures into an array with splitted params
+   * @param {Object.<string, function>} rawSignatures
+   * @return {Array.<{params: Array.<string>, fn: function}>} Returns splitted signatures
    */
-  function analyse(signatures) {
-    var tree = {};
-    var args = [];
-
-    // split all raw signatures into arrays with params
-    var entries = Object.keys(signatures).map(function (rawSignature) {
-      var fn = signatures[rawSignature];
+  function splitSignatures(rawSignatures) {
+    return Object.keys(rawSignatures).map(function (rawSignature) {
+      var fn = rawSignatures[rawSignature];
       var params = (rawSignature !== '') ? rawSignature.split(',').map(function (param) {
         return param.trim();
       }) : [];
@@ -107,10 +99,17 @@
     });
 
     // TODO: split params containing an '|' into multiple entries
+  }
 
-    // create a map with normalized signatures as key and the function as value
+  /**
+   * create a map with normalized signatures as key and the function as value
+   * @param {Array.<{params: Array.<string>, fn: function}>} signatures   An array with splitted signatures
+   * @return {{}} Returns a map with normalized signatures
+   */
+  function normalizeSignatures(signatures) {
     var normalized = {};
-    entries.map(function (entry) {
+
+    signatures.map(function (entry) {
       var signature = entry.params.join(',');
       if (signature in normalized) {
         throw new Error('Error: signature "' + signature + '" defined twice');
@@ -118,14 +117,41 @@
       normalized[signature] = entry.fn;
     });
 
-    entries.forEach(function (entry) {
-      var params = entry.params;
+    return normalized
+  }
 
-      // add types of this signature to args
-      params.forEach(function (param, i) {
-        if (!args[i]) args[i] = [];
-        if (args[i].indexOf(param) == -1) args[i].push(param);
+  /**
+   * create an array with for every parameter an array with possible types
+   * @param {Array.<{params: Array.<string>, fn: function}>} signatures   An array with splitted signatures
+   * @return {Array.<Array.<string>>} Returns an array with allowed types per parameter
+   */
+  function splitTypes(signatures) {
+    var types = [];
+
+    signatures.forEach(function (entry) {
+      entry.params.forEach(function (param, i) {
+        if (!types[i]) {
+          types[i] = [];
+        }
+        if (types[i].indexOf(param) == -1) {
+          types[i].push(param);
+        }
       });
+    });
+
+    return types;
+  }
+
+  /**
+   * create a recursive tree for traversing the number and type of arguments
+   * @param {Array.<{params: Array.<string>, fn: function}>} signatures   An array with splitted signatures
+   * @returns {{}}
+   */
+  function createArgumentsTree(signatures) {
+    var tree = {};
+
+    signatures.forEach(function (entry) {
+      var params = entry.params.concat([]);
 
       // get the tree entry for the current number of arguments
       var obj = tree[params.length];
@@ -154,11 +180,7 @@
       obj.fn = entry.fn;
     });
 
-    return {
-      tree: tree,
-      signatures: normalized,
-      args: args
-    }
+    return tree;
   }
 
   /**
@@ -176,7 +198,7 @@
     }
 
     var defs = new Defs();
-    var structure = analyse(signatures);
+    var structure = splitSignatures(signatures);
 
     function switchTypes(signature, args, prefix) {
       var code = [];
@@ -236,25 +258,27 @@
       return code;
     }
 
-    var args = [];
-    for (var i = 0; i < structure.args.length; i++) {
-      args.push('arg' + i);
+    var types = splitTypes(structure);
+    var params = [];
+    for (var i = 0; i < types.length; i++) { // we can't use .map here, some entries may be undefined
+      params.push('arg' + i);
     }
 
     var code = [];
-    var counts = Object.keys(structure.tree);
-    code.push('return function ' + (name || '') + '(' + args.join(', ') + ') {');
-    counts
+    var tree = createArgumentsTree(structure);
+    var paramCounts = Object.keys(tree);
+    code.push('return function ' + (name || '') + '(' + params.join(', ') + ') {');
+    paramCounts
         .sort(compareNumbers)
         .forEach(function (count, index) {
-          var signature = structure.tree[count];
+          var signature = tree[count];
           var args = [];
           var statement = (index == 0) ? 'if' : 'else if';
           code.push('  ' + statement + ' (arguments.length == ' + count +  ') {');
           code = code.concat(switchTypes(signature, args, '    '));
 
           code.push('  }');
-          if (index == counts.length - 1) {
+          if (index == paramCounts.length - 1) {
             code.push('  else {');
             code.push('    throw new TypeError(\'Wrong number of arguments\');'); // TODO: output the allowed numbers
             code.push('  }');
@@ -271,8 +295,8 @@
 
     var fn = eval(factory.join('\n'))(defs);
 
-    // attach the original functions
-    fn.signatures = structure.signatures; // normalized signatures
+    // attach the signatures with sub-functions to the constructed function
+    fn.signatures = normalizeSignatures(structure); // normalized signatures
 
     return fn;
   }
