@@ -90,18 +90,36 @@
    *    - `args`: array with arrays with the supported types
    */
   function analyse(signatures) {
-    // analyse all signatures
-    var normalized = {}; // normalized signatures
     var tree = {};
     var args = [];
 
-    Object.keys(signatures).forEach(function (signature) {
-      var fn = signatures[signature];
-      var params = (signature !== '') ? signature.split(',').map(function (param) {
+    // split all raw signatures into arrays with params
+    var entries = Object.keys(signatures).map(function (rawSignature) {
+      var fn = signatures[rawSignature];
+      var params = (rawSignature !== '') ? rawSignature.split(',').map(function (param) {
         return param.trim();
       }) : [];
-      var normSignature = params.join(',');
-      normalized[normSignature] = fn;
+
+      return {
+        fn: fn,
+        params: params
+      };
+    });
+
+    // TODO: split params containing an '|' into multiple entries
+
+    // create a map with normalized signatures as key and the function as value
+    var normalized = {};
+    entries.map(function (entry) {
+      var signature = entry.params.join(',');
+      if (signature in normalized) {
+        throw new Error('Error: signature "' + signature + '" defined twice');
+      }
+      normalized[signature] = entry.fn;
+    });
+
+    entries.forEach(function (entry) {
+      var params = entry.params;
 
       // add types of this signature to args
       params.forEach(function (param, i) {
@@ -109,7 +127,7 @@
         if (args[i].indexOf(param) == -1) args[i].push(param);
       });
 
-      // get the parameter entry for this number of arguments
+      // get the tree entry for the current number of arguments
       var obj = tree[params.length];
       if (!obj) {
         obj = tree[params.length] = {
@@ -132,7 +150,8 @@
         obj = obj.types[param];
       }
 
-      obj.fn = fn;
+      // add the function as leaf
+      obj.fn = entry.fn;
     });
 
     return {
