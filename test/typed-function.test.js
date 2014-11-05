@@ -1,11 +1,11 @@
 // test parse
 var assert = require('assert');
-var compose = require('../function-composer');
+var typed = require('../typed-function');
 
 describe('parse', function() {
 
   it('should compose an empty function', function() {
-    var fn = compose({});
+    var fn = typed({});
     assert.throws(function () {
       fn();
     }, /TypeError: Wrong function signature/);
@@ -19,7 +19,7 @@ describe('parse', function() {
         return 'noargs';
       }
     };
-    var fn = compose(signatures);
+    var fn = typed(signatures);
 
     assert.equal(fn(), 'noargs');
     assert(fn.signatures instanceof Object);
@@ -28,7 +28,7 @@ describe('parse', function() {
   });
 
   it('should create a named function', function() {
-    var fn = compose('myFunction',  {
+    var fn = typed('myFunction',  {
       '': function () {
         return 'noargs';
       }
@@ -50,7 +50,7 @@ describe('parse', function() {
         return 'boolean:' + value;
       }
     };
-    var fn = compose(signatures);
+    var fn = typed(signatures);
 
     assert.equal(fn(2), 'number:2');
     assert.equal(fn('foo'), 'string:foo');
@@ -74,7 +74,7 @@ describe('parse', function() {
         return 'number,boolean:' + a + ',' + b;
       }
     };
-    var fn = compose(signatures);
+    var fn = typed(signatures);
 
     assert.equal(fn(2), 'number:2');
     assert.equal(fn('foo'), 'string:foo');
@@ -89,7 +89,7 @@ describe('parse', function() {
   describe('anytype', function () {
 
     it('should compose a function with one anytype argument', function() {
-      var fn = compose({
+      var fn = typed({
         '*': function (value) {
           return 'anytype:' + value;
         },
@@ -110,7 +110,7 @@ describe('parse', function() {
     });
 
     it('should compose a function with multiple anytype arguments (1)', function() {
-      var fn = compose({
+      var fn = typed({
         '*,boolean': function () {
           return 'anytype,boolean';
         },
@@ -128,7 +128,7 @@ describe('parse', function() {
     });
 
     it('should compose a function with multiple anytype arguments (2)', function() {
-      var fn = compose({
+      var fn = typed({
         '*,boolean': function () {
           return 'anytype,boolean';
         },
@@ -150,7 +150,7 @@ describe('parse', function() {
     });
 
     it('should compose a function with multiple anytype arguments (3)', function() {
-      var fn = compose({
+      var fn = typed({
         'string,*': function () {
           return 'string,anytype';
         },
@@ -180,14 +180,14 @@ describe('parse', function() {
         return 'Date';
       }
     };
-    var fn = compose(signatures);
+    var fn = typed(signatures);
 
     assert.equal(fn({foo: 'bar'}), 'Object');
     assert.equal(fn(new Date()), 'Date');
   });
 
   it('should throw an error when providing an unsupported type of argument', function() {
-    var fn = compose({
+    var fn = typed({
       'number': function (value) {
         return 'number:' + value;
       }
@@ -197,7 +197,7 @@ describe('parse', function() {
   });
 
   it('should throw an error when providing a wrong number of arguments', function() {
-    var fn = compose({
+    var fn = typed({
       'number': function (value) {
         return 'number:' + value;
       }
@@ -208,7 +208,7 @@ describe('parse', function() {
 
   it('should throw an error when composing with an unknown type', function() {
     assert.throws(function () {
-      var fn = compose({
+      var fn = typed({
         'foo': function (value) {
           return 'number:' + value;
         }
@@ -218,7 +218,7 @@ describe('parse', function() {
 
   it('should give a hint when composing with a wrongly cased type', function() {
     assert.throws(function () {
-      var fn = compose({
+      var fn = typed({
         'array': function (value) {
           return 'array:' + value;
         }
@@ -226,7 +226,7 @@ describe('parse', function() {
     }, /Error: Unknown type "array". Did you mean "Array"?/);
 
     assert.throws(function () {
-      var fn = compose({
+      var fn = typed({
         'Function': function (value) {
           return 'Function:' + value;
         }
@@ -237,7 +237,7 @@ describe('parse', function() {
   describe('conversions' , function () {
 
     before(function () {
-      compose.conversions = [
+      typed.conversions = [
         {from: 'boolean', to: 'number', convert: function (x) {return +x;}},
         {from: 'boolean', to: 'string', convert: function (x) {return x + '';}},
         {from: 'number',  to: 'string', convert: function (x) {return x + '';}}
@@ -245,11 +245,11 @@ describe('parse', function() {
     });
 
     after(function () {
-      compose.conversions = [];
+      typed.conversions = [];
     });
 
     it('should add conversions to a function with one argument', function() {
-      var fn = compose({
+      var fn = typed({
         'string': function (a) {
           return a;
         }
@@ -263,7 +263,7 @@ describe('parse', function() {
     it('should add conversions to a function with multiple arguments', function() {
       // note: we add 'string, string' first, and `string, number` afterwards,
       //       to test whether the conversions are correctly ordered.
-      var fn = compose({
+      var fn = typed({
         'string, string': function (a, b) {
           assert.equal(typeof a, 'string');
           assert.equal(typeof b, 'string');
@@ -288,7 +288,7 @@ describe('parse', function() {
     });
 
     it('should add non-conflicting conversions to a function with one argument', function() {
-      var fn = compose({
+      var fn = typed({
         'number': function (a) {
           return a;
         },

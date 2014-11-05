@@ -1,8 +1,8 @@
-var compose = require('../function-composer');
+var typed = require('../typed-function');
 
 
-// compose a function with anytype arguments
-var log = compose({
+// create a typed function with anytype arguments
+var log = typed({
   'string, *': function (event, data) {
     console.log('event: ' + event + ', data: ' + JSON.stringify(data));
   },

@@ -1,4 +1,4 @@
-var compose = require('../function-composer');
+var typed = require('../typed-function');
 
 var I_MAX = 1e6;
 
@@ -45,11 +45,11 @@ function direct(text) {
 //  return count++;
 //}
 
-var composed = compose({
+var fn = typed({
   'number': direct,
   'number,boolean': direct,
   'number,number': direct,
-  'number,date': direct,
+  'number,Date': direct,
   'string': direct,
   'string,boolean': direct
 });
@@ -67,19 +67,19 @@ var directResult = benchmark('Direct', function () {
   return I_MAX * 3;
 });
 
-var composedResult = benchmark('Composed', function () {
+var typedResult = benchmark('Composed', function () {
   var i, r, d = new Date();
   for (i = 0; i < I_MAX; i++) {
-    r = composed(1, d);
-    r = composed('hello you there', false);
-    r = composed(2, 4);
+    r = fn(1, d);
+    r = fn('hello you there', false);
+    r = fn(2, 4);
   }
 
   return I_MAX * 3;
 });
 
 
-var overhead = ((composedResult.duration - directResult.duration) / composedResult.repetitions);
+var overhead = ((typedResult.duration - directResult.duration) / typedResult.repetitions);
 var percentage = overhead / (directResult.duration / directResult.repetitions) * 100;
 console.log('Overhead: ' + percentage.toPrecision(4) + '%, ' +
     parseFloat(overhead.toPrecision(4)).toExponential() + ' ms per call');

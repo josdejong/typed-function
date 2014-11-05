@@ -1,7 +1,7 @@
-var compose = require('../function-composer');
+var typed = require('../typed-function');
 
-// compose a new function
-var fn = compose({
+// create a typed function
+var fn = typed({
   'number': function (a) {
     return 'a is a number';
   },

@@ -1,5 +1,9 @@
 # History
 
+## 2014-11-05, version 0.3.1
+
+- Renamed module to `typed-function`.
+
 
 ## 2014-11-05, version 0.3.0
 

@@ -1,15 +1,16 @@
 {
-  "name": "function-composer",
-  "version": "0.3.0",
-  "description": "Compose functions with multiple type signatures",
+  "name": "typed-function",
+  "version": "0.3.1",
+  "description": "Type checking for JavaScript functions",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
   "contributors": [],
-  "homepage": "https://github.com/josdejong/function-composer",
+  "homepage": "https://github.com/josdejong/typed-function",
   "repository": {
     "type": "git",
-    "url": "https://github.com/josdejong/function-composer.git"
+    "url": "https://github.com/josdejong/typed-function.git"
   },
   "keywords": [
+    "typed",
     "function",
     "arguments",
     "compose",
@@ -21,9 +22,9 @@
     "mocha": "^1.21.5",
     "uglify-js": "^2.4.15"
   },
-  "main": "./function-composer",
+  "main": "./typed-function",
   "scripts": {
-    "minify": "uglifyjs function-composer.js -o function-composer.min.js -c -m",
+    "minify": "uglifyjs typed-function.js -o typed-function.min.js -c -m",
     "test": "mocha test --recursive",
     "coverage": "istanbul cover _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\""
   },

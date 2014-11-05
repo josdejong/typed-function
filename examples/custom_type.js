@@ -1,4 +1,4 @@
-var compose = require('../function-composer');
+var typed = require('../typed-function');
 
 // create a prototype
 function Person(params) {
@@ -7,12 +7,12 @@ function Person(params) {
 }
 
 // register a test for this new type
-compose.types['Person'] = function (x) {
+typed.types['Person'] = function (x) {
   return x instanceof Person;
 };
 
-// compose a function
-var stringify = compose({
+// create a typed function
+var stringify = typed({
   'Person': function (person) {
     return JSON.stringify(person);
   },

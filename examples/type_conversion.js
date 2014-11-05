@@ -1,7 +1,7 @@
-var compose = require('../function-composer');
+var typed = require('../typed-function');
 
 // define type conversions that we want to support
-compose.conversions = [
+typed.conversions = [
   {
     from: 'boolean',
     to: 'number',
@@ -25,7 +25,7 @@ compose.conversions = [
   }
 ];
 
-// compose a new function
+// create a typed function
 //
 // where possible, the created function will automatically convert booleans to
 // numbers or strings, and convert numbers to strings.
@@ -33,7 +33,7 @@ compose.conversions = [
 // note that the length property is only available on strings, and the toFixed
 // function only on numbers, so this requires the right type of argument else
 // the function will throw an exception.
-var fn = compose({
+var fn = typed({
   'string': function (name) {
     return 'Name: ' + name + ', length: ' + name.length;
   },

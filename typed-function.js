@@ -1,6 +1,9 @@
 /**
- * Function composer
- * https://github.com/josdejong/function-composer
+ * typed-function
+ *
+ * Type checking for JavaScript functions
+ *
+ * https://github.com/josdejong/typed-function
  */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
@@ -13,7 +16,7 @@
     module.exports = factory();
   } else {
     // Browser globals (root is window)
-    root.compose = factory();
+    root.typed = factory();
   }
 }(this, function () {
   'use strict';
@@ -206,7 +209,7 @@
    *            A map with the type signature as key and the sub-function as value
    * @return {function} Returns the composed function
    */
-  function compose(name, signatures) {
+  function typed(name, signatures) {
     // handle arguments
     if (!signatures) {
       signatures = name;
@@ -251,7 +254,7 @@
 
         // add entries for type conversions
         var added = {};
-        compose.conversions
+        typed.conversions
             .filter(function (conversion) {
               return signature.types[conversion.to] &&
                   !signature.types[conversion.from];
@@ -318,7 +321,7 @@
   }
 
   // data type tests
-  compose.types = {
+  typed.types = {
     'null':     function (x) {return x === null},
     'boolean':  function (x) {return typeof x === 'boolean'},
     'number':   function (x) {return typeof x === 'number'},
@@ -331,9 +334,9 @@
   };
 
   function getTest(type) {
-    var test = compose.types[type];
+    var test = typed.types[type];
     if (!test) {
-      var matches = Object.keys(compose.types)
+      var matches = Object.keys(typed.types)
           .filter(function (t) {
             return t.toLowerCase() == type.toLowerCase();
           })
@@ -348,8 +351,8 @@
 
   // type conversions
   // order is important
-  compose.conversions = [];
+  typed.conversions = [];
 
-  return compose;
+  return typed;
 }));
 
