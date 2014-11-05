@@ -81,21 +81,37 @@
   };
 
   /**
+   * A function signature
+   * @param {string | Array.<string>} params  Array with the type(s) of each parameter,
+   *                                          or a comma separated string with types
+   * @param {function} fn                     The actual function
+   * @constructor
+   */
+  function Signature(params, fn) {
+    if (typeof params === 'string') {
+      this.params = (params !== '') ? params.split(',').map(function (param) {
+        return param.trim();
+      }) : [];
+    }
+    else {
+      this.params = params;
+    }
+    this.fn = fn;
+  }
+
+  // TODO: implement function Signature.split
+  // TODO: implement function Signature.merge
+  // TODO: implement function Signature.toString
+
+  /**
    * split all raw signatures into an array with splitted params
    * @param {Object.<string, function>} rawSignatures
    * @return {Array.<{params: Array.<string>, fn: function}>} Returns splitted signatures
    */
   function splitSignatures(rawSignatures) {
-    return Object.keys(rawSignatures).map(function (rawSignature) {
-      var fn = rawSignatures[rawSignature];
-      var params = (rawSignature !== '') ? rawSignature.split(',').map(function (param) {
-        return param.trim();
-      }) : [];
-
-      return {
-        fn: fn,
-        params: params
-      };
+    return Object.keys(rawSignatures).map(function (params) {
+      var fn = rawSignatures[params];
+      return new Signature(params, fn);
     });
 
     // TODO: split params containing an '|' into multiple entries
@@ -143,11 +159,11 @@
   }
 
   /**
-   * create a recursive tree for traversing the number and type of arguments
+   * create a recursive tree for traversing the number and type of parameters
    * @param {Array.<{params: Array.<string>, fn: function}>} signatures   An array with splitted signatures
    * @returns {{}}
    */
-  function createArgumentsTree(signatures) {
+  function createParamsTree(signatures) {
     var tree = {};
 
     signatures.forEach(function (entry) {
@@ -265,7 +281,7 @@
     }
 
     var code = [];
-    var tree = createArgumentsTree(structure);
+    var tree = createParamsTree(structure);
     var paramCounts = Object.keys(tree);
     code.push('return function ' + (name || '') + '(' + params.join(', ') + ') {');
     paramCounts
