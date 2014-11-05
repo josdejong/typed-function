@@ -149,6 +149,12 @@ The functions generated with `compose({...})` have:
   - Object definitions like `'Object.<string, Person>'`
   - Array definitions like `'Array.<Person>'`
 
+## Test
+
+To test the library, run:
+
+    npm test
+
 
 ## Minify
 

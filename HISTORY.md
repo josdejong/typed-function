@@ -1,7 +1,7 @@
 # History
 
 
-## not yet released, version 0.3.0
+## 2014-11-05, version 0.3.0
 
 - Implemented support for anytype arguments (denoted with `*`).
 
