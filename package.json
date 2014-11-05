@@ -1,6 +1,6 @@
 {
   "name": "function-composer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Compose functions with multiple type signatures",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
   "contributors": [],
