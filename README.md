@@ -7,7 +7,7 @@ Features:
 
 - Type-checking of input arguments.
 - Automatic type conversion of arguments.
-- Compose multiple functions with different signatures into one.
+- Compose a function from multiple sub-functions with different signatures.
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
@@ -25,7 +25,7 @@ Example usage:
 ```js
 var typed = require('typed-function');
 
-// compose a new function
+// create a typed function
 var fn = typed({
   'number': function (a) {
     return 'a is a number';
