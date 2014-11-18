@@ -7,9 +7,10 @@ Features:
 
 - Type-checking of input arguments.
 - Automatic type conversion of arguments.
-- Compose a function from multiple sub-functions with different signatures.
+- Compose a typed function with multiple signatures.
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
+
 
 ## Load
 
@@ -26,7 +27,12 @@ Example usage:
 var typed = require('typed-function');
 
 // create a typed function
-var fn = typed({
+var fn1 = typed('number, *': function (a, b) {
+  return 'a is a number, b can be anything';
+});
+
+// create a typed function with multiple signatures
+var fn2 = typed({
   'number': function (a) {
     return 'a is a number';
   },
@@ -38,13 +44,13 @@ var fn = typed({
   }
 });
 
-// use the function
-console.log(fn(2, true));      // outputs 'a is a number, b is a boolean'
-console.log(fn(2));            // outputs 'a is a number'
+// use the functions
+console.log(fn1(2, true));      // outputs 'a is a number, b can be anything'
+console.log(fn2(2));            // outputs 'a is a number'
 
 // calling the function with a non-supported type signature will throw an error
 try {
-  fn('hello world');
+  fn2('hello world');
 }
 catch (err) {
   console.log(err.toString()); // outputs: 'TypeError: Wrong function signature'
@@ -65,9 +71,12 @@ checking done by `typed-function` anyway.
 
 ### Construction
 
-A function is constructed as:
+A typed function can be constructed as:
 
 ```js
+typed(signature: string, fn: function) : function
+typed(name: string, signature: string, fn: function) : function
+
 typed(signatures: Object.<string, function>) : function
 typed(name: string, signatures: Object.<string, function>) : function
 ```

@@ -1,6 +1,7 @@
 var typed = require('../typed-function');
 
 // define type conversions that we want to support
+// order is important.
 typed.conversions = [
   {
     from: 'boolean',
@@ -25,7 +26,7 @@ typed.conversions = [
   }
 ];
 
-// create a typed function
+// create a typed function with multiple signatures
 //
 // where possible, the created function will automatically convert booleans to
 // numbers or strings, and convert numbers to strings.

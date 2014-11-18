@@ -12,13 +12,8 @@ typed.types['Person'] = function (x) {
 };
 
 // create a typed function
-var stringify = typed({
-  'Person': function (person) {
-    return JSON.stringify(person);
-  },
-  'Person,number': function (person, indentation) {
-    return JSON.stringify(person, null, indentation);
-  }
+var stringify = typed('Person', function (person) {
+  return JSON.stringify(person);
 });
 
 // use the function
@@ -26,13 +21,6 @@ var person = new Person({name: 'John', age: 28});
 
 console.log(stringify(person));
 // outputs: '{"name":"John","age":28}'
-
-console.log(stringify(person, 2));
-// outputs with indentation:
-//   '{
-//     "name": "John",
-//     "age": 28
-//   }'
 
 // calling the function with a non-supported type signature will throw an error
 try {

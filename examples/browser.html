@@ -7,25 +7,16 @@
 <body>
 <script>
   // create a typed function
-  var fn = typed({
-    'number': function (a) {
-      return 'a is a number';
-    },
-    'number, boolean': function (a, b) {
-      return 'a is a number, b is a boolean';
-    },
-    'number, number': function (a, b) {
-      return 'a is a number, b is a number';
-    }
+  var fn = typed('number, *', function (a, b) {
+    return 'a is a number, b can be anything';
   });
 
   // use the function
-  document.write(fn(2, true) + '<br>');      // outputs 'a is a number, b is a boolean'
-  document.write(fn(2) + '<br>');            // outputs 'a is a number'
+  document.write(fn(2, true) + '<br>');     // outputs 'a is a number, b can be anything'
 
   // calling the function with a non-supported type signature will throw an error
   try {
-    fn('hello world');
+    fn('hello world', true);
   }
   catch (err) {
     document.write(err.toString() + '<br>'); // outputs: 'TypeError: Wrong function signature'
