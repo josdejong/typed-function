@@ -55,6 +55,8 @@ describe('parse', function() {
     assert.equal(fn.name, 'myFunction');
   });
 
+  // TODO: test whether the constructor throws errors when providing wrong arguments to typed(...)
+
   it('should compose a function with one argument', function() {
     var signatures = {
       'number': function (value) {

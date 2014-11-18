@@ -210,51 +210,12 @@
    *   typed(signatures: Object.<string, function>)
    *   typed(name: string, signatures: Object.<string, function>)
    *
-   * @param {string | Object} [arg0]
-   * @param {string | function | Object} [arg1]
-   * @param {function} [arg2]
+   * @param {string | null} name
+   * @param {Object.<string, function>} signatures
    * @return {function} Returns the typed function
+   * @private
    */
-  function typed(arg0, arg1, arg2) {
-    // handle arguments
-    var name = null;
-    var signatures = {};
-    switch (arguments.length) {
-      case 1:
-        // typed(signatures: Object.<string, function>)
-        if (typeof arg0 !== 'object') throw new Error('Object expected');
-        signatures = arg0;
-        break;
-
-      case 2:
-        if (typeof arg0 !== 'string') throw new Error('String expected as first argument');
-        if (typeof arg1 === 'function') {
-          // typed(signature: string, fn: function)
-          signatures[arg0] = arg1;
-        }
-        else {
-          // typed(name: string, signatures: Object.<string, function>)
-          if (typeof arg1 !== 'object') throw new Error('Object expected as second argument');
-
-          name = arg0;
-          signatures = arg1;
-        }
-        break;
-
-      case 3:
-        // typed(name: string, signature: string, fn: function)
-        if (typeof arg0 !== 'string') throw new Error('String expected as first argument');
-        if (typeof arg1 !== 'string') throw new Error('String expected as second argument');
-        if (typeof arg2 !== 'function') throw new Error('Function expected as third argument');
-
-        name = arg0;
-        signatures[arg1] = arg2;
-        break;
-
-      default:
-        throw new Error('Wrong number of arguments');
-    }
-
+  function _typed(name, signatures) {
     var defs = new Defs();
     var structure = splitSignatures(signatures);
 
@@ -360,7 +321,7 @@
   }
 
   // data type tests
-  typed.types = {
+  var types = {
     'null':     function (x) {return x === null},
     'boolean':  function (x) {return typeof x === 'boolean'},
     'number':   function (x) {return typeof x === 'number'},
@@ -371,6 +332,10 @@
     'RegExp':   function (x) {return x instanceof RegExp},
     'Object':   function (x) {return typeof x === 'object'}
   };
+
+  // type conversions
+  // order is important
+  var conversions = [];
 
   function getTest(type) {
     var test = typed.types[type];
@@ -388,9 +353,44 @@
     return test;
   }
 
-  // type conversions
-  // order is important
-  typed.conversions = [];
+  // temporary object for holding types and conversions, for constructing
+  // the `typed` function itself
+  // TODO: find a more elegant solution for this
+  var typed = {
+    types: types,
+    conversions: conversions
+  };
+
+  /**
+   * Construct the typed function itself with various signatures
+   *
+   * Signatures:
+   *
+   *   typed(signature: string, fn: function)
+   *   typed(name: string, signature: string, fn: function)
+   *   typed(signatures: Object.<string, function>)
+   *   typed(name: string, signatures: Object.<string, function>)
+   */
+  typed = _typed('typed', {
+    'Object': function (signatures) {
+      return _typed(null, signatures);
+    },
+    'string, Object': _typed,
+    'string, function': function (signature, fn) {
+      var signatures = {};
+      signatures[signature] = fn;
+      return _typed(null, signatures);
+    },
+    'string, string, function': function(name, signature, fn) {
+      var signatures = {};
+      signatures[signature] = fn;
+      return _typed(name, signatures);
+    }
+  });
+
+  // attach types and conversions to the final `typed` function
+  typed.types = types;
+  typed.conversions = conversions;
 
   return typed;
 }));
