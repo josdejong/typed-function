@@ -34,6 +34,29 @@
     return 0;
   }
 
+  /**
+   * Get a type test function for a specific data type
+   * @param {string} type                   A data type like 'number' or 'string'
+   * @returns {function(obj: *) : boolean}  Returns a type testing function.
+   *                                        Throws an error for an unknown type.
+   */
+  function getTypeTest(type) {
+    var test = typed.types[type];
+    if (!test) {
+      var matches = Object.keys(typed.types)
+          .filter(function (t) {
+            return t.toLowerCase() == type.toLowerCase();
+          })
+          .map(function (t) {
+            return '"' + t + '"';
+          });
+
+      throw new Error('Unknown type "' + type + '"' +
+          (matches.length ? ('. Did you mean ' + matches.join(', or ') + '?') : ''));
+    }
+    return test;
+  }
+
   // order numbers
   function compareNumbers(a, b) {
     return a > b;
@@ -242,7 +265,7 @@
                 if (index == 0) {nextPrefix = prefix;}
               }
               else {
-                var def = defs.add(getTest(type), 'test') + '(' + arg + ')';
+                var def = defs.add(getTypeTest(type), 'test') + '(' + arg + ')';
                 before = 'if (' + def + ') { // type: ' + type;
                 after  = '}';
               }
@@ -264,7 +287,7 @@
                 added[conversion.from] = true;
 
                 var arg = 'arg' + args.length;
-                var test = defs.add(getTest(conversion.from), 'test') + '(' + arg + ')';
+                var test = defs.add(getTypeTest(conversion.from), 'test') + '(' + arg + ')';
                 var convert = defs.add(conversion.convert, 'convert') + '(' + arg + ')';
 
                 code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
@@ -333,25 +356,8 @@
     'Object':   function (x) {return typeof x === 'object'}
   };
 
-  // type conversions
-  // order is important
+  // type conversions. Order is important
   var conversions = [];
-
-  function getTest(type) {
-    var test = typed.types[type];
-    if (!test) {
-      var matches = Object.keys(typed.types)
-          .filter(function (t) {
-            return t.toLowerCase() == type.toLowerCase();
-          })
-          .map(function (t) {
-            return '"' + t + '"';
-          });
-      throw new Error('Unknown type "' + type + '"' +
-      (matches.length ? ('. Did you mean ' + matches.join(', or ') + '?') : ''));
-    }
-    return test;
-  }
 
   // temporary object for holding types and conversions, for constructing
   // the `typed` function itself
