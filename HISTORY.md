@@ -1,5 +1,11 @@
 # History
 
+## 2014-11-05, version 0.3.2
+
+- Introduced new constructor options, create a typed function as
+  `typed([name,] signature, fn)` or `typed([name,] signatures)`.
+
+
 ## 2014-11-05, version 0.3.1
 
 - Renamed module to `typed-function`.

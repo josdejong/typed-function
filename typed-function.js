@@ -204,16 +204,55 @@
 
   /**
    * Compose a function from sub-functions each handling a single type signature.
-   * @param {string} [name]  An optional name for the function
-   * @param {Object.<string, function>} signatures
-   *            A map with the type signature as key and the sub-function as value
-   * @return {function} Returns the composed function
+   * Signatures:
+   *   typed(signature: string, fn: function)
+   *   typed(name: string, signature: string, fn: function)
+   *   typed(signatures: Object.<string, function>)
+   *   typed(name: string, signatures: Object.<string, function>)
+   *
+   * @param {string | Object} [arg0]
+   * @param {string | function | Object} [arg1]
+   * @param {function} [arg2]
+   * @return {function} Returns the typed function
    */
-  function typed(name, signatures) {
+  function typed(arg0, arg1, arg2) {
     // handle arguments
-    if (!signatures) {
-      signatures = name;
-      name = null;
+    var name = null;
+    var signatures = {};
+    switch (arguments.length) {
+      case 1:
+        // typed(signatures: Object.<string, function>)
+        if (typeof arg0 !== 'object') throw new Error('Object expected');
+        signatures = arg0;
+        break;
+
+      case 2:
+        if (typeof arg0 !== 'string') throw new Error('String expected as first argument');
+        if (typeof arg1 === 'function') {
+          // typed(signature: string, fn: function)
+          signatures[arg0] = arg1;
+        }
+        else {
+          // typed(name: string, signatures: Object.<string, function>)
+          if (typeof arg1 !== 'object') throw new Error('Object expected as second argument');
+
+          name = arg0;
+          signatures = arg1;
+        }
+        break;
+
+      case 3:
+        // typed(name: string, signature: string, fn: function)
+        if (typeof arg0 !== 'string') throw new Error('String expected as first argument');
+        if (typeof arg1 !== 'string') throw new Error('String expected as second argument');
+        if (typeof arg2 !== 'function') throw new Error('Function expected as third argument');
+
+        name = arg0;
+        signatures[arg1] = arg2;
+        break;
+
+      default:
+        throw new Error('Wrong number of arguments');
     }
 
     var defs = new Defs();

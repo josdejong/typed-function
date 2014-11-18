@@ -38,6 +38,23 @@ describe('parse', function() {
     assert.equal(fn.name, 'myFunction');
   });
 
+  it('should create a typed function', function() {
+    var fn = typed('string, boolean', function () {
+        return 'noargs';
+    });
+
+    assert.equal(fn('hi', true), 'noargs');
+  });
+
+  it('should create a named, typed function', function() {
+    var fn = typed('myFunction', 'string, boolean', function () {
+        return 'noargs';
+    });
+
+    assert.equal(fn('hi', true), 'noargs');
+    assert.equal(fn.name, 'myFunction');
+  });
+
   it('should compose a function with one argument', function() {
     var signatures = {
       'number': function (value) {
