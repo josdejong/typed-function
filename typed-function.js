@@ -367,10 +367,9 @@
     }
 
     var types = splitTypes(structure);
-    var params = [];
-    for (var i = 0; i < types.length; i++) { // we can't use .map here, some entries may be undefined
-      params.push('arg' + i);
-    }
+    var params = types.map(function (value, index) {
+      return 'arg' + index;
+    });
 
     var code = [];
     var tree = createParamsTree(structure);
