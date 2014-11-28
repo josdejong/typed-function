@@ -7,7 +7,7 @@ Features:
 
 - Type-checking of input arguments.
 - Automatic type conversion of arguments.
-- Compose a typed function with multiple signatures.
+- Compose typed functions with multiple signatures.
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
@@ -27,12 +27,22 @@ Example usage:
 var typed = require('typed-function');
 
 // create a typed function
-var fn1 = typed('number, *': function (a, b) {
-  return 'a is a number, b can be anything';
+var fn1 = typed('number, string', function (a, b) {
+  return 'a is a number, b is a string';
+});
+
+// create a typed function with multiple types per argument
+var fn2 = typed('string, number | boolean', function (a, b) {
+  return 'a is a string, b is a number or a boolean';
+});
+
+// create a typed function with anytype argument
+var fn3 = typed('string, *', function (a, b) {
+  return 'a is a string, b can be anything';
 });
 
 // create a typed function with multiple signatures
-var fn2 = typed({
+var fn4 = typed({
   'number': function (a) {
     return 'a is a number';
   },
@@ -45,12 +55,12 @@ var fn2 = typed({
 });
 
 // use the functions
-console.log(fn1(2, true));      // outputs 'a is a number, b can be anything'
-console.log(fn2(2));            // outputs 'a is a number'
+console.log(fn1(2, 'foo'));      // outputs 'a is a number, b is a string'
+console.log(fn4(2));            // outputs 'a is a number'
 
 // calling the function with a non-supported type signature will throw an error
 try {
-  fn2('hello world');
+  fn4('hello world');
 }
 catch (err) {
   console.log(err.toString()); // outputs: 'TypeError: Wrong function signature'
@@ -141,10 +151,8 @@ The functions generated with `typed({...})` have:
 ### Version 1
 
 - Extend function signatures:
-  - Any type arguments like `'*, boolean'`
   - Ellipsis like `'string, ...'`
   - Optional arguments like `'number?, array'`
-  - Multiple types per argument like `number | string, number'`
 - Detailed error messages.
 - Create a good benchmark, to get insight in the overhead.
 - Allow conversions not to be able to convert any input (for example string to
@@ -153,7 +161,7 @@ The functions generated with `typed({...})` have:
 ### Version 2
 
 - Extend function signatures:
-  - Constants like `'"linear" | "cubic"'`.
+  - Constants like `'"linear" | "cubic"'`, `'0..10'`, etc.
   - Object definitions like `'{name: string, age: number}'`
   - Object definitions like `'Object.<string, Person>'`
   - Array definitions like `'Array.<Person>'`

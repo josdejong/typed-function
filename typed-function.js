@@ -71,7 +71,7 @@
   /**
    * Add a function definition.
    * @param {function} fn
-   * @param {string} [type='fn']
+   * @param {string} [type='fn']    A function category, like 'fn' or 'signature'
    * @returns {string} Returns the function name, for example 'fn0' or 'signature2'
    */
   Defs.prototype.add = function (fn, type) {
@@ -107,6 +107,38 @@
   };
 
   /**
+   * A function parameter
+   * @param {string | string[] | Param} types    A parameter type like 'string',
+   *                                             'number | boolean'
+   * @constructor
+   */
+  function Param(types) {
+    if (typeof types === 'string') {
+      this.types = types.split('|').map(function (type) {
+        return type.trim();
+      })
+    }
+    else if (Array.isArray(types)) {
+      this.types = types;
+    }
+    else if (types instanceof Param) {
+      this.types = types.types;
+    }
+    else {
+      throw new Error('string or Array expected');
+    }
+  }
+
+  /**
+   * Return a string representation of this params types, like 'string' or
+   * 'number | boolean'
+   * @returns {string}
+   */
+  Param.prototype.toString = function () {
+    return this.types.join('|');
+  };
+
+  /**
    * A function signature
    * @param {string | Array.<string>} params  Array with the type(s) of each parameter,
    *                                          or a comma separated string with types
@@ -115,37 +147,64 @@
    */
   function Signature(params, fn) {
     if (typeof params === 'string') {
-      this.params = (params !== '') ? params.split(',').map(function (param) {
-        return param.trim();
+      this.params = (params !== '') ? params.split(',').map(function (types) {
+        return new Param(types);
       }) : [];
     }
+    else if (Array.isArray(params)) {
+      this.params = params.map(function (types) {
+        return new Param(types);
+      });
+    }
     else {
-      this.params = params;
+      throw new Error('string or Array expected');
     }
     this.fn = fn;
   }
 
-  // TODO: implement function Signature.split
   // TODO: implement function Signature.merge
   // TODO: implement function Signature.toString
 
   /**
-   * split all raw signatures into an array with splitted params
+   * Split params with multiple types in separate signatures
+   * @return {Signature[]} Returns an array with signatures (at least one)
+   */
+  Signature.prototype.split = function () {
+    var signatures = [];
+
+    function _iterate(signature, types, index) {
+      if (index < signature.params.length) {
+        var param = signature.params[index];
+        param.types.forEach(function (type) {
+          _iterate(signature, types.concat(type), index + 1);
+        });
+      }
+      else {
+        signatures.push(new Signature(types, signature.fn));
+      }
+    }
+    _iterate(this, [], 0);
+
+    return signatures;
+  };
+
+  /**
+   * Split all raw signatures into an array with splitted params
    * @param {Object.<string, function>} rawSignatures
-   * @return {Array.<{params: Array.<string>, fn: function}>} Returns splitted signatures
+   * @return {Array.<Signature>} Returns an array with splitted signatures
    */
   function splitSignatures(rawSignatures) {
-    return Object.keys(rawSignatures).map(function (params) {
+    return Object.keys(rawSignatures).reduce(function (signatures, params) {
       var fn = rawSignatures[params];
-      return new Signature(params, fn);
-    });
+      var signature = new Signature(params, fn);
 
-    // TODO: split params containing an '|' into multiple entries
+      return signatures.concat(signature.split());
+    }, []);
   }
 
   /**
    * create a map with normalized signatures as key and the function as value
-   * @param {Array.<{params: Array.<string>, fn: function}>} signatures   An array with splitted signatures
+   * @param {Array.<Signature>} signatures   An array with splitted signatures
    * @return {{}} Returns a map with normalized signatures
    */
   function normalizeSignatures(signatures) {
@@ -164,7 +223,7 @@
 
   /**
    * create an array with for every parameter an array with possible types
-   * @param {Array.<{params: Array.<string>, fn: function}>} signatures   An array with splitted signatures
+   * @param {Array.<Signature>} signatures   An array with splitted signatures
    * @return {Array.<Array.<string>>} Returns an array with allowed types per parameter
    */
   function splitTypes(signatures) {
@@ -172,12 +231,14 @@
 
     signatures.forEach(function (entry) {
       entry.params.forEach(function (param, i) {
-        if (!types[i]) {
-          types[i] = [];
-        }
-        if (types[i].indexOf(param) == -1) {
-          types[i].push(param);
-        }
+        param.types.forEach(function (type) {
+          if (!types[i]) {
+            types[i] = [];
+          }
+          if (types[i].indexOf(type) == -1) {
+            types[i].push(type);
+          }
+        });
       });
     });
 
@@ -186,7 +247,7 @@
 
   /**
    * create a recursive tree for traversing the number and type of parameters
-   * @param {Array.<{params: Array.<string>, fn: function}>} signatures   An array with splitted signatures
+   * @param {Array.<Signature>} signatures   An array with splitted signatures
    * @returns {{}}
    */
   function createParamsTree(signatures) {
@@ -208,14 +269,19 @@
       // loop over all parameters, create a nested structure
       while(params.length > 0) {
         var param = params.shift();
-        if (!obj.types[param]) {
-          obj.types[param] = {
-            signature: obj.signature.concat(param),
+        if (param.types.length != 1) {
+          throw new Error('Parameters should have one type. Split the signatures first.')
+        }
+        var type = param.types[0];
+
+        if (!obj.types[type]) {
+          obj.types[type] = {
+            signature: obj.signature.concat(type),
             fn: null,
             types: {}
           };
         }
-        obj = obj.types[param];
+        obj = obj.types[type];
       }
 
       // add the function as leaf

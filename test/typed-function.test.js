@@ -55,6 +55,36 @@ describe('parse', function() {
     assert.equal(fn.name, 'myFunction');
   });
 
+  it('should create a typed function with multiple types per argument', function() {
+    var fn = typed('number | boolean', function (arg) {
+      return typeof arg;
+    });
+
+    assert.equal(fn(true), 'boolean');
+    assert.equal(fn(2), 'number');
+    assert.throws(function () {fn('string')}, /Wrong function signature/);
+  });
+
+  it('should create a composed function with multiple types per argument', function() {
+    var fn = typed({
+      'string | number, boolean':  function () {return 'A';},
+      'boolean, boolean | number': function () {return 'B';},
+      'string':                    function () {return 'C';}
+    });
+
+    assert.equal(fn('str', false), 'A');
+    assert.equal(fn(2, true), 'A');
+    assert.equal(fn(false, true), 'B');
+    assert.equal(fn(false, 2), 'B');
+    assert.equal(fn('str'), 'C');
+    assert.throws(function () {fn()}, /Wrong number of arguments/);
+    assert.throws(function () {fn(1,2,3)}, /Wrong number of arguments/);
+    assert.throws(function () {fn('str', 2)}, /Wrong function signature/);
+    assert.throws(function () {fn(true, 'str')}, /Wrong function signature/);
+    assert.throws(function () {fn(2, 3)}, /Wrong function signature/);
+    assert.throws(function () {fn(2, 'str')}, /Wrong function signature/);
+  });
+
   // TODO: test whether the constructor throws errors when providing wrong arguments to typed(...)
 
   it('should compose a function with one argument', function() {

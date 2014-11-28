@@ -1,5 +1,10 @@
 # History
 
+## not yet released, version 0.3.3
+
+- Support for multiple types per argument like `number | string, number'`.
+
+
 ## 2014-11-05, version 0.3.2
 
 - Introduced new constructor options, create a typed function as
