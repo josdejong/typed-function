@@ -156,9 +156,9 @@
 
   /**
    * A function signature
-   * @param {string | Array.<string>} params  Array with the type(s) of each parameter,
-   *                                          or a comma separated string with types
-   * @param {function} fn                     The actual function
+   * @param {string | string[]} params  Array with the type(s) of each parameter,
+   *                                    or a comma separated string with types
+   * @param {function} fn               The actual function
    * @constructor
    */
   function Signature(params, fn) {
@@ -197,7 +197,8 @@
   // TODO: implement function Signature.toString
 
   /**
-   * Split params with multiple types in separate signatures
+   * Split params with multiple types in separate signatures,
+   * for example split a Signature "string | number" into two signatures.
    * @return {Signature[]} Returns an array with signatures (at least one)
    */
   Signature.prototype.split = function () {
@@ -220,9 +221,32 @@
   };
 
   /**
-   * Split all raw signatures into an array with splitted params
+   * A node is used to create a node tree to recursively traverse parameters
+   * of a function. Nodes have either:
+   * - Child nodes in a map `types`.
+   * - No child nodes but a function `fn`, the function to be called for 
+   *   This signature.
+   * @param {string[]} [signature]   An optional array with types of the
+   *                                 signature up to this child node.
+   */ 
+  function Node (signature) {
+    this.signature = signature || [];
+    this.fn = null;
+    this.childs = {};
+  }
+
+  /**
+   * The root node of a node tree is an arguments node, which does not
+   * have a map with childs per type, but per argument count
+   */ 
+  function RootNode() {
+    this.args = {};
+  }
+  
+  /**
+   * Split all raw signatures into an array with (splitted) Signatures
    * @param {Object.<string, function>} rawSignatures
-   * @return {Array.<Signature>} Returns an array with splitted signatures
+   * @return {Signature[]} Returns an array with splitted signatures
    */
   function splitSignatures(rawSignatures) {
     return Object.keys(rawSignatures).reduce(function (signatures, params) {
@@ -235,8 +259,8 @@
 
   /**
    * create a map with normalized signatures as key and the function as value
-   * @param {Array.<Signature>} signatures   An array with splitted signatures
-   * @return {{}} Returns a map with normalized signatures
+   * @param {Signature[]} signatures   An array with splitted signatures
+   * @return {Object} Returns a map with normalized signatures
    */
   function normalizeSignatures(signatures) {
     var normalized = {};
@@ -253,73 +277,82 @@
   }
 
   /**
-   * create an array with for every parameter an array with possible types
-   * @param {Array.<Signature>} signatures   An array with splitted signatures
+   * Create an array with for every parameter an array with possible types
+   * @param {Signature[]} signatures   An array with splitted signatures
    * @return {Array.<Array.<string>>} Returns an array with allowed types per parameter
    */
-  function splitTypes(signatures) {
-    var types = [];
+  // TODO: cleanup
+  // function splitTypes(signatures) {
+  //   var types = [];
 
-    signatures.forEach(function (entry) {
-      entry.params.forEach(function (param, i) {
-        param.types.forEach(function (type) {
-          if (!types[i]) {
-            types[i] = [];
-          }
-          if (types[i].indexOf(type) == -1) {
-            types[i].push(type);
-          }
-        });
-      });
+  //   signatures.forEach(function (entry) {
+  //     entry.params.forEach(function (param, i) {
+  //       param.types.forEach(function (type) {
+  //         if (!types[i]) {
+  //           types[i] = [];
+  //         }
+  //         if (types[i].indexOf(type) == -1) {
+  //           types[i].push(type);
+  //         }
+  //       });
+  //     });
+  //   });
+
+  //   return types;
+  // }
+  
+  /**
+   * Calculate the maximum number of arguments
+   * @param {Signature[]} signatures   An array with splitted signatures
+   * @return {number} Returns the maximum number of arguments
+   */
+  function argumentCount(signatures) {
+    var max = 0;
+
+    signatures.forEach(function (signature) {
+      var count = signature.params.length;
+      if (count > max) {
+        max = count;
+      }
     });
 
-    return types;
+    return max;
   }
-
+  
   /**
-   * create a recursive tree for traversing the number and type of parameters
+   * Create a recursive node tree for traversing the number and type of parameters
    * @param {Array.<Signature>} signatures   An array with splitted signatures
-   * @returns {Object} Returns a node tree
+   * @returns {RootNode} Returns a node tree
    */
-  function createParamsTree(signatures) {
-    var tree = {};
+  function createNodeTree(signatures) {
+    var root = new RootNode();
 
-    signatures.forEach(function (entry) {
-      var params = entry.params.concat([]);
+    signatures.forEach(function (signature) {
+      var params = signature.params.concat([]);
 
       // get the tree entry for the current number of arguments
-      var node = tree[params.length];
+      var node = root.args[params.length];
       if (!node) {
-        node = tree[params.length] = {
-          signature: [],
-          fn: null,
-          types: {}
-        };
+        node = root.args[params.length] = new Node();
       }
 
       // loop over all parameters, create a nested structure
       while(params.length > 0) {
         var param = params.shift();
-        if (param.types.length != 1) {
-          throw new Error('Parameters should have one type. Split the signatures first.');
-        }
         var type = param.types[0];
 
-        if (!node.types[type]) {
-          node.types[type] = {
-            signature: node.signature.concat(type),
-            fn: null,
-            types: {}
-          };
+        var child = node.childs[type];
+        if (child === undefined) {
+          child = node.childs[type] = new Node(node.signature.concat(type));
         }
-        node = node.types[type];
+        node = child;
       }
 
-      // add the function as leaf
-      node.fn = entry.fn;
+      // add the function as leaf of the innermost node
+      node.fn = signature.fn;
     });
 
-    return tree;
+    return root;
   }
 
   /**
@@ -337,7 +370,6 @@
    */
   function _typed(name, signatures) {
     var defs = new Defs();
-    var structure = splitSignatures(signatures);
 
     function switchTypes(node, args, prefix) {
       var code = [];
@@ -347,8 +379,8 @@
         code.push(prefix + 'return ' + def + '(' + args.join(', ') +'); // signature: ' + node.signature);
       }
       else {
-        // add entries for the provided types
-        Object.keys(node.types)
+        // add entries for the provided childs
+        Object.keys(node.childs)
             .sort(compareTypes)
             .forEach(function (type, index) {
               var arg = 'arg' + args.length;
@@ -368,7 +400,7 @@
               }
 
               if (before) code.push(prefix + before);
-              code = code.concat(switchTypes(node.types[type], args.concat(arg), nextPrefix));
+              code = code.concat(switchTypes(node.childs[type], args.concat(arg), nextPrefix));
               if (after) code.push(prefix + after);
             });
 
@@ -376,8 +408,8 @@
         var added = {};
         typed.conversions
             .filter(function (conversion) {
-              return node.types[conversion.to] &&
-                  !node.types[conversion.from];
+              return node.childs[conversion.to] &&
+                  !node.childs[conversion.from];
             })
             .forEach(function (conversion) {
               if (!added[conversion.from]) {
@@ -388,7 +420,7 @@
                 var convert = defs.add(conversion.convert, 'convert') + '(' + arg + ')';
 
                 code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-                code = code.concat(switchTypes(node.types[conversion.to], args.concat(convert), prefix + '  '));
+                code = code.concat(switchTypes(node.childs[conversion.to], args.concat(convert), prefix + '  '));
                 code.push(prefix + '}');
               }
             });
@@ -397,26 +429,28 @@
       return code;
     }
 
-    var types = splitTypes(structure);
-    var params = types.map(function (value, index) {
-      return 'arg' + index;
-    });
+    var structure = splitSignatures(signatures);
+    var root = createNodeTree(structure);
 
     var code = [];
-    var tree = createParamsTree(structure);
-    var paramCounts = Object.keys(tree);
+    var argCounts = Object.keys(root.args);
+    var count = argumentCount(structure);
+    var params = [];
+    for (var i = 0; i < count; i++) {
+      params[i] = 'arg' + i;
+    }
     code.push('return function ' + (name || '') + '(' + params.join(', ') + ') {');
-    paramCounts
+    argCounts
         .sort(compareNumbers)
-        .forEach(function (count, index) {
-          var node = tree[count];
+        .forEach(function (argCount, index) {
+          var node = root.args[argCount];
           var args = [];
           var statement = (index === 0) ? 'if' : 'else if';
-          code.push('  ' + statement + ' (arguments.length == ' + count +  ') {');
+          code.push('  ' + statement + ' (arguments.length == ' + argCount +  ') {');
           code = code.concat(switchTypes(node, args, '    '));
 
           code.push('  }');
-          if (index == paramCounts.length - 1) {
+          if (index == argCounts.length - 1) {
             code.push('  else {');
             code.push('    throw new TypeError(\'Wrong number of arguments\');'); // TODO: output the allowed numbers
             code.push('  }');
