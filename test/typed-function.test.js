@@ -85,6 +85,8 @@ describe('parse', function() {
     }, /SyntaxError: Unexpected varArgs/);
   });
 
+  // TODO: test a function with only two arguments (not one)
+
   it('should create a composed function with multiple types per argument', function() {
     var fn = typed({
       'string | number, boolean':  function () {return 'A';},
