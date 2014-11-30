@@ -93,32 +93,44 @@ typed(name: string, signatures: Object.<string, function>) : function
 
 ### Properties
 
-- `typed.types: Object`
-  A map with the object types as key and a type checking test as value.
-  Custom types can be added like:
+-   `typed.types: Object`
 
-  ```js
-  function Person(...) {
-    ...
-  }
+    A map with the object types as key and a type checking test as value.
+    Custom types can be added like:
 
-  typed.types['Person'] = function (x) {
-    return x instanceof Person;
-  };
+    ```js
+    function Person(...) {
+      ...
+    }
+
+    typed.types['Person'] = function (x) {
+      return x instanceof Person;
+    };
   ```
 
-- `typed.conversions: Array`
-  An Array with built-in conversions. Empty by default. Can be used for example 
-  to defined conversions from `boolean` to `number`. For example:
+-   `typed.conversions: Array`
 
-  ```js
-  typed.conversions.push({
-    from: 'boolean',
-    to: 'number',
-    convert: function (x) {
-      return +x;
-  });
-  ```
+    An Array with built-in conversions. Empty by default. Can be used for example
+    to defined conversions from `boolean` to `number`. For example:
+
+    ```js
+    typed.conversions.push({
+      from: 'boolean',
+      to: 'number',
+      convert: function (x) {
+        return +x;
+    });
+    ```
+
+-   `typed.config: Object`
+
+    An object with configuration options for typed-function:
+
+    -   `minify: boolean`
+
+        If true (default), the functions are generated from minified code.
+        If false the typed-functions have a nicely readable .toString() source.
+
 
 ### Types
 
@@ -140,8 +152,9 @@ typed-function has the following built-in types:
 
 The functions generated with `typed({...})` have:
 
-- A `toString()` function which returns well readable code, giving insight in
-  what the function exactly does.
+- A function `toString`. When `typed.config.minify` is set to `true` (is `false`
+  by default), the `toString` function will return well readable code which can
+  be used to see what the function exactly does. For debugging purposes.
 - A property `signatures`, which holds a map with the (normalized)
   signatures as key and the original sub-functions as value.
 

@@ -3,6 +3,7 @@
 ## not yet released, version 0.3.3
 
 - Support for multiple types per argument like `number | string, number'`.
+- Implemented option `typed.config.minify`.
 
 
 ## 2014-11-05, version 0.3.2

@@ -103,8 +103,7 @@
     var categories = this.categories;
 
     Object.keys(categories).forEach(function (cat) {
-      var def = categories[cat];
-      def.forEach(function (def, index) {
+      categories[cat].forEach(function (ref, index) {
         code.push('var ' + cat + index + ' = ' + path + '[\'' + cat + '\'][' + index + '];');
       });
     });
@@ -239,7 +238,7 @@
     this.fn = null;
     this.childs = {};
   }
-    
+
   /**
    * Returns a string with JavaScript code for this function
    * @param {Refs} refs     Object to store function references
@@ -252,8 +251,8 @@
     var childs = this.childs;
 
     if (this.fn !== null) {
-      var def = refs.add(this.fn, 'signature');
-      code.push(prefix + 'return ' + def + '(' + args.join(', ') + '); // signature: ' + this.signature);
+      var ref = refs.add(this.fn, 'signature');
+      code.push(prefix + 'return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature);
     }
     else {
       // add entries for the provided childs
@@ -265,19 +264,19 @@
             var before;
             var after;
             var nextPrefix = prefix + '  ';
-            if (type == '*') {
+            if (type == '*') { // anytype
               before = (index > 0 ? 'else {' : '');
               after  = (index > 0 ? '}' : '');
               if (index === 0) {nextPrefix = prefix;}
             }
             else {
-              var def = refs.add(getTypeTest(type), 'test') + '(' + arg + ')';
-              before = 'if (' + def + ') { // type: ' + type;
+              var ref = refs.add(getTypeTest(type), 'test') + '(' + arg + ')';
+              before = 'if (' + ref + ') { // type: ' + type;
               after  = '}';
             }
 
             if (before) code.push(prefix + before);
-            code = code.concat(childs[type].toCode(refs, args.concat(arg), nextPrefix));
+            code.push(childs[type].toCode(refs, args.concat(arg), nextPrefix));
             if (after) code.push(prefix + after);
           });
 
@@ -296,7 +295,7 @@
               var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
 
               code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-              code = code.concat(childs[conversion.to].toCode(refs, args.concat(convert), prefix + '  '));
+              code.push(childs[conversion.to].toCode(refs, args.concat(convert), prefix + '  '));
               code.push(prefix + '}');
             }
           });
@@ -309,18 +308,19 @@
    * The root node of a node tree is an arguments node, which does not
    * have a map with childs per type, but has an array with entries for each
    * supported argument count
-   */ 
+   * @param {string} [name] Optional function name
+   */
   function RootNode(name) {
+    this.name = name || '';
     this.args = [];
   }
   
   /**
    * Returns a string with JavaScript code for this function
    * @param {Refs} refs     Object to store function references
-   * @param {string} [name] Optional function name
    * @return {string} code
    */
-  RootNode.prototype.toCode = function (refs, name) {
+  RootNode.prototype.toCode = function (refs) {
     var code = [];
 
     // we use a regular for loop: can't use .map as this.args can contain undefined entries
@@ -329,17 +329,17 @@
       params[i] = 'arg' + i;
     }
 
-    code.push('return function ' + (name || '') + '(' + params.join(', ') + ') {');
+    code.push('return function ' + this.name + '(' + params.join(', ') + ') {');
     
     var first = true;
-    this.args.forEach(function (node, index, array) {
+    this.args.forEach(function (node, index) {
       // Note that some indexes can be undefined, but forEach skips undefined 
       //      values automatically so we don't have to check whether node !== undefined.
       var args = [];
       var prefix = '    ';
       var statement = first ? 'if' : 'else if';
       code.push('  ' + statement + ' (arguments.length === ' + index +  ') {');
-      code = code.concat(node.toCode(refs, args, prefix));
+      code.push(node.toCode(refs, args, prefix));
 
       code.push('  }');
       
@@ -392,11 +392,12 @@
 
   /**
    * Create a recursive node tree for traversing the number and type of parameters
-   * @param {Array.<Signature>} signatures   An array with splitted signatures
+   * @param {string} [name]            Fuction name. Optional
+   * @param {Signature[]} signatures   An array with splitted signatures
    * @returns {RootNode} Returns a node tree
    */
-  function createNodeTree(signatures) {
-    var root = new RootNode();
+  function createNodeTree(name, signatures) {
+    var root = new RootNode(name);
 
     signatures.forEach(function (signature) {
       var params = signature.params.concat([]);
@@ -428,6 +429,23 @@
   }
 
   /**
+   * minify JavaScript code of a typed function
+   * @param {string} code
+   * @return {string} Returns minified code
+   */
+  function minify (code) {
+    return code
+        .replace(/\/\/.*/g, '')     // remove comments
+        .replace(/\s*\n\s*/gm, '') // remove spaces and returns
+        .replace(/ \{/g, '{')     // other whitespaces
+        .replace(/ \(/g, '(')     // other whitespaces
+        .replace(/(signature|test|convert|arg)(?=\d)/g, function (v) {
+          // replace long variable names like 'signature1' with their first letter 's1'
+          return v.charAt(0);
+        });
+  }
+
+  /**
    * Compose a function from sub-functions each handling a single type signature.
    * Signatures:
    *   typed(signature: string, fn: function)
@@ -445,9 +463,9 @@
 
     // parse signatures, create a node tree
     var structure = splitSignatures(signatures);
-    var tree = createNodeTree(structure);
-    
-    var treeCode = tree.toCode(refs, name); // TODO: do not create references in toCode but in createNodeTree
+    var tree = createNodeTree(name, structure);
+
+    var treeCode = tree.toCode(refs); // TODO: do not create references in toCode but in createNodeTree
     var refsCode = refs.toCode();
 
     // generate JavaScript code
@@ -457,6 +475,10 @@
       treeCode,
       '})'
     ].join('\n');
+
+    if (typed.config.minify) {
+      factory = minify(factory);
+    }
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
@@ -480,6 +502,11 @@
     'Object':   function (x) {return typeof x === 'object'}
   };
 
+  // configuration
+  var config = {
+    minify: true
+  };
+
   // type conversions. Order is important
   var conversions = [];
 
@@ -487,6 +514,7 @@
   // the `typed` function itself
   // TODO: find a more elegant solution for this
   var typed = {
+    config: config,
     types: types,
     conversions: conversions
   };
@@ -519,6 +547,7 @@
   });
 
   // attach types and conversions to the final `typed` function
+  typed.config = config;
   typed.types = types;
   typed.conversions = conversions;
 
