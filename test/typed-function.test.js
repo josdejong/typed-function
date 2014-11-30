@@ -65,6 +65,26 @@ describe('parse', function() {
     assert.throws(function () {fn('string')}, /Wrong function signature/);
   });
 
+  it('should create a typed function with varArgs', function() {
+    var fn = typed('number...', function (arg) {
+      return typeof arg;
+    });
+
+    assert.equal(fn(2), 'number');
+    assert.throws(function () {fn(true)}, /Wrong function signature/);
+    assert.throws(function () {fn('string')}, /Wrong function signature/);
+  });
+
+  it('should throw an error in case of unexpected varArgs', function() {
+    assert.throws(function () {
+      typed('number... | string', function () {});
+    }, /SyntaxError: Unexpected varArgs/);
+    
+    assert.throws(function () {
+      typed('number..., string', function () {});
+    }, /SyntaxError: Unexpected varArgs/);
+  });
+
   it('should create a composed function with multiple types per argument', function() {
     var fn = typed({
       'string | number, boolean':  function () {return 'A';},

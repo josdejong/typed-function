@@ -66,42 +66,43 @@
    * Collection with function definitions (local shortcuts to functions)
    * @constructor
    */
-  function Defs() {}
+  function Defs() {
+    this.categories = {};
+  }
 
   /**
    * Add a function definition.
    * @param {function} fn
-   * @param {string} [type='fn']    A function category, like 'fn' or 'signature'
+   * @param {string} [category='fn']    A function category, like 'fn' or 'signature'
    * @returns {string} Returns the function name, for example 'fn0' or 'signature2'
    */
-  Defs.prototype.add = function (fn, type) {
-    type = type || 'fn';
-    if (!this[type]) this[type] = [];
+  Defs.prototype.add = function (fn, category) {
+    var cat = category || 'fn';
+    if (!this.categories[cat]) this.categories[cat] = [];
 
-    var index = this[type].indexOf(fn);
+    var index = this.categories[cat].indexOf(fn);
     if (index == -1) {
-      index = this[type].length;
-      this[type].push(fn);
+      index = this.categories[cat].length;
+      this.categories[cat].push(fn);
     }
-    return type + index;
+    return cat + index;
   };
 
   /**
    * Create code lines for all definitions
-   * @param [name='defs']
+   * @param [name='defs']   Variable name for the array holding the definitions
    * @returns {Array} Returns the code lines containing all function definitions
    */
   Defs.prototype.code = function (name) {
-    var me = this;
     var code = [];
     name = name || 'defs';
 
-    Object.keys(this).forEach(function (type) {
-      var def = me[type];
+    Object.keys(this.categories).forEach(function (cat) {
+      var def = this.categories[cat];
       def.forEach(function (def, index) {
-        code.push('var ' + type + index + ' = ' + name + '[\'' + type + '\'][' + index + '];');
+        code.push('var ' + cat + index + ' = ' + name + '[\'' + cat + '\'][' + index + '];');
       });
-    });
+    }.bind(this));
 
     return code;
   };
@@ -113,10 +114,11 @@
    * @constructor
    */
   function Param(types) {
+    // parse the types, can be a string with types separated by pipe characters |
     if (typeof types === 'string') {
       this.types = types.split('|').map(function (type) {
         return type.trim();
-      })
+      });
     }
     else if (Array.isArray(types)) {
       this.types = types;
@@ -125,8 +127,22 @@
       this.types = types.types;
     }
     else {
-      throw new Error('string or Array expected');
+      throw new Error('String or Array expected');
     }
+
+    // parse varArgs operator (ellipses '...')
+    this.varArgs = false;
+    this.types.forEach(function (type, index) {
+      if (type.substring(type.length - 3) == '...') {
+        if (index === this.types.length - 1) {
+          this.types[index] = type.substring(0, type.length - 3);
+          this.varArgs = true;
+        }
+        else {
+          throw new SyntaxError('Unexpected varArgs "..."');
+        }
+      }
+    }.bind(this));
   }
 
   /**
@@ -159,6 +175,21 @@
     else {
       throw new Error('string or Array expected');
     }
+    
+    // check varArgs operator '...'
+    var withVarArgs = this.params.filter(function (param) {
+      return param.varArgs;
+    });
+    if (withVarArgs.length === 0) {
+      this.varArgs = false;
+    }
+    else if (withVarArgs[0] === this.params[this.params.length - 1]) {
+      this.varArgs = true;
+    }
+    else {
+      throw new SyntaxError('Unexpected varArgs "..."');
+    }
+
     this.fn = fn;
   }
 
@@ -218,7 +249,7 @@
       normalized[signature] = entry.fn;
     });
 
-    return normalized
+    return normalized;
   }
 
   /**
@@ -248,7 +279,7 @@
   /**
    * create a recursive tree for traversing the number and type of parameters
    * @param {Array.<Signature>} signatures   An array with splitted signatures
-   * @returns {{}}
+   * @returns {Object} Returns a node tree
    */
   function createParamsTree(signatures) {
     var tree = {};
@@ -257,9 +288,9 @@
       var params = entry.params.concat([]);
 
       // get the tree entry for the current number of arguments
-      var obj = tree[params.length];
-      if (!obj) {
-        obj = tree[params.length] = {
+      var node = tree[params.length];
+      if (!node) {
+        node = tree[params.length] = {
           signature: [],
           fn: null,
           types: {}
@@ -270,22 +301,22 @@
       while(params.length > 0) {
         var param = params.shift();
         if (param.types.length != 1) {
-          throw new Error('Parameters should have one type. Split the signatures first.')
+          throw new Error('Parameters should have one type. Split the signatures first.');
         }
         var type = param.types[0];
 
-        if (!obj.types[type]) {
-          obj.types[type] = {
-            signature: obj.signature.concat(type),
+        if (!node.types[type]) {
+          node.types[type] = {
+            signature: node.signature.concat(type),
             fn: null,
             types: {}
           };
         }
-        obj = obj.types[type];
+        node = node.types[type];
       }
 
       // add the function as leaf
-      obj.fn = entry.fn;
+      node.fn = entry.fn;
     });
 
     return tree;
@@ -308,16 +339,16 @@
     var defs = new Defs();
     var structure = splitSignatures(signatures);
 
-    function switchTypes(signature, args, prefix) {
+    function switchTypes(node, args, prefix) {
       var code = [];
 
-      if (signature.fn !== null) {
-        var def = defs.add(signature.fn, 'signature');
-        code.push(prefix + 'return ' + def + '(' + args.join(', ') +'); // signature: ' + signature.signature);
+      if (node.fn !== null) {
+        var def = defs.add(node.fn, 'signature');
+        code.push(prefix + 'return ' + def + '(' + args.join(', ') +'); // signature: ' + node.signature);
       }
       else {
         // add entries for the provided types
-        Object.keys(signature.types)
+        Object.keys(node.types)
             .sort(compareTypes)
             .forEach(function (type, index) {
               var arg = 'arg' + args.length;
@@ -328,7 +359,7 @@
               if (type == '*') {
                 before = (index > 0 ? 'else {' : '');
                 after  = (index > 0 ? '}' : '');
-                if (index == 0) {nextPrefix = prefix;}
+                if (index === 0) {nextPrefix = prefix;}
               }
               else {
                 var def = defs.add(getTypeTest(type), 'test') + '(' + arg + ')';
@@ -337,7 +368,7 @@
               }
 
               if (before) code.push(prefix + before);
-              code = code.concat(switchTypes(signature.types[type], args.concat(arg), nextPrefix));
+              code = code.concat(switchTypes(node.types[type], args.concat(arg), nextPrefix));
               if (after) code.push(prefix + after);
             });
 
@@ -345,8 +376,8 @@
         var added = {};
         typed.conversions
             .filter(function (conversion) {
-              return signature.types[conversion.to] &&
-                  !signature.types[conversion.from];
+              return node.types[conversion.to] &&
+                  !node.types[conversion.from];
             })
             .forEach(function (conversion) {
               if (!added[conversion.from]) {
@@ -357,7 +388,7 @@
                 var convert = defs.add(conversion.convert, 'convert') + '(' + arg + ')';
 
                 code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-                code = code.concat(switchTypes(signature.types[conversion.to], args.concat(convert), prefix + '  '));
+                code = code.concat(switchTypes(node.types[conversion.to], args.concat(convert), prefix + '  '));
                 code.push(prefix + '}');
               }
             });
@@ -378,11 +409,11 @@
     paramCounts
         .sort(compareNumbers)
         .forEach(function (count, index) {
-          var signature = tree[count];
+          var node = tree[count];
           var args = [];
-          var statement = (index == 0) ? 'if' : 'else if';
+          var statement = (index === 0) ? 'if' : 'else if';
           code.push('  ' + statement + ' (arguments.length == ' + count +  ') {');
-          code = code.concat(switchTypes(signature, args, '    '));
+          code = code.concat(switchTypes(node, args, '    '));
 
           code.push('  }');
           if (index == paramCounts.length - 1) {
@@ -400,7 +431,7 @@
     factory = factory.concat(code);
     factory.push('})');
 
-    var fn = eval(factory.join('\n'))(defs);
+    var fn = eval(factory.join('\n'))(defs.categories);
 
     // attach the signatures with sub-functions to the constructed function
     fn.signatures = normalizeSignatures(structure); // normalized signatures
