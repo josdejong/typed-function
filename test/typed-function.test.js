@@ -65,7 +65,7 @@ describe('parse', function() {
     assert.throws(function () {fn('string')}, /Wrong function signature/);
   });
 
-  it('should create a typed function with varArgs', function() {
+  it.skip('should create a typed function with varArgs', function() {
     var fn = typed('number...', function (arg) {
       return typeof arg;
     });
@@ -86,6 +86,8 @@ describe('parse', function() {
   });
 
   // TODO: test a function with only two arguments (not one)
+
+  // TODO: test config.minify
 
   it('should create a composed function with multiple types per argument', function() {
     var fn = typed({

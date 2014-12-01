@@ -22,8 +22,8 @@
   'use strict';
 
   // order types
-  // anytype (*) will be ordered last, and then object, as other types may be
-  // an object too.
+  // anytype (*) will be ordered last, and object as second last (as other types
+  // may be an object as well, like Array)
   function compareTypes(a, b) {
     if (a === '*') return 1;
     if (b === '*') return -1;
@@ -57,18 +57,12 @@
     return test;
   }
 
-  // order numbers
-  function compareNumbers(a, b) {
-    return a > b;
-  }
-
   /**
    * Collection with function references (local shortcuts to functions)
    * @constructor
    * @param {string} [name='refs']  Optional name for the refs, used to generate
    *                                JavaScript code
    */
-   // TODO: rename Refs to Refs
   function Refs(name) {
     this.name = name || 'refs';
     this.categories = {};
@@ -115,9 +109,10 @@
    * A function parameter
    * @param {string | string[] | Param} types    A parameter type like 'string',
    *                                             'number | boolean'
+   * @param {boolean} [varArgs=false]            Variable arguments if true
    * @constructor
    */
-  function Param(types) {
+  function Param(types, varArgs) {
     // parse the types, can be a string with types separated by pipe characters |
     if (typeof types === 'string') {
       this.types = types.split('|').map(function (type) {
@@ -128,14 +123,14 @@
       this.types = types;
     }
     else if (types instanceof Param) {
-      this.types = types.types;
+      return types.clone();
     }
     else {
       throw new Error('String or Array expected');
     }
 
     // parse varArgs operator (ellipses '...')
-    this.varArgs = false;
+    this.varArgs = varArgs || false;
     this.types.forEach(function (type, index) {
       if (type.substring(type.length - 3) == '...') {
         if (index === this.types.length - 1) {
@@ -148,6 +143,14 @@
       }
     }.bind(this));
   }
+
+  /**
+   * Create a clone of this param
+   * @returns {Param} A cloned version of this param
+   */
+  Param.prototype.clone = function () {
+    return new Param(this.types.slice(), this.varArgs);
+  };
 
   /**
    * Return a string representation of this params types, like 'string' or
@@ -212,7 +215,7 @@
       if (index < signature.params.length) {
         var param = signature.params[index];
         param.types.forEach(function (type) {
-          _iterate(signature, types.concat(type), index + 1);
+          _iterate(signature, types.concat(new Param(type, param.varArgs)), index + 1);
         });
       }
       else {
@@ -232,7 +235,8 @@
    *   This signature.
    * @param {string[]} [signature]   An optional array with types of the
    *                                 signature up to this child node.
-   */ 
+   * @constructor
+   */
   function Node (signature) {
     this.signature = signature || [];
     this.fn = null;
@@ -308,11 +312,18 @@
    * The root node of a node tree is an arguments node, which does not
    * have a map with childs per type, but has an array with entries for each
    * supported argument count
-   * @param {string} [name] Optional function name
+   * @param {string} [name]         Optional function name
+   * @param {Node[]} args           Tree of nodes, signatures grouped per
+   *                                argument count
+   * @param {Signature[]} [varArgs] Array with signatures with variable argument
+   *                                count. The array must be ordered by
+   *                                minimal number of arguments
+   * @constructor
    */
-  function RootNode(name) {
+  function RootNode(name, args, varArgs) {
     this.name = name || '';
-    this.args = [];
+    this.args = args || [];
+    this.varArgs = varArgs || [];
   }
   
   /**
@@ -340,7 +351,6 @@
       var statement = first ? 'if' : 'else if';
       code.push('  ' + statement + ' (arguments.length === ' + index +  ') {');
       code.push(node.toCode(refs, args, prefix));
-
       code.push('  }');
       
       first = false;
@@ -348,9 +358,14 @@
 
     if (!first) {
       code.push('  else {');
+
+      // TODO: varArg signatures
+
       code.push('    throw new TypeError(\'Wrong number of arguments\');'); // TODO: output the allowed numbers
       code.push('  }');
     }
+
+
     code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the actual signature
     code.push('}');
     
@@ -358,9 +373,9 @@
   };
   
   /**
-   * Split all raw signatures into an array with (splitted) Signatures
+   * Split all raw signatures into an array with (split) Signatures
    * @param {Object.<string, function>} rawSignatures
-   * @return {Signature[]} Returns an array with splitted signatures
+   * @return {Signature[]} Returns an array with split signatures
    */
   function splitSignatures(rawSignatures) {
     return Object.keys(rawSignatures).reduce(function (signatures, params) {
@@ -373,7 +388,7 @@
 
   /**
    * create a map with normalized signatures as key and the function as value
-   * @param {Signature[]} signatures   An array with splitted signatures
+   * @param {Signature[]} signatures   An array with split signatures
    * @return {Object} Returns a map with normalized signatures
    */
   function normalizeSignatures(signatures) {
@@ -392,40 +407,53 @@
 
   /**
    * Create a recursive node tree for traversing the number and type of parameters
-   * @param {string} [name]            Fuction name. Optional
-   * @param {Signature[]} signatures   An array with splitted signatures
-   * @returns {RootNode} Returns a node tree
+   * @param {string} [name]            Function name. Optional
+   * @param {Signature[]} signatures   An array with split signatures
+   * @return {RootNode} Returns a node tree
    */
   function createNodeTree(name, signatures) {
-    var root = new RootNode(name);
+    var args = [];        // nodes with no varArgs, place in array corresponds
+                          // with the number of arguments
+    var varArgs = [];     // signatures with varArgs
 
     signatures.forEach(function (signature) {
-      var params = signature.params.concat([]);
-      
-      // get the tree entry for the current number of arguments
-      var argCount = params.length;
-      var node = root.args[argCount];
-      if (!node) {
-        node = root.args[argCount] = new Node();
+      if (signature.varArgs) {
+        varArgs.push(signature);
       }
+      else {
+        var params = signature.params.concat([]);
 
-      // loop over all parameters, create a nested structure
-      while(params.length > 0) {
-        var param = params.shift();
-        var type = param.types[0];
-
-        var child = node.childs[type];
-        if (child === undefined) {
-          child = node.childs[type] = new Node(node.signature.concat(type));
+        // get the tree entry for the current number of arguments
+        var argCount = params.length;
+        var node = args[argCount];
+        if (!node) {
+          node = args[argCount] = new Node();
         }
-        node = child;
-      }
 
-      // add the function as leaf of the innermost node
-      node.fn = signature.fn;
+        // loop over all parameters, create a nested structure
+        while(params.length > 0) {
+          var param = params.shift();
+          var type = param.types[0];
+
+          var child = node.childs[type];
+          if (child === undefined) {
+            child = node.childs[type] = new Node(node.signature.concat(type));
+          }
+          node = child;
+        }
+
+        // add the function as leaf of the innermost node
+        node.fn = signature.fn;
+      }
     });
 
-    return root;
+    // order the varArgs by number of params
+    varArgs.sort(function (a, b) {
+      return a.params.length - b.params.length;
+    });
+    // TODO: test for conflicts between varArgs and non-vararg signatures
+
+    return new RootNode(name, args, varArgs);
   }
 
   /**
