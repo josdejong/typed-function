@@ -65,15 +65,39 @@ describe('parse', function() {
     assert.throws(function () {fn('string')}, /Wrong function signature/);
   });
 
-  it.skip('should create a typed function with varArgs', function() {
-    var fn = typed('number...', function (arg) {
-      return typeof arg;
+  it('should create a typed function with varArgs', function() {
+    var sum = typed('number...', function (values) {
+      assert(Array.isArray(values));
+      var sum = 0;
+      for (var i = 0; i < values.length; i++) {
+        sum += values[i];
+      }
+      return sum;
     });
 
-    assert.equal(fn(2), 'number');
-    assert.throws(function () {fn(true)}, /Wrong function signature/);
-    assert.throws(function () {fn('string')}, /Wrong function signature/);
+    assert.equal(sum(2), 2);
+    assert.equal(sum(2,3,4), 9);
+    assert.throws(function () {sum()}, /Wrong function signature/);
+    assert.throws(function () {sum(true)}, /Wrong function signature/);
+    assert.throws(function () {sum('string')}, /Wrong function signature/);
   });
+
+  it('should create a typed function with varArgs (2)', function() {
+    var fn = typed('string, number...', function (str, values) {
+      assert.equal(typeof str, 'string');
+      assert(Array.isArray(values));
+      return str + ': ' + values.join(', ');
+    });
+
+    assert.equal(fn('foo', 2), 'foo: 2');
+    assert.equal(fn('foo', 2, 4), 'foo: 2, 4');
+    assert.throws(function () {fn(2, 4)}, /Wrong function signature/);
+    assert.throws(function () {fn('string')}, /Wrong function signature/);
+    assert.throws(function () {fn('string', 'string')}, /Wrong function signature/);
+  });
+
+  // TODO: test combination of varArgs and composed
+  // TODO: test combination of varArgs and anyType
 
   it('should throw an error in case of unexpected varArgs', function() {
     assert.throws(function () {

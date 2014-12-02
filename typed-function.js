@@ -237,6 +237,7 @@
   function Node (signature) {
     this.signature = signature || [];
     this.fn = null;
+    this.varArgs = false;
     this.childs = {};
   }
 
@@ -258,20 +259,28 @@
   /**
    * Returns a string with JavaScript code for this function
    * @param {Refs} refs     Object to store function references
-   * @param {string[]} args Argument names, like ['arg0', 'arg1', ...]
+   * @param {string[]} args Argument names, like ['arg0', 'arg1', ...],
+   *                        but can also contain conversions like ['arg0', 'convert1(arg1)']
    * @param {string} prefix A number of spaces to prefix for every line of code
    * @return {string} code
    */
-  // TODO: change the function signature to toCode(refs, level)
   Node.prototype.toCode = function (refs, args, prefix) {
     var code = [];
     var childs = this.childs;
 
     if (this.fn !== null) {
       var ref = refs.add(this.fn, 'signature');
-      code.push(prefix + 'if (arguments.length === ' + args.length +') {');
-      code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature);
-      code.push(prefix + '}');
+
+      if(this.varArgs) {
+        var type = this.signature[this.signature.length - 1];
+        var test = refs.add(getTypeTest(type), 'test');
+
+      }
+      else {
+        code.push(prefix + 'if (arguments.length === ' + args.length +') {');
+        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature);
+        code.push(prefix + '}');
+      }
     }
 
     // add entries for the provided childs
@@ -279,15 +288,37 @@
         .sort(compareTypes)
         .forEach(function (type) {
           var arg = 'arg' + args.length;
+          var child = childs[type];
 
           if (type == '*') { // anytype (this type is ordered last)
-            code.push(childs[type].toCode(refs, args.concat(arg), prefix));
+            code.push(child.toCode(refs, args.concat(arg), prefix));
           }
           else {
-            var ref = refs.add(getTypeTest(type), 'test') + '(' + arg + ')';
-            code.push(prefix + 'if (' + ref + ') { // type: ' + type);
-            code.push(childs[type].toCode(refs, args.concat(arg), prefix + '  '));
-            code.push(prefix + '}');
+            var test = refs.add(getTypeTest(type), 'test');
+
+            if (child.varArgs) {
+              var ref = refs.add(child.fn, 'signature');
+
+              code.push(prefix + 'var match = true;');
+              code.push(prefix + 'var varArgs = [];');
+              code.push(prefix + 'for (var i = ' + args.length + '; i < arguments.length; i++) {');
+              code.push(prefix + '  if (' + test + '(arguments[i])) {');
+              code.push(prefix + '    varArgs.push(arguments[i]);');
+              code.push(prefix + '  } else {');
+              code.push(prefix + '    match = false;');
+              code.push(prefix + '    break;');
+              code.push(prefix + '  }');
+              code.push(prefix + '}');
+              code.push(prefix + 'if (arguments.length > ' + args.length + ' && match) {');
+              code.push(prefix + '  return ' + ref + '(' + args.concat(['varArgs']).join(', ') + '); ' +
+                '// signature: ' + child.signature + '...');
+              code.push(prefix + '}');
+            }
+            else {
+              code.push(prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
+              code.push(child.toCode(refs, args.concat(arg), prefix + '  '));
+              code.push(prefix + '}');
+            }
           }
         });
 
@@ -415,6 +446,7 @@
 
       // add the function as leaf of the innermost node
       node.fn = signature.fn;
+      node.varArgs = signature.varArgs;
     });
 
     return root;
