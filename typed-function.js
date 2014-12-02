@@ -200,9 +200,6 @@
     this.fn = fn;
   }
 
-  // TODO: implement function Signature.merge
-  // TODO: implement function Signature.toString
-
   /**
    * Split params with multiple types in separate signatures,
    * for example split a Signature "string | number" into two signatures.
@@ -244,88 +241,95 @@
   }
 
   /**
+   * Calculates the maximum depth (level) of nested childs
+   * @return {number} Returns the maximum depth (zero if no childs, one if
+   *                  it has childs without childs, etc)
+   */
+  Node.prototype.depth = function () {
+    var level = 0;
+    Object.keys(this.childs).forEach(function (type) {
+      var childLevel = this.childs[type].depth() + 1;
+      level = Math.max(level, childLevel);
+    }.bind(this));
+
+    return level;
+  };
+
+  /**
    * Returns a string with JavaScript code for this function
    * @param {Refs} refs     Object to store function references
    * @param {string[]} args Argument names, like ['arg0', 'arg1', ...]
    * @param {string} prefix A number of spaces to prefix for every line of code
    * @return {string} code
    */
+  // TODO: change the function signature to toCode(refs, level)
   Node.prototype.toCode = function (refs, args, prefix) {
     var code = [];
     var childs = this.childs;
 
     if (this.fn !== null) {
       var ref = refs.add(this.fn, 'signature');
-      code.push(prefix + 'return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature);
+      code.push(prefix + 'if (arguments.length === ' + args.length +') {');
+      code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature);
+      code.push(prefix + '}');
     }
-    else {
-      // add entries for the provided childs
-      Object.keys(childs)
-          .sort(compareTypes)
-          .forEach(function (type, index) {
+
+    // add entries for the provided childs
+    Object.keys(childs)
+        .sort(compareTypes)
+        .forEach(function (type) {
+          var arg = 'arg' + args.length;
+
+          if (type == '*') { // anytype (this type is ordered last)
+            code.push(childs[type].toCode(refs, args.concat(arg), prefix));
+          }
+          else {
+            var ref = refs.add(getTypeTest(type), 'test') + '(' + arg + ')';
+            code.push(prefix + 'if (' + ref + ') { // type: ' + type);
+            code.push(childs[type].toCode(refs, args.concat(arg), prefix + '  '));
+            code.push(prefix + '}');
+          }
+        });
+
+    // add entries for type conversions
+    var added = {};
+    typed.conversions
+        .filter(function (conversion) {
+          return childs[conversion.to] && !childs[conversion.from];
+        })
+        .forEach(function (conversion) {
+          if (!added[conversion.from]) {
+            added[conversion.from] = true;
+
             var arg = 'arg' + args.length;
+            var test = refs.add(getTypeTest(conversion.from), 'test') + '(' + arg + ')';
+            var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
 
-            var before;
-            var after;
-            var nextPrefix = prefix + '  ';
-            if (type == '*') { // anytype
-              before = (index > 0 ? 'else {' : '');
-              after  = (index > 0 ? '}' : '');
-              if (index === 0) {nextPrefix = prefix;}
-            }
-            else {
-              var ref = refs.add(getTypeTest(type), 'test') + '(' + arg + ')';
-              before = 'if (' + ref + ') { // type: ' + type;
-              after  = '}';
-            }
+            code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
+            code.push(childs[conversion.to].toCode(refs, args.concat(convert), prefix + '  '));
+            code.push(prefix + '}');
+          }
+        });
 
-            if (before) code.push(prefix + before);
-            code.push(childs[type].toCode(refs, args.concat(arg), nextPrefix));
-            if (after) code.push(prefix + after);
-          });
-
-      // add entries for type conversions
-      var added = {};
-      typed.conversions
-          .filter(function (conversion) {
-            return childs[conversion.to] && !childs[conversion.from];
-          })
-          .forEach(function (conversion) {
-            if (!added[conversion.from]) {
-              added[conversion.from] = true;
-
-              var arg = 'arg' + args.length;
-              var test = refs.add(getTypeTest(conversion.from), 'test') + '(' + arg + ')';
-              var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
-
-              code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-              code.push(childs[conversion.to].toCode(refs, args.concat(convert), prefix + '  '));
-              code.push(prefix + '}');
-            }
-          });
-    }
-    
     return code.join('\n');
   };
 
   /**
-   * The root node of a node tree is an arguments node, which does not
-   * have a map with childs per type, but has an array with entries for each
-   * supported argument count
+   * The root node of a node tree
    * @param {string} [name]         Optional function name
-   * @param {Node[]} args           Tree of nodes, signatures grouped per
-   *                                argument count
-   * @param {Signature[]} [varArgs] Array with signatures with variable argument
-   *                                count. The array must be ordered by
-   *                                minimal number of arguments
    * @constructor
    */
-  function RootNode(name, args, varArgs) {
+  function RootNode(name) {
     this.name = name || '';
-    this.args = args || [];
-    this.varArgs = varArgs || [];
+    this.signature = [];
+    this.fn = null;
+    this.childs = {};
   }
-  
+
+  RootNode.prototype = Object.create(Node.prototype);
+
+  RootNode.prototype._toCode = Node.prototype.toCode;
+
   /**
    * Returns a string with JavaScript code for this function
    * @param {Refs} refs     Object to store function references
@@ -334,38 +338,17 @@
   RootNode.prototype.toCode = function (refs) {
     var code = [];
 
-    // we use a regular for loop: can't use .map as this.args can contain undefined entries
+    // create an array with all argument names
+    var argCount = this.depth();
     var params = [];
-    for (var i = 0; i < this.args.length; i++) {
+    for (var i = 0; i < argCount; i++) {
       params[i] = 'arg' + i;
     }
 
+    var args = [];
+    var prefix = '  ';
     code.push('return function ' + this.name + '(' + params.join(', ') + ') {');
-    
-    var first = true;
-    this.args.forEach(function (node, index) {
-      // Note that some indexes can be undefined, but forEach skips undefined 
-      //      values automatically so we don't have to check whether node !== undefined.
-      var args = [];
-      var prefix = '    ';
-      var statement = first ? 'if' : 'else if';
-      code.push('  ' + statement + ' (arguments.length === ' + index +  ') {');
-      code.push(node.toCode(refs, args, prefix));
-      code.push('  }');
-      
-      first = false;
-    });
-
-    if (!first) {
-      code.push('  else {');
-
-      // TODO: varArg signatures
-
-      code.push('    throw new TypeError(\'Wrong number of arguments\');'); // TODO: output the allowed numbers
-      code.push('  }');
-    }
-
-
+    code.push(this._toCode(refs, args, prefix));
     code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the actual signature
     code.push('}');
     
@@ -409,57 +392,38 @@
    * Create a recursive node tree for traversing the number and type of parameters
    * @param {string} [name]            Function name. Optional
    * @param {Signature[]} signatures   An array with split signatures
-   * @return {RootNode} Returns a node tree
+   * @return {RootNode}                Returns a node tree
    */
   function createNodeTree(name, signatures) {
-    var args = [];        // nodes with no varArgs, place in array corresponds
-                          // with the number of arguments
-    var varArgs = [];     // signatures with varArgs
+    var root = new RootNode(name);
 
     signatures.forEach(function (signature) {
-      if (signature.varArgs) {
-        varArgs.push(signature);
-      }
-      else {
-        var params = signature.params.concat([]);
+      var params = signature.params.concat([]);
 
-        // get the tree entry for the current number of arguments
-        var argCount = params.length;
-        var node = args[argCount];
-        if (!node) {
-          node = args[argCount] = new Node();
+      // loop over all parameters, create a nested structure
+      var node = root;
+      while(params.length > 0) {
+        var param = params.shift();
+        var type = param.types[0];
+
+        var child = node.childs[type];
+        if (child === undefined) {
+          child = node.childs[type] = new Node(node.signature.concat(type));
         }
-
-        // loop over all parameters, create a nested structure
-        while(params.length > 0) {
-          var param = params.shift();
-          var type = param.types[0];
-
-          var child = node.childs[type];
-          if (child === undefined) {
-            child = node.childs[type] = new Node(node.signature.concat(type));
-          }
-          node = child;
-        }
-
-        // add the function as leaf of the innermost node
-        node.fn = signature.fn;
+        node = child;
       }
+
+      // add the function as leaf of the innermost node
+      node.fn = signature.fn;
     });
 
-    // order the varArgs by number of params
-    varArgs.sort(function (a, b) {
-      return a.params.length - b.params.length;
-    });
-    // TODO: test for conflicts between varArgs and non-vararg signatures
-
-    return new RootNode(name, args, varArgs);
+    return root;
   }
 
   /**
-   * minify JavaScript code of a typed function
+   * Minify JavaScript code of a typed function
    * @param {string} code
-   * @return {string} Returns minified code
+   * @return {string} Returns (roughly) minified code
    */
   function minify (code) {
     return code
@@ -493,6 +457,8 @@
     var structure = splitSignatures(signatures);
     var tree = createNodeTree(name, structure);
 
+    //console.log('TREE', JSON.stringify(tree, null, 2)) // TODO: cleanup
+
     var treeCode = tree.toCode(refs); // TODO: do not create references in toCode but in createNodeTree
     var refsCode = refs.toCode();
 
@@ -503,6 +469,8 @@
       treeCode,
       '})'
     ].join('\n');
+
+    //console.log('FACTORY', factory) // TODO: cleanup
 
     if (typed.config.minify) {
       factory = minify(factory);

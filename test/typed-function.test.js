@@ -101,8 +101,8 @@ describe('parse', function() {
     assert.equal(fn(false, true), 'B');
     assert.equal(fn(false, 2), 'B');
     assert.equal(fn('str'), 'C');
-    assert.throws(function () {fn()}, /Wrong number of arguments/);
-    assert.throws(function () {fn(1,2,3)}, /Wrong number of arguments/);
+    assert.throws(function () {fn()}, / Wrong function signature/);
+    assert.throws(function () {fn(1,2,3)}, / Wrong function signature/);
     assert.throws(function () {fn('str', 2)}, /Wrong function signature/);
     assert.throws(function () {fn(true, 'str')}, /Wrong function signature/);
     assert.throws(function () {fn(2, 3)}, /Wrong function signature/);
@@ -269,14 +269,14 @@ describe('parse', function() {
     assert.throws(function () {fn(new Date())}, /TypeError: Wrong function signature/);
   });
 
-  it('should throw an error when providing a wrong number of arguments', function() {
+  it('should throw an error when providing a  Wrong function signature', function() {
     var fn = typed({
       'number': function (value) {
         return 'number:' + value;
       }
     });
 
-    assert.throws(function () {fn(1, 2)}, /TypeError: Wrong number of arguments/);
+    assert.throws(function () {fn(1, 2)}, /TypeError: Wrong function signature/);
   });
 
   it('should throw an error when composing with an unknown type', function() {
