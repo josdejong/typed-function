@@ -8,6 +8,7 @@ Features:
 - Type-checking of input arguments.
 - Automatic type conversion of arguments.
 - Compose typed functions with multiple signatures.
+- Supports union types, any type, variable arguments.
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
@@ -31,12 +32,12 @@ var fn1 = typed('number, string', function (a, b) {
   return 'a is a number, b is a string';
 });
 
-// create a typed function with multiple types per argument
+// create a typed function with multiple types per argument (type union)
 var fn2 = typed('string, number | boolean', function (a, b) {
   return 'a is a string, b is a number or a boolean';
 });
 
-// create a typed function with anytype argument
+// create a typed function with any type argument
 var fn3 = typed('string, *', function (a, b) {
   return 'a is a string, b can be anything';
 });
@@ -145,7 +146,7 @@ typed-function has the following built-in types:
 - `Date`
 - `RegExp`
 - `Object`
-- `*` (anytype)
+- `*` (any)
 
 
 ### Output
@@ -164,7 +165,6 @@ The functions generated with `typed({...})` have:
 ### Version 1
 
 - Extend function signatures:
-  - Ellipsis like `'string, ...'`
   - Optional arguments like `'number?, array'`
 - Detailed error messages.
 - Create a good benchmark, to get insight in the overhead.

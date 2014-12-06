@@ -22,7 +22,7 @@
   'use strict';
 
   // order types
-  // anytype (*) will be ordered last, and object as second last (as other types
+  // any type (*) will be ordered last, and object as second last (as other types
   // may be an object as well, like Array)
   function compareTypes(a, b) {
     if (a === '*') return 1;
@@ -291,7 +291,7 @@
           var arg = 'arg' + args.length;
           var child = childs[type];
 
-          if (type == '*') { // anytype (this type is ordered last)
+          if (type == '*') { // any type (this type is ordered last)
             if (child.variable) {
               code.push(prefix + 'var varArgs = [];');
               code.push(prefix + 'for (var i = ' + args.length + '; i < arguments.length; i++) {');

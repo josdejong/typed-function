@@ -181,7 +181,7 @@ describe('parse', function() {
       assert.throws(function () {fn('string', 'string')}, /Wrong function signature/);
     });
 
-    it('should create a typed function with anytype arguments (1)', function() {
+    it('should create a typed function with any type arguments (1)', function() {
       var fn = typed('string, *...', function (str, values) {
         assert.equal(typeof str, 'string');
         assert(Array.isArray(values));
@@ -195,7 +195,7 @@ describe('parse', function() {
       assert.throws(function () {fn('string')}, /Wrong function signature/);
     });
 
-    it('should create a typed function with anytype arguments (2)', function() {
+    it('should create a typed function with any type arguments (2)', function() {
       var fn = typed('*, number...', function (any, values) {
         assert(Array.isArray(values));
         return any + ': ' + values.join(', ');
@@ -318,12 +318,12 @@ describe('parse', function() {
 
   });
 
-  describe('anytype', function () {
+  describe('any type', function () {
 
-    it('should compose a function with one anytype argument', function() {
+    it('should compose a function with one any type argument', function() {
       var fn = typed({
         '*': function (value) {
-          return 'anytype:' + value;
+          return 'any type:' + value;
         },
         'string': function (value) {
           return 'string:' + value;
@@ -335,67 +335,67 @@ describe('parse', function() {
 
       assert(fn.signatures instanceof Object);
       assert.strictEqual(Object.keys(fn.signatures).length, 3);
-      assert.equal(fn(2), 'anytype:2');
-      assert.equal(fn([1,2,3]), 'anytype:1,2,3');
+      assert.equal(fn(2), 'any type:2');
+      assert.equal(fn([1,2,3]), 'any type:1,2,3');
       assert.equal(fn('foo'), 'string:foo');
       assert.equal(fn(false), 'boolean:false');
     });
 
-    it('should compose a function with multiple anytype arguments (1)', function() {
+    it('should compose a function with multiple any type arguments (1)', function() {
       var fn = typed({
         '*,boolean': function () {
-          return 'anytype,boolean';
+          return 'any type,boolean';
         },
         '*,string': function () {
-          return 'anytype,string';
+          return 'any type,string';
         }
       });
 
       assert(fn.signatures instanceof Object);
       assert.strictEqual(Object.keys(fn.signatures).length, 2);
-      assert.equal(fn([],true), 'anytype,boolean');
-      assert.equal(fn(2,'foo'), 'anytype,string');
+      assert.equal(fn([],true), 'any type,boolean');
+      assert.equal(fn(2,'foo'), 'any type,string');
       assert.throws(function () {fn([], new Date())}, /Wrong function signature/)
       assert.throws(function () {fn(2, 2)}, /Wrong function signature/)
     });
 
-    it('should compose a function with multiple anytype arguments (2)', function() {
+    it('should compose a function with multiple any type arguments (2)', function() {
       var fn = typed({
         '*,boolean': function () {
-          return 'anytype,boolean';
+          return 'any type,boolean';
         },
         '*,number': function () {
-          return 'anytype,number';
+          return 'any type,number';
         },
         'string,*': function () {
-          return 'string,anytype';
+          return 'string,any type';
         }
       });
 
       assert(fn.signatures instanceof Object);
       assert.strictEqual(Object.keys(fn.signatures).length, 3);
-      assert.equal(fn([],true), 'anytype,boolean');
-      assert.equal(fn([],2), 'anytype,number');
-      assert.equal(fn('foo', 2), 'string,anytype');
+      assert.equal(fn([],true), 'any type,boolean');
+      assert.equal(fn([],2), 'any type,number');
+      assert.equal(fn('foo', 2), 'string,any type');
       assert.throws(function () {fn([], new Date())}, /Wrong function signature/)
       assert.throws(function () {fn([], 'foo')}, /Wrong function signature/)
     });
 
-    it('should compose a function with multiple anytype arguments (3)', function() {
+    it('should compose a function with multiple any type arguments (3)', function() {
       var fn = typed({
         'string,*': function () {
-          return 'string,anytype';
+          return 'string,any type';
         },
         '*': function () {
-          return 'anytype';
+          return 'any type';
         }
       });
 
       assert(fn.signatures instanceof Object);
       assert.strictEqual(Object.keys(fn.signatures).length, 2);
-      assert.equal(fn('foo', 2), 'string,anytype');
-      assert.equal(fn('foo'), 'anytype');
-      assert.equal(fn([]), 'anytype');
+      assert.equal(fn('foo', 2), 'string,any type');
+      assert.equal(fn('foo'), 'any type');
+      assert.equal(fn([]), 'any type');
       assert.throws(function () {fn([], 'foo')}, /Wrong function signature/)
     });
 

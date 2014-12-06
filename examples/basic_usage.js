@@ -5,12 +5,12 @@ var fn1 = typed('number, string', function (a, b) {
   return 'a is a number, b is a string';
 });
 
-// create a typed function with multiple types per argument
+// create a typed function with multiple types per argument (type union)
 var fn2 = typed('string, number | boolean', function (a, b) {
   return 'a is a string, b is a number or a boolean';
 });
 
-// create a typed function with anytype argument
+// create a typed function with any type argument *
 var fn3 = typed('string, *', function (a, b) {
   return 'a is a string, b can be anything';
 });
