@@ -87,7 +87,7 @@ The following type expressions are supported:
 
 - Any type: `*`
 - Union types: `number | string`
-- Variable arguments: `...number`
+- Variable parameters: `...number`
 
 
 ## API
@@ -170,7 +170,7 @@ checking done by `typed-function` anyway.
 ### Version 1
 
 - Extend function signatures:
-  - Optional arguments like `'[number], array'`
+  - Optional arguments like `'[number], array'` or like `number=, array`
   - Nullable arguments like `'?Object'`
 - Detailed error messages.
 - Create a good benchmark, to get insight in the overhead.

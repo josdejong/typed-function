@@ -195,6 +195,20 @@ describe('parse', function() {
       assert.throws(function () {fn('string')}, /Wrong function signature/);
     });
 
+    it('should create a typed function with implicit any type arguments', function() {
+      var fn = typed('string, ...', function (str, values) {
+        assert.equal(typeof str, 'string');
+        assert(Array.isArray(values));
+        return str + ': ' + values.join(', ');
+      });
+
+      assert.equal(fn('foo', 2), 'foo: 2');
+      assert.equal(fn('foo', 2, true, 'bar'), 'foo: 2, true, bar');
+      assert.equal(fn('foo', 'bar'), 'foo: bar');
+      assert.throws(function () {fn(2, 4)}, /Wrong function signature/);
+      assert.throws(function () {fn('string')}, /Wrong function signature/);
+    });
+
     it('should create a typed function with any type arguments (2)', function() {
       var fn = typed('*, ...number', function (any, values) {
         assert(Array.isArray(values));

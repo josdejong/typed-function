@@ -134,7 +134,7 @@
     this.types.forEach(function (type, index) {
       if (type.substring(0, 3) == '...') {
         if (index === this.types.length - 1) {
-          this.types[index] = type.substring(3);
+          this.types[index] = type.substring(3) || '*';
           this.variable = true;
         }
         else {
