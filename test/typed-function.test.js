@@ -151,7 +151,7 @@ describe('parse', function() {
   describe('variable arguments', function () {
 
     it('should create a typed function with variable arguments', function() {
-      var sum = typed('number...', function (values) {
+      var sum = typed('...number', function (values) {
         assert(Array.isArray(values));
         var sum = 0;
         for (var i = 0; i < values.length; i++) {
@@ -168,7 +168,7 @@ describe('parse', function() {
     });
 
     it('should create a typed function with variable arguments (2)', function() {
-      var fn = typed('string, number...', function (str, values) {
+      var fn = typed('string, ...number', function (str, values) {
         assert.equal(typeof str, 'string');
         assert(Array.isArray(values));
         return str + ': ' + values.join(', ');
@@ -182,7 +182,7 @@ describe('parse', function() {
     });
 
     it('should create a typed function with any type arguments (1)', function() {
-      var fn = typed('string, *...', function (str, values) {
+      var fn = typed('string, ...*', function (str, values) {
         assert.equal(typeof str, 'string');
         assert(Array.isArray(values));
         return str + ': ' + values.join(', ');
@@ -196,7 +196,7 @@ describe('parse', function() {
     });
 
     it('should create a typed function with any type arguments (2)', function() {
-      var fn = typed('*, number...', function (any, values) {
+      var fn = typed('*, ...number', function (any, values) {
         assert(Array.isArray(values));
         return any + ': ' + values.join(', ');
       });
@@ -210,13 +210,13 @@ describe('parse', function() {
 
     it('should create a composed function with variable arguments', function() {
       var fn = typed({
-        'string, number...': function (str, values) {
+        'string, ...number': function (str, values) {
           assert.equal(typeof str, 'string');
           assert(Array.isArray(values));
           return str + ': ' + values.join(', ');
         },
 
-        'boolean...': function (values) {
+        '...boolean': function (values) {
           assert(Array.isArray(values));
           return 'booleans';
         }
@@ -234,11 +234,11 @@ describe('parse', function() {
 
     it('should throw an error in case of unexpected variable arguments', function() {
       assert.throws(function () {
-        typed('number... | string', function () {});
+        typed('...number | string', function () {});
       }, /SyntaxError: Unexpected variable arguments operator "..."/);
 
       assert.throws(function () {
-        typed('number..., string', function () {});
+        typed('...number, string', function () {});
       }, /SyntaxError: Unexpected variable arguments operator "..."/);
     });
 

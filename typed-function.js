@@ -129,12 +129,12 @@
       throw new Error('String or Array expected');
     }
 
-    // parse variable arguments operator (ellipses '...')
+    // parse variable arguments operator (ellipses '...number')
     this.variable = variable || false;
     this.types.forEach(function (type, index) {
-      if (type.substring(type.length - 3) == '...') {
+      if (type.substring(0, 3) == '...') {
         if (index === this.types.length - 1) {
-          this.types[index] = type.substring(0, type.length - 3);
+          this.types[index] = type.substring(3);
           this.variable = true;
         }
         else {
@@ -274,7 +274,7 @@
 
       if(this.variable) {
         code.push(prefix + 'if (arguments.length > ' + (args.length - 1) + ') {');
-        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature + '...');
+        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ...' + this.signature);
         code.push(prefix + '}');
       }
       else {

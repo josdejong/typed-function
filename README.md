@@ -69,13 +69,25 @@ catch (err) {
 ```
 
 
-## Performance
+## Types
 
-Type checking input arguments adds some overhead to a function. For very small
-functions this overhead can be larger than the function execution itself is, 
-but for any non-trivial function the overhead is typically small to neglectable.
-You need to keep in mind though that you probably would have to do the type
-checking done by `typed-function` anyway.
+typed-function has the following built-in types:
+
+- `null`
+- `boolean`
+- `number`
+- `string`
+- `function`
+- `Array`
+- `Date`
+- `RegExp`
+- `Object`
+
+The following type expressions are supported:
+
+- Any type: `*`
+- Union types: `number | string`
+- Variable arguments: `...number`
 
 
 ## API
@@ -133,22 +145,6 @@ typed(name: string, signatures: Object.<string, function>) : function
         If false the typed-functions have a nicely readable .toString() source.
 
 
-### Types
-
-typed-function has the following built-in types:
-
-- `null`
-- `boolean`
-- `number`
-- `string`
-- `function`
-- `Array`
-- `Date`
-- `RegExp`
-- `Object`
-- `*` (any)
-
-
 ### Output
 
 The functions generated with `typed({...})` have:
@@ -160,12 +156,22 @@ The functions generated with `typed({...})` have:
   signatures as key and the original sub-functions as value.
 
 
+## Performance
+
+Type checking input arguments adds some overhead to a function. For very small
+functions this overhead can be larger than the function execution itself is,
+but for any non-trivial function the overhead is typically small to neglectable.
+You need to keep in mind though that you probably would have to do the type
+checking done by `typed-function` anyway.
+
+
 ## Roadmap
 
 ### Version 1
 
 - Extend function signatures:
-  - Optional arguments like `'number?, array'`
+  - Optional arguments like `'[number], array'`
+  - Nullable arguments like `'?Object'`
 - Detailed error messages.
 - Create a good benchmark, to get insight in the overhead.
 - Allow conversions not to be able to convert any input (for example string to
