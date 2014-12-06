@@ -273,12 +273,7 @@
         code.push(prefix + 'for (var i = ' + args.length + '; i < arguments.length; i++) {');
         code.push(prefix + '  varArgs.push(arguments[i]);');
         code.push(prefix + '}');
-        if (this.fn) {
-          code.push(this._fnToCode(refs, nodeArgs, nodeTypes, prefix));
-        }
-        this.forEach(function (child) {
-          code.push(child.toCode(refs, nodeArgs, nodeTypes, prefix));
-        });
+        code = code.concat(this._contentToCode(refs, nodeArgs, nodeTypes, prefix));
       }
       else {
         test = refs.add(getTypeTest(type), 'test');
@@ -294,37 +289,19 @@
         code.push(prefix + '  }');
         code.push(prefix + '}');
         code.push(prefix + 'if (match) {');
-        if (this.fn) {
-          code.push(this._fnToCode(refs, nodeArgs, nodeTypes, prefix + '  '));
-        }
-        this.forEach(function (child) {
-          code.push(child.toCode(refs, nodeArgs, nodeTypes, prefix + '  '));
-        });
+        code = code.concat(this._contentToCode(refs, nodeArgs, nodeTypes, prefix + '  '));
         code.push(prefix + '}');
-
-        // TODO: conversion of arguments
       }
     }
     else {
       if (type == '*') { // any type (ordered last)
-        if (this.fn) {
-          code.push(this._fnToCode(refs, nodeArgs, nodeTypes, prefix));
-        }
-        this.forEach(function (child) {
-          code.push(child.toCode(refs, nodeArgs, nodeTypes, prefix));
-        });
+        code = code.concat(this._contentToCode(refs, nodeArgs, nodeTypes, prefix));
       }
       else {
         test = refs.add(getTypeTest(type), 'test');
 
         code.push(prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
-        if (this.fn) {
-          code.push(this._fnToCode(refs, nodeArgs, nodeTypes, prefix + '  '));
-        }
-        this.forEach(function (child) {
-          code.push(child.toCode(refs, nodeArgs, nodeTypes, prefix + '  '));
-        });
-
+        code = code.concat(this._contentToCode(refs, nodeArgs, nodeTypes, prefix + '  '));
         code.push(prefix + '}');
       }
     }
@@ -354,24 +331,34 @@
   };
 
   /**
-   * Create a code representation for calling a function signature.
-   * Tests for correct number of arguments first.
+   * Create a code representation for calling a function signature,
+   * iterating over it's childs, and iterating over conversions
    * @param {Refs} refs         Object to store function references
    * @param {string[]} args     Argument names, like ['arg0', 'arg1', ...],
    *                            but can also contain conversions like ['arg0', 'convert1(arg1)']
    * @param {Param[]} types     Array with parameter types parsed so far
    * @param {string} prefix     A number of spaces to prefix for every line of code
-   * @return {string} code
+   * @return {string[]} code
    * @private
    */
-  Node.prototype._fnToCode = function (refs, args, types, prefix) {
-    var compare = this.variable ? '>=' : '===';
-    var ref = refs.add(this.fn, 'signature');
-    return [
-      prefix + 'if (arguments.length ' + compare + ' ' + args.length + ') {',
-      prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '),
-      prefix + '}'
-    ].join('\n');
+  Node.prototype._contentToCode = function (refs, args, types, prefix) {
+    var code = [];
+    if (this.fn) {
+      var compare = this.variable ? '>=' : '===';
+      var ref = refs.add(this.fn, 'signature');
+      code.push(prefix + 'if (arguments.length ' + compare + ' ' + args.length + ') {');
+      code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
+      code.push(prefix + '}');
+    }
+
+    // iterate over childs
+    this.forEach(function (child) {
+      code.push(child.toCode(refs, args, types, prefix));
+    });
+
+    // TODO: conversion of arguments
+
+    return code;
   };
 
   /**
@@ -416,15 +403,9 @@
 
     var args = [];
     var types = [];
-    var prefix = '  ';
+    var prefix = '';
     code.push('return function ' + this.name + '(' + params.join(', ') + ') {');
-    if (this.fn) {
-      code.push(this._fnToCode(refs, args, types, prefix));
-    }
-    this.forEach(function (child) {
-      code.push(child.toCode(refs, args, types, prefix));
-    });
-
+    code = code.concat(this._contentToCode(refs, args, types, prefix + '  '));
     code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the actual signature
     code.push('}');
     
