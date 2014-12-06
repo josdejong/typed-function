@@ -225,14 +225,13 @@
    * - Child nodes in a map `types`.
    * - No child nodes but a function `fn`, the function to be called for 
    *   This signature.
-   * @param {string[]} [signature]   An optional array with types of the
-   *                                 signature up to this child node.
+   * @param {Param} type   The parameter type of this node
    * @constructor
    */
-  function Node (signature) {
-    this.signature = signature || [];
+  function Node (type) {
+    this.type = type;
     this.fn = null;
-    this.variable = false;
+    this.variable = false; // true if variable args '...'
     this.childs = {};
   }
 
@@ -256,10 +255,11 @@
    * @param {Refs} refs     Object to store function references
    * @param {string[]} args Argument names, like ['arg0', 'arg1', ...],
    *                        but can also contain conversions like ['arg0', 'convert1(arg1)']
-   * @param {string} prefix A number of spaces to prefix for every line of code
+   * @param {string[]} types    Array with parameter types parsed so far
+   * @param {string} prefix     A number of spaces to prefix for every line of code
    * @return {string} code
    */
-  Node.prototype.toCode = function (refs, args, prefix) {
+  Node.prototype.toCode = function (refs, args, types, prefix) {
     var code = [];
     var childs = this.childs;
 
@@ -268,12 +268,12 @@
 
       if(this.variable) {
         code.push(prefix + 'if (arguments.length > ' + (args.length - 1) + ') {');
-        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature);
+        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
         code.push(prefix + '}');
       }
       else {
         code.push(prefix + 'if (arguments.length === ' + args.length +') {');
-        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature);
+        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
         code.push(prefix + '}');
       }
     }
@@ -291,10 +291,10 @@
               code.push(prefix + 'for (var i = ' + args.length + '; i < arguments.length; i++) {');
               code.push(prefix + '  varArgs.push(arguments[i]);');
               code.push(prefix + '}');
-              code.push(child.toCode(refs, args.concat('varArgs'), prefix));
+              code.push(child.toCode(refs, args.concat('varArgs'), types.concat(this.type), prefix));
             }
             else {
-              code.push(child.toCode(refs, args.concat(arg), prefix));
+              code.push(child.toCode(refs, args.concat(arg), types.concat(this.type), prefix));
             }
           }
           else {
@@ -312,18 +312,18 @@
               code.push(prefix + '  }');
               code.push(prefix + '}');
               code.push(prefix + 'if (match) {');
-              code.push(child.toCode(refs, args.concat('varArgs'), prefix + '  '));
+              code.push(child.toCode(refs, args.concat('varArgs'), types.concat(this.type), prefix + '  '));
               code.push(prefix + '}');
 
               // TODO: conversion of arguments
             }
             else {
               code.push(prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
-              code.push(child.toCode(refs, args.concat(arg), prefix + '  '));
+              code.push(child.toCode(refs, args.concat(arg), types.concat(this.type), prefix + '  '));
               code.push(prefix + '}');
             }
           }
-        });
+        }.bind(this));
 
     // add entries for type conversions
     var added = {};
@@ -340,10 +340,10 @@
             var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
 
             code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-            code.push(childs[conversion.to].toCode(refs, args.concat(convert), prefix + '  '));
+            code.push(childs[conversion.to].toCode(refs, args.concat(convert), types.concat(this.type), prefix + '  '));
             code.push(prefix + '}');
           }
-        });
+        }.bind(this));
 
     return code.join('\n');
   };
@@ -355,7 +355,6 @@
    */
   function RootNode(name) {
     this.name = name || '';
-    this.signature = [];
     this.fn = null;
     this.childs = {};
   }
@@ -380,9 +379,10 @@
     }
 
     var args = [];
+    var types = [];
     var prefix = '  ';
     code.push('return function ' + this.name + '(' + params.join(', ') + ') {');
-    code.push(this._toCode(refs, args, prefix));
+    code.push(this._toCode(refs, args, types, prefix));
     code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the actual signature
     code.push('}');
     
@@ -443,7 +443,7 @@
 
         var child = node.childs[type];
         if (child === undefined) {
-          child = node.childs[type] = new Node(node.signature.concat(param));
+          child = node.childs[type] = new Node(param);
         }
         node = child;
       }
