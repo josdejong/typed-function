@@ -130,19 +130,13 @@
     }
 
     // parse variable arguments operator (ellipses '...number')
-    this.variable = variable || false;
-    this.types.forEach(function (type, index) {
-      if (type.substring(0, 3) == '...') {
-        if (index === this.types.length - 1) {
-          this.types[index] = type.substring(3) || '*';
-          this.variable = true;
-        }
-        else {
-          // TODO: allow variable arguments anywhere? (similar to optional args like `fn(string?, string, function)`
-          throw new SyntaxError('Unexpected variable arguments operator "..."');
-        }
-      }
-    }.bind(this));
+    if (this.types[0] !== undefined && this.types[0].substring(0, 3) == '...') {
+      this.types[0] = this.types[0].substring(3) || '*';
+      this.variable = true;
+    }
+    else {
+      this.variable = variable || false;
+    }
   }
 
   /**
@@ -155,11 +149,11 @@
 
   /**
    * Return a string representation of this params types, like 'string' or
-   * 'number | boolean'
+   * 'number | boolean' or '...number'
    * @returns {string}
    */
   Param.prototype.toString = function () {
-    return this.types.join('|');
+    return (this.variable ? '...' : '') + this.types.join('|');
   };
 
   /**
@@ -274,7 +268,7 @@
 
       if(this.variable) {
         code.push(prefix + 'if (arguments.length > ' + (args.length - 1) + ') {');
-        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ...' + this.signature);
+        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature);
         code.push(prefix + '}');
       }
       else {
@@ -429,12 +423,13 @@
   }
 
   /**
-   * Create a recursive node tree for traversing the number and type of parameters
+   * Parse an object with signatures. Creates a recursive node tree for
+   * traversing the number and type of parameters.
    * @param {string} [name]            Function name. Optional
    * @param {Signature[]} signatures   An array with split signatures
    * @return {RootNode}                Returns a node tree
    */
-  function createNodeTree(name, signatures) {
+  function parseSignatures(name, signatures) {
     var root = new RootNode(name);
 
     signatures.forEach(function (signature) {
@@ -448,7 +443,7 @@
 
         var child = node.childs[type];
         if (child === undefined) {
-          child = node.childs[type] = new Node(node.signature.concat(type));
+          child = node.childs[type] = new Node(node.signature.concat(param));
         }
         node = child;
       }
@@ -496,11 +491,11 @@
 
     // parse signatures, create a node tree
     var structure = splitSignatures(signatures);
-    var tree = createNodeTree(name, structure);
+    var tree = parseSignatures(name, structure);
 
     //console.log('TREE', JSON.stringify(tree, null, 2)) // TODO: cleanup
 
-    var treeCode = tree.toCode(refs); // TODO: do not create references in toCode but in createNodeTree
+    var treeCode = tree.toCode(refs); // TODO: do not create references in toCode but in parseSignatures
     var refsCode = refs.toCode();
 
     // generate JavaScript code

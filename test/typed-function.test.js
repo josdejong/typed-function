@@ -275,10 +275,6 @@ describe('parse', function() {
 
     it('should throw an error in case of unexpected variable arguments', function() {
       assert.throws(function () {
-        typed('...number | string', function () {});
-      }, /SyntaxError: Unexpected variable arguments operator "..."/);
-
-      assert.throws(function () {
         typed('...number, string', function () {});
       }, /SyntaxError: Unexpected variable arguments operator "..."/);
     });

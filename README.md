@@ -1,5 +1,4 @@
-typed-function
-=================
+# typed-function
 
 Type checking for JavaScript functions.
 
@@ -9,7 +8,6 @@ Features:
 - Automatic type conversion of arguments.
 - Compose typed functions with multiple signatures.
 - Supports union types, any type, variable arguments.
-- Uses type expression syntax from the [closure compiler](https://developers.google.com/closure/compiler/docs/js-for-compiler#types).
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
@@ -58,14 +56,14 @@ var fn4 = typed({
 
 // use the functions
 console.log(fn1(2, 'foo'));      // outputs 'a is a number, b is a string'
-console.log(fn4(2));            // outputs 'a is a number'
+console.log(fn4(2));             // outputs 'a is a number'
 
 // calling the function with a non-supported type signature will throw an error
 try {
   fn4('hello world');
 }
 catch (err) {
-  console.log(err.toString()); // outputs: 'TypeError: Wrong function signature'
+  console.log(err.toString());   // outputs: 'TypeError: Wrong function signature'
 }
 ```
 
