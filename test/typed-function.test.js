@@ -15,12 +15,12 @@ describe('parse', function() {
 
   it('should create a named function', function() {
     var fn = typed('myFunction',  {
-      '': function () {
-        return 'noargs';
+      'string': function (str) {
+        return 'foo';
       }
     });
 
-    assert.equal(fn(), 'noargs');
+    assert.equal(fn('bar'), 'foo');
     assert.equal(fn.name, 'myFunction');
   });
 
