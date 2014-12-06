@@ -109,10 +109,10 @@
    * A function parameter
    * @param {string | string[] | Param} types    A parameter type like 'string',
    *                                             'number | boolean'
-   * @param {boolean} [varArgs=false]            Variable arguments if true
+   * @param {boolean} [variable=false]           Variable arguments if true
    * @constructor
    */
-  function Param(types, varArgs) {
+  function Param(types, variable) {
     // parse the types, can be a string with types separated by pipe characters |
     if (typeof types === 'string') {
       this.types = types.split('|').map(function (type) {
@@ -129,17 +129,17 @@
       throw new Error('String or Array expected');
     }
 
-    // parse varArgs operator (ellipses '...')
-    this.varArgs = varArgs || false;
+    // parse variable arguments operator (ellipses '...')
+    this.variable = variable || false;
     this.types.forEach(function (type, index) {
       if (type.substring(type.length - 3) == '...') {
         if (index === this.types.length - 1) {
           this.types[index] = type.substring(0, type.length - 3);
-          this.varArgs = true;
+          this.variable = true;
         }
         else {
-          // TODO: allow varArgs anywhere? (similar to optional args like `fn(string?, string, function)`
-          throw new SyntaxError('Unexpected varArgs "..."');
+          // TODO: allow variable arguments anywhere? (similar to optional args like `fn(string?, string, function)`
+          throw new SyntaxError('Unexpected variable arguments operator "..."');
         }
       }
     }.bind(this));
@@ -150,7 +150,7 @@
    * @returns {Param} A cloned version of this param
    */
   Param.prototype.clone = function () {
-    return new Param(this.types.slice(), this.varArgs);
+    return new Param(this.types.slice(), this.variable);
   };
 
   /**
@@ -184,18 +184,18 @@
       throw new Error('string or Array expected');
     }
     
-    // check varArgs operator '...'
+    // check variable arguments operator '...'
     var withVarArgs = this.params.filter(function (param) {
-      return param.varArgs;
+      return param.variable;
     });
     if (withVarArgs.length === 0) {
-      this.varArgs = false;
+      this.variable = false;
     }
     else if (withVarArgs[0] === this.params[this.params.length - 1]) {
-      this.varArgs = true;
+      this.variable = true;
     }
     else {
-      throw new SyntaxError('Unexpected varArgs "..."');
+      throw new SyntaxError('Unexpected variable arguments operator "..."');
     }
 
     this.fn = fn;
@@ -213,7 +213,7 @@
       if (index < signature.params.length) {
         var param = signature.params[index];
         param.types.forEach(function (type) {
-          _iterate(signature, types.concat(new Param(type, param.varArgs)), index + 1);
+          _iterate(signature, types.concat(new Param(type, param.variable)), index + 1);
         });
       }
       else {
@@ -238,7 +238,7 @@
   function Node (signature) {
     this.signature = signature || [];
     this.fn = null;
-    this.varArgs = false;
+    this.variable = false;
     this.childs = {};
   }
 
@@ -272,10 +272,10 @@
     if (this.fn !== null) {
       var ref = refs.add(this.fn, 'signature');
 
-      if(this.varArgs) {
-        var type = this.signature[this.signature.length - 1];
-        var test = refs.add(getTypeTest(type), 'test');
-
+      if(this.variable) {
+        code.push(prefix + 'if (arguments.length > ' + (args.length - 1) + ') {');
+        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.signature + '...');
+        code.push(prefix + '}');
       }
       else {
         code.push(prefix + 'if (arguments.length === ' + args.length +') {');
@@ -292,14 +292,21 @@
           var child = childs[type];
 
           if (type == '*') { // anytype (this type is ordered last)
-            code.push(child.toCode(refs, args.concat(arg), prefix));
+            if (child.variable) {
+              code.push(prefix + 'var varArgs = [];');
+              code.push(prefix + 'for (var i = ' + args.length + '; i < arguments.length; i++) {');
+              code.push(prefix + '  varArgs.push(arguments[i]);');
+              code.push(prefix + '}');
+              code.push(child.toCode(refs, args.concat('varArgs'), prefix));
+            }
+            else {
+              code.push(child.toCode(refs, args.concat(arg), prefix));
+            }
           }
           else {
             var test = refs.add(getTypeTest(type), 'test');
 
-            if (child.varArgs) {
-              var ref = refs.add(child.fn, 'signature');
-
+            if (child.variable) {
               code.push(prefix + 'var match = true;');
               code.push(prefix + 'var varArgs = [];');
               code.push(prefix + 'for (var i = ' + args.length + '; i < arguments.length; i++) {');
@@ -310,19 +317,11 @@
               code.push(prefix + '    break;');
               code.push(prefix + '  }');
               code.push(prefix + '}');
-              code.push(prefix + 'if (arguments.length > ' + args.length + ' && match) {');
-              code.push(prefix + '  return ' + ref + '(' + args.concat(['varArgs']).join(', ') + '); ' +
-                '// signature: ' + child.signature + '...');
+              code.push(prefix + 'if (match) {');
+              code.push(child.toCode(refs, args.concat('varArgs'), prefix + '  '));
               code.push(prefix + '}');
 
               // TODO: conversion of arguments
-
-              // TODO: this works too but is way slower I think because of slice, test this
-              //code.push(prefix + 'var varArgs = Array.prototype.slice.call(arguments, ' + args.length + ');');
-              //code.push(prefix + 'if (varArgs.length > 0 && varArgs.every(' + test + ')) {');
-              //code.push(prefix + '  return ' + ref + '(' + args.concat(['varArgs']).join(', ') + '); ' +
-              //  '// signature: ' + child.signature + '...');
-              //code.push(prefix + '}');
             }
             else {
               code.push(prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
@@ -456,7 +455,7 @@
 
       // add the function as leaf of the innermost node
       node.fn = signature.fn;
-      node.varArgs = signature.varArgs;
+      node.variable = signature.variable;
     });
 
     return root;

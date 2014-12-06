@@ -63,6 +63,77 @@ describe('parse', function() {
     assert.equal(fn.name, 'myFunction');
   });
 
+  it('should correctly recognize Date from Object (both are an Object)', function() {
+    var signatures = {
+      'Object': function (value) {
+        assert(value instanceof Object);
+        return 'Object';
+      },
+      'Date': function (value) {
+        assert(value instanceof Date);
+        return 'Date';
+      }
+    };
+    var fn = typed(signatures);
+
+    assert.equal(fn({foo: 'bar'}), 'Object');
+    assert.equal(fn(new Date()), 'Date');
+  });
+
+  it('should throw an error when providing an unsupported type of argument', function() {
+    var fn = typed({
+      'number': function (value) {
+        return 'number:' + value;
+      }
+    });
+
+    assert.throws(function () {fn(new Date())}, /TypeError: Wrong function signature/);
+  });
+
+  it('should throw an error when providing a  Wrong function signature', function() {
+    var fn = typed({
+      'number': function (value) {
+        return 'number:' + value;
+      }
+    });
+
+    assert.throws(function () {fn(1, 2)}, /TypeError: Wrong function signature/);
+  });
+
+  it('should throw an error when composing with an unknown type', function() {
+    assert.throws(function () {
+      var fn = typed({
+        'foo': function (value) {
+          return 'number:' + value;
+        }
+      });
+    }, /Error: Unknown type "foo"/);
+  });
+
+  it('should give a hint when composing with a wrongly cased type', function() {
+    assert.throws(function () {
+      var fn = typed({
+        'array': function (value) {
+          return 'array:' + value;
+        }
+      });
+    }, /Error: Unknown type "array". Did you mean "Array"?/);
+
+    assert.throws(function () {
+      var fn = typed({
+        'Function': function (value) {
+          return 'Function:' + value;
+        }
+      });
+    }, /Error: Unknown type "Function". Did you mean "function"?/);
+  });
+
+  describe('multiple types', function () {
+
+    // TODO: test config.minify
+
+  });
+
   describe('multiple types', function () {
 
     it('should create a typed function with multiple types per argument', function() {
@@ -110,22 +181,68 @@ describe('parse', function() {
       assert.throws(function () {fn('string', 'string')}, /Wrong function signature/);
     });
 
+    it('should create a typed function with anytype arguments (1)', function() {
+      var fn = typed('string, *...', function (str, values) {
+        assert.equal(typeof str, 'string');
+        assert(Array.isArray(values));
+        return str + ': ' + values.join(', ');
+      });
+
+      assert.equal(fn('foo', 2), 'foo: 2');
+      assert.equal(fn('foo', 2, true, 'bar'), 'foo: 2, true, bar');
+      assert.equal(fn('foo', 'bar'), 'foo: bar');
+      assert.throws(function () {fn(2, 4)}, /Wrong function signature/);
+      assert.throws(function () {fn('string')}, /Wrong function signature/);
+    });
+
+    it('should create a typed function with anytype arguments (2)', function() {
+      var fn = typed('*, number...', function (any, values) {
+        assert(Array.isArray(values));
+        return any + ': ' + values.join(', ');
+      });
+
+      assert.equal(fn('foo', 2), 'foo: 2');
+      assert.equal(fn(1, 2, 4), '1: 2, 4');
+      assert.equal(fn(null, 2, 4), 'null: 2, 4');
+      assert.throws(function () {fn('string')}, /Wrong function signature/);
+      assert.throws(function () {fn('string', 'string')}, /Wrong function signature/);
+    });
+
+    it('should create a composed function with variable arguments', function() {
+      var fn = typed({
+        'string, number...': function (str, values) {
+          assert.equal(typeof str, 'string');
+          assert(Array.isArray(values));
+          return str + ': ' + values.join(', ');
+        },
+
+        'boolean...': function (values) {
+          assert(Array.isArray(values));
+          return 'booleans';
+        }
+      });
+
+      assert.equal(fn('foo', 2), 'foo: 2');
+      assert.equal(fn('foo', 2, 4), 'foo: 2, 4');
+      assert.equal(fn(true, false, false), 'booleans');
+      assert.throws(function () {fn(2, 4)}, /Wrong function signature/);
+      assert.throws(function () {fn('string')}, /Wrong function signature/);
+      assert.throws(function () {fn('string', true)}, /Wrong function signature/);
+    });
+
+    // TODO: test combination of varArgs and conversion
+
     it('should throw an error in case of unexpected variable arguments', function() {
       assert.throws(function () {
         typed('number... | string', function () {});
-      }, /SyntaxError: Unexpected varArgs/);
+      }, /SyntaxError: Unexpected variable arguments operator "..."/);
 
       assert.throws(function () {
         typed('number..., string', function () {});
-      }, /SyntaxError: Unexpected varArgs/);
+      }, /SyntaxError: Unexpected variable arguments operator "..."/);
     });
 
-    // TODO: test combination of varArgs and composed
-    // TODO: test combination of varArgs and anyType
-
   });
-
-  // TODO: test config.minify
 
   describe('compose', function () {
 
@@ -282,71 +399,6 @@ describe('parse', function() {
       assert.throws(function () {fn([], 'foo')}, /Wrong function signature/)
     });
 
-  });
-
-  it('should correctly recognize Date from Object (both are an Object)', function() {
-    var signatures = {
-      'Object': function (value) {
-        assert(value instanceof Object);
-        return 'Object';
-      },
-      'Date': function (value) {
-        assert(value instanceof Date);
-        return 'Date';
-      }
-    };
-    var fn = typed(signatures);
-
-    assert.equal(fn({foo: 'bar'}), 'Object');
-    assert.equal(fn(new Date()), 'Date');
-  });
-
-  it('should throw an error when providing an unsupported type of argument', function() {
-    var fn = typed({
-      'number': function (value) {
-        return 'number:' + value;
-      }
-    });
-
-    assert.throws(function () {fn(new Date())}, /TypeError: Wrong function signature/);
-  });
-
-  it('should throw an error when providing a  Wrong function signature', function() {
-    var fn = typed({
-      'number': function (value) {
-        return 'number:' + value;
-      }
-    });
-
-    assert.throws(function () {fn(1, 2)}, /TypeError: Wrong function signature/);
-  });
-
-  it('should throw an error when composing with an unknown type', function() {
-    assert.throws(function () {
-      var fn = typed({
-        'foo': function (value) {
-          return 'number:' + value;
-        }
-      });
-    }, /Error: Unknown type "foo"/);
-  });
-
-  it('should give a hint when composing with a wrongly cased type', function() {
-    assert.throws(function () {
-      var fn = typed({
-        'array': function (value) {
-          return 'array:' + value;
-        }
-      });
-    }, /Error: Unknown type "array". Did you mean "Array"?/);
-
-    assert.throws(function () {
-      var fn = typed({
-        'Function': function (value) {
-          return 'Function:' + value;
-        }
-      });
-    }, /Error: Unknown type "Function". Did you mean "function"?/);
   });
 
   describe('conversions' , function () {
