@@ -13,6 +13,17 @@ describe('parse', function() {
     assert.deepEqual(fn.signatures, []);
   });
 
+  it('should create a named function', function() {
+    var fn = typed('myFunction',  {
+      '': function () {
+        return 'noargs';
+      }
+    });
+
+    assert.equal(fn(), 'noargs');
+    assert.equal(fn.name, 'myFunction');
+  });
+
   it('should compose a function with zero arguments', function() {
     var signatures = {
       '': function () {
@@ -27,23 +38,20 @@ describe('parse', function() {
     assert.strictEqual(fn.signatures[''], signatures['']);
   });
 
-  it('should create a named function', function() {
-    var fn = typed('myFunction',  {
-      '': function () {
-        return 'noargs';
-      }
+  it('should create a typed function with one argument', function() {
+    var fn = typed('string', function () {
+        return 'string';
     });
 
-    assert.equal(fn(), 'noargs');
-    assert.equal(fn.name, 'myFunction');
+    assert.equal(fn('hi'), 'string');
   });
 
-  it('should create a typed function', function() {
+  it('should create a typed function with two arguments', function() {
     var fn = typed('string, boolean', function () {
-        return 'noargs';
+        return 'foo';
     });
 
-    assert.equal(fn('hi', true), 'noargs');
+    assert.equal(fn('hi', true), 'foo');
   });
 
   it('should create a named, typed function', function() {
@@ -55,132 +63,142 @@ describe('parse', function() {
     assert.equal(fn.name, 'myFunction');
   });
 
-  it('should create a typed function with multiple types per argument', function() {
-    var fn = typed('number | boolean', function (arg) {
-      return typeof arg;
+  describe('multiple types', function () {
+
+    it('should create a typed function with multiple types per argument', function() {
+      var fn = typed('number | boolean', function (arg) {
+        return typeof arg;
+      });
+
+      assert.equal(fn(true), 'boolean');
+      assert.equal(fn(2), 'number');
+      assert.throws(function () {fn('string')}, /Wrong function signature/);
     });
 
-    assert.equal(fn(true), 'boolean');
-    assert.equal(fn(2), 'number');
-    assert.throws(function () {fn('string')}, /Wrong function signature/);
   });
 
-  it('should create a typed function with varArgs', function() {
-    var sum = typed('number...', function (values) {
-      assert(Array.isArray(values));
-      var sum = 0;
-      for (var i = 0; i < values.length; i++) {
-        sum += values[i];
-      }
-      return sum;
+  describe('variable arguments', function () {
+
+    it('should create a typed function with variable arguments', function() {
+      var sum = typed('number...', function (values) {
+        assert(Array.isArray(values));
+        var sum = 0;
+        for (var i = 0; i < values.length; i++) {
+          sum += values[i];
+        }
+        return sum;
+      });
+
+      assert.equal(sum(2), 2);
+      assert.equal(sum(2,3,4), 9);
+      assert.throws(function () {sum()}, /Wrong function signature/);
+      assert.throws(function () {sum(true)}, /Wrong function signature/);
+      assert.throws(function () {sum('string')}, /Wrong function signature/);
     });
 
-    assert.equal(sum(2), 2);
-    assert.equal(sum(2,3,4), 9);
-    assert.throws(function () {sum()}, /Wrong function signature/);
-    assert.throws(function () {sum(true)}, /Wrong function signature/);
-    assert.throws(function () {sum('string')}, /Wrong function signature/);
-  });
+    it('should create a typed function with variable arguments (2)', function() {
+      var fn = typed('string, number...', function (str, values) {
+        assert.equal(typeof str, 'string');
+        assert(Array.isArray(values));
+        return str + ': ' + values.join(', ');
+      });
 
-  it('should create a typed function with varArgs (2)', function() {
-    var fn = typed('string, number...', function (str, values) {
-      assert.equal(typeof str, 'string');
-      assert(Array.isArray(values));
-      return str + ': ' + values.join(', ');
+      assert.equal(fn('foo', 2), 'foo: 2');
+      assert.equal(fn('foo', 2, 4), 'foo: 2, 4');
+      assert.throws(function () {fn(2, 4)}, /Wrong function signature/);
+      assert.throws(function () {fn('string')}, /Wrong function signature/);
+      assert.throws(function () {fn('string', 'string')}, /Wrong function signature/);
     });
 
-    assert.equal(fn('foo', 2), 'foo: 2');
-    assert.equal(fn('foo', 2, 4), 'foo: 2, 4');
-    assert.throws(function () {fn(2, 4)}, /Wrong function signature/);
-    assert.throws(function () {fn('string')}, /Wrong function signature/);
-    assert.throws(function () {fn('string', 'string')}, /Wrong function signature/);
+    it('should throw an error in case of unexpected variable arguments', function() {
+      assert.throws(function () {
+        typed('number... | string', function () {});
+      }, /SyntaxError: Unexpected varArgs/);
+
+      assert.throws(function () {
+        typed('number..., string', function () {});
+      }, /SyntaxError: Unexpected varArgs/);
+    });
+
+    // TODO: test combination of varArgs and composed
+    // TODO: test combination of varArgs and anyType
+
   });
-
-  // TODO: test combination of varArgs and composed
-  // TODO: test combination of varArgs and anyType
-
-  it('should throw an error in case of unexpected varArgs', function() {
-    assert.throws(function () {
-      typed('number... | string', function () {});
-    }, /SyntaxError: Unexpected varArgs/);
-    
-    assert.throws(function () {
-      typed('number..., string', function () {});
-    }, /SyntaxError: Unexpected varArgs/);
-  });
-
-  // TODO: test a function with only two arguments (not one)
 
   // TODO: test config.minify
 
-  it('should create a composed function with multiple types per argument', function() {
-    var fn = typed({
-      'string | number, boolean':  function () {return 'A';},
-      'boolean, boolean | number': function () {return 'B';},
-      'string':                    function () {return 'C';}
+  describe('compose', function () {
+
+    it('should create a composed function with multiple types per argument', function() {
+      var fn = typed({
+        'string | number, boolean':  function () {return 'A';},
+        'boolean, boolean | number': function () {return 'B';},
+        'string':                    function () {return 'C';}
+      });
+
+      assert.equal(fn('str', false), 'A');
+      assert.equal(fn(2, true), 'A');
+      assert.equal(fn(false, true), 'B');
+      assert.equal(fn(false, 2), 'B');
+      assert.equal(fn('str'), 'C');
+      assert.throws(function () {fn()}, / Wrong function signature/);
+      assert.throws(function () {fn(1,2,3)}, / Wrong function signature/);
+      assert.throws(function () {fn('str', 2)}, /Wrong function signature/);
+      assert.throws(function () {fn(true, 'str')}, /Wrong function signature/);
+      assert.throws(function () {fn(2, 3)}, /Wrong function signature/);
+      assert.throws(function () {fn(2, 'str')}, /Wrong function signature/);
     });
 
-    assert.equal(fn('str', false), 'A');
-    assert.equal(fn(2, true), 'A');
-    assert.equal(fn(false, true), 'B');
-    assert.equal(fn(false, 2), 'B');
-    assert.equal(fn('str'), 'C');
-    assert.throws(function () {fn()}, / Wrong function signature/);
-    assert.throws(function () {fn(1,2,3)}, / Wrong function signature/);
-    assert.throws(function () {fn('str', 2)}, /Wrong function signature/);
-    assert.throws(function () {fn(true, 'str')}, /Wrong function signature/);
-    assert.throws(function () {fn(2, 3)}, /Wrong function signature/);
-    assert.throws(function () {fn(2, 'str')}, /Wrong function signature/);
-  });
+    // TODO: test whether the constructor throws errors when providing wrong arguments to typed(...)
 
-  // TODO: test whether the constructor throws errors when providing wrong arguments to typed(...)
+    it('should compose a function with one argument', function() {
+      var signatures = {
+        'number': function (value) {
+          return 'number:' + value;
+        },
+        'string': function (value) {
+          return 'string:' + value;
+        },
+        'boolean': function (value) {
+          return 'boolean:' + value;
+        }
+      };
+      var fn = typed(signatures);
 
-  it('should compose a function with one argument', function() {
-    var signatures = {
-      'number': function (value) {
-        return 'number:' + value;
-      },
-      'string': function (value) {
-        return 'string:' + value;
-      },
-      'boolean': function (value) {
-        return 'boolean:' + value;
-      }
-    };
-    var fn = typed(signatures);
+      assert.equal(fn(2), 'number:2');
+      assert.equal(fn('foo'), 'string:foo');
+      assert.equal(fn(false), 'boolean:false');
+      assert(fn.signatures instanceof Object);
+      assert.strictEqual(Object.keys(fn.signatures).length, 3);
+      assert.strictEqual(fn.signatures['number'], signatures['number']);
+      assert.strictEqual(fn.signatures['string'], signatures['string']);
+      assert.strictEqual(fn.signatures['boolean'], signatures['boolean']);
+    });
 
-    assert.equal(fn(2), 'number:2');
-    assert.equal(fn('foo'), 'string:foo');
-    assert.equal(fn(false), 'boolean:false');
-    assert(fn.signatures instanceof Object);
-    assert.strictEqual(Object.keys(fn.signatures).length, 3);
-    assert.strictEqual(fn.signatures['number'], signatures['number']);
-    assert.strictEqual(fn.signatures['string'], signatures['string']);
-    assert.strictEqual(fn.signatures['boolean'], signatures['boolean']);
-  });
+    it('should compose a function with multiple arguments', function() {
+      var signatures = {
+        'number': function (value) {
+          return 'number:' + value;
+        },
+        'string': function (value) {
+          return 'string:' + value;
+        },
+        'number, boolean': function (a, b) { // mind space after the comma, should be normalized by composer
+          return 'number,boolean:' + a + ',' + b;
+        }
+      };
+      var fn = typed(signatures);
 
-  it('should compose a function with multiple arguments', function() {
-  var signatures = {
-      'number': function (value) {
-        return 'number:' + value;
-      },
-      'string': function (value) {
-        return 'string:' + value;
-      },
-      'number, boolean': function (a, b) { // mind space after the comma, should be normalized by composer
-        return 'number,boolean:' + a + ',' + b;
-      }
-    };
-    var fn = typed(signatures);
+      assert.equal(fn(2), 'number:2');
+      assert.equal(fn('foo'), 'string:foo');
+      assert.equal(fn(2, false), 'number,boolean:2,false');
+      assert(fn.signatures instanceof Object);
+      assert.strictEqual(Object.keys(fn.signatures).length, 3);
+      assert.strictEqual(fn.signatures['number'], signatures['number']);
+      assert.strictEqual(fn.signatures['string'], signatures['string']);
+      assert.strictEqual(fn.signatures['number,boolean'], signatures['number, boolean']);
+    });
 
-    assert.equal(fn(2), 'number:2');
-    assert.equal(fn('foo'), 'string:foo');
-    assert.equal(fn(2, false), 'number,boolean:2,false');
-    assert(fn.signatures instanceof Object);
-    assert.strictEqual(Object.keys(fn.signatures).length, 3);
-    assert.strictEqual(fn.signatures['number'], signatures['number']);
-    assert.strictEqual(fn.signatures['string'], signatures['string']);
-    assert.strictEqual(fn.signatures['number,boolean'], signatures['number, boolean']);
   });
 
   describe('anytype', function () {

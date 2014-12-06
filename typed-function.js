@@ -138,6 +138,7 @@
           this.varArgs = true;
         }
         else {
+          // TODO: allow varArgs anywhere? (similar to optional args like `fn(string?, string, function)`
           throw new SyntaxError('Unexpected varArgs "..."');
         }
       }
@@ -313,6 +314,15 @@
               code.push(prefix + '  return ' + ref + '(' + args.concat(['varArgs']).join(', ') + '); ' +
                 '// signature: ' + child.signature + '...');
               code.push(prefix + '}');
+
+              // TODO: conversion of arguments
+
+              // TODO: this works too but is way slower I think because of slice, test this
+              //code.push(prefix + 'var varArgs = Array.prototype.slice.call(arguments, ' + args.length + ');');
+              //code.push(prefix + 'if (varArgs.length > 0 && varArgs.every(' + test + ')) {');
+              //code.push(prefix + '  return ' + ref + '(' + args.concat(['varArgs']).join(', ') + '); ' +
+              //  '// signature: ' + child.signature + '...');
+              //code.push(prefix + '}');
             }
             else {
               code.push(prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
