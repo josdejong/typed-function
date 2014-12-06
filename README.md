@@ -9,6 +9,7 @@ Features:
 - Automatic type conversion of arguments.
 - Compose typed functions with multiple signatures.
 - Supports union types, any type, variable arguments.
+- Uses type expression syntax from the [closure compiler](https://developers.google.com/closure/compiler/docs/js-for-compiler#types).
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
@@ -85,9 +86,10 @@ typed-function has the following built-in types:
 
 The following type expressions are supported:
 
-- Any type: `*`
+- Multiple parameters: `string, number, function`
 - Union types: `number | string`
 - Variable parameters: `...number`
+- Any type: `*`
 
 
 ## API

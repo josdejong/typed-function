@@ -130,7 +130,34 @@ describe('parse', function() {
 
   describe('multiple types', function () {
 
-    // TODO: test config.minify
+    it('option minify should be true by default', function () {
+      assert.equal(typed.config.minify, true)
+    });
+
+    it('should configure option minify', function () {
+      var orig = typed.config.minify;
+
+      typed.config.minify = true;
+
+      var fn1 = typed('string', function (str) {
+        return 'string';
+      });
+      var len1 = fn1.toString().length;
+
+      typed.config.minify = false;
+
+      var fn2 = typed('string', function (str) {
+        return 'string';
+      });
+      var len2 = fn2.toString().length;
+
+      assert.equal(fn1('foo'), 'string');
+      assert.equal(fn2('foo'), 'string');
+      assert(len2 > len1);
+
+      // restore original configuration
+      typed.config.minify = orig;
+    });
 
   });
 
