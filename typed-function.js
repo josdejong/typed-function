@@ -344,8 +344,8 @@
       code.push(child._toCode(refs, args.concat(arg), types.concat(child.type), prefix));
     });
 
-    //// add entries for type conversions
-    //code = code.concat(this._conversionsToCode(refs, args, types, prefix)); // TODO
+    // add entries for type conversions
+    code = code.concat(this._conversionsToCode(refs, args, types, prefix));
 
     // TODO: throw error
 
@@ -357,16 +357,19 @@
    * @param {Refs} refs         Object to store function references
    * @param {string[]} args     Argument names, like ['arg0', 'arg1', ...],
    *                            but can also contain conversions like ['arg0', 'convert1(arg1)']
+   *                            args must include the argument for the current node
+   *                            (i.e. args.length >= 1)
    * @param {Param[]} types     Array with parameter types parsed so far
+   *                            types must include the type of the current node
+   *                            i.e. types.length >= 1)
    * @param {string} prefix     A number of spaces to prefix for every line of code
    * @return {string[]} code
-   * @private
+   * @protected
    */
   Node.prototype._conversionsToCode = function (refs, args, types, prefix) {
     var code = [];
 
     // add entries for type conversions
-    console.log('CONVERSIONS', typed.conversions.length, Object.keys(this.childs))
     var added = {};
     typed.conversions
         .filter(function (conversion) {
@@ -380,13 +383,9 @@
             var child = this.childs[conversion.to];
             var test = refs.add(getTypeTest(conversion.from), 'test') + '(' + arg + ')';
             var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
-            var convertArgs = args.concat(convert);
-            var convertTypes = types.concat(child.type);
-
-            console.log('CONVERT', convertArgs, convertTypes)
 
             code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-            code.push(child._toCode(refs, convertArgs, convertTypes, prefix + '  '));
+            code = code.concat(child._contentToCode(refs, args.concat(convert), types.concat(child.type), prefix + '  '));
             code.push(prefix + '}');
           }
         }.bind(this));
