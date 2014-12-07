@@ -285,9 +285,6 @@
         code.push(prefix + 'for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
         code.push(prefix + '  if (' + test + '(arguments[i])) {');
         code.push(prefix + '    varArgs.push(arguments[i]);');
-
-        // TODO: conversions
-
         code.push(prefix + '  } else {');
         code.push(prefix + '    match = false;');
         code.push(prefix + '    break;');
@@ -371,31 +368,10 @@
    */
   Node.prototype._conversionsToCode = function (refs, args, types, prefix) {
     var code = [];
+    var added = {};
 
     // add entries for type conversions
-    this._conversions().forEach(function (conversion) {
-        var arg = 'arg' + args.length;
-        var child = this.childs[conversion.to];
-        var test = refs.add(getTypeTest(conversion.from), 'test') + '(' + arg + ')';
-        var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
-
-        code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-        code = code.concat(child._contentToCode(refs, args.concat(convert), types.concat(child.type), prefix + '  '));
-        code.push(prefix + '}');
-      }.bind(this));
-
-    return code;
-  };
-
-  /**
-   * Get filtered conversions, only conversions which are relevant for this
-   * node are returned.
-   * @returns {Object[]} Returns an array with conversions for this node
-   * @private
-   */
-  Node.prototype._conversions = function () {
-    var added = {};
-    return typed.conversions
+    typed.conversions
         .filter(function (conversion) {
           if (this.childs[conversion.to] !== undefined &&
               this.childs[conversion.from] === undefined &&
@@ -404,7 +380,59 @@
             return true;
           }
           return false;
+        }.bind(this))
+        .forEach(function (conversion) {
+          var test, convert;
+
+          // note: at this point, each child of our node can be pointed to by
+          //       by one conversion or no conversions
+          var type = conversion.to;
+          var child = this.childs[type];
+
+          if (child.variable) {
+            code.push(prefix + 'var match = true;');
+            code.push(prefix + 'var varArgs = [];');
+            code.push(prefix + 'for (var i = ' + args.length + '; i < arguments.length; i++) {');
+
+            // unconverted type
+            test = refs.add(getTypeTest(type), 'test');
+            convert = refs.add(conversion.convert, 'convert');
+            code.push(prefix + '  if (' + test + '(arguments[i])) { // type: ' + conversion.to);
+            code.push(prefix + '    varArgs.push(arguments[i]);');
+
+            // all convertable types
+            typed.conversions
+                .filter(function (c) {
+                  return c.to == type;
+                })
+                .forEach(function (c) {
+                  var test = refs.add(getTypeTest(c.from), 'test') + '(arguments[i])';
+                  var convert = refs.add(c.convert, 'convert') + '(arguments[i])';
+
+                  code.push(prefix + '  } else if (' + test + ') { // type: ' + c.from + ', convert to ' + c.to);
+                  code.push(prefix + '    varArgs.push(' + convert + ');');
+                });
+
+            code.push(prefix + '  } else {');
+            code.push(prefix + '    match = false;');
+            code.push(prefix + '    break;');
+            code.push(prefix + '  }');
+            code.push(prefix + '}');
+            code.push(prefix + 'if (match) {');
+            code = code.concat(child._contentToCode(refs, args.concat('varArgs'), types.concat(child.type), prefix + '  '));
+            code.push(prefix + '}');
+          }
+          else {
+            test = refs.add(getTypeTest(conversion.from), 'test') + '(arguments[' + args.length + '])';
+            convert = refs.add(conversion.convert, 'convert') + '(arguments[' + args.length + '])';
+
+            code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
+            code = code.concat(child._contentToCode( refs, args.concat(convert), types.concat(child.type), prefix + '  '));
+            code.push(prefix + '}');
+          }
         }.bind(this));
+
+    return code;
   };
 
   /**
@@ -575,11 +603,11 @@
       '})'
     ].join('\n');
 
-    console.log('CODE', treeCode) // TODO: cleanup
+    //console.log('CODE', treeCode) // TODO: cleanup
 
-    //if (typed.config.minify) {
-    //  factory = minify(factory);
-    //}
+    if (typed.config.minify) {
+      factory = minify(factory);
+    }
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);

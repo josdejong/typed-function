@@ -2,7 +2,7 @@
 var assert = require('assert');
 var typed = require('../typed-function');
 
-describe('parse', function() {
+describe('typed-function', function() {
 
   it('should compose an empty function', function() {
     var fn = typed({});
@@ -128,7 +128,7 @@ describe('parse', function() {
     }, /Error: Unknown type "Function". Did you mean "function"?/);
   });
 
-  describe.skip('configuration', function () {
+  describe('configuration', function () {
 
     it('option minify should be true by default', function () {
       assert.equal(typed.config.minify, true)
@@ -491,7 +491,7 @@ describe('parse', function() {
       assert.equal(fn('foo', 'foo'), 'string, string');
     });
 
-    it.skip('should add conversions to a function with variable arguments', function() {
+    it('should add conversions to a function with variable arguments', function() {
       var sum = typed('string, ...number', function (name, values) {
         assert.equal(typeof name, 'string');
         assert(Array.isArray(values));
@@ -505,8 +505,8 @@ describe('parse', function() {
       assert.equal(sum('foo', 2,3,4), 9);
       assert.equal(sum('foo', 2,true,4), 7);
       assert.equal(sum('foo', 1,2,false), 3);
-      assert.equal(sum('foo', 1,2,true), 3);
-      assert.equal(sum('foo', true,1,2), 3);
+      assert.equal(sum('foo', 1,2,true), 4);
+      assert.equal(sum('foo', true,1,2), 4);
       assert.equal(sum('foo', true,false, true), 2);
       assert.equal(sum(123, 2,3), 5);
       assert.equal(sum(false, 2,3), 5);
