@@ -491,6 +491,27 @@ describe('parse', function() {
       assert.equal(fn('foo', 'foo'), 'string, string');
     });
 
+    it.skip('should add conversions to a function with variable arguments', function() {
+      var sum = typed('string, ...number', function (name, values) {
+        assert.equal(typeof name, 'string');
+        assert(Array.isArray(values));
+        var sum = 0;
+        for (var i = 0; i < values.length; i++) {
+          sum += values[i];
+        }
+        return sum;
+      });
+
+      assert.equal(sum('foo', 2,3,4), 9);
+      assert.equal(sum('foo', 2,true,4), 7);
+      assert.equal(sum('foo', 1,2,false), 3);
+      assert.equal(sum('foo', 1,2,true), 3);
+      assert.equal(sum('foo', true,1,2), 3);
+      assert.equal(sum('foo', true,false, true), 2);
+      assert.equal(sum(123, 2,3), 5);
+      assert.equal(sum(false, 2,3), 5);
+    });
+
     it('should add non-conflicting conversions to a function with one argument', function() {
       var fn = typed({
         'number': function (a) {

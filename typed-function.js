@@ -285,6 +285,9 @@
         code.push(prefix + 'for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
         code.push(prefix + '  if (' + test + '(arguments[i])) {');
         code.push(prefix + '    varArgs.push(arguments[i]);');
+
+        // TODO: conversions
+
         code.push(prefix + '  } else {');
         code.push(prefix + '    match = false;');
         code.push(prefix + '    break;');
@@ -370,27 +373,38 @@
     var code = [];
 
     // add entries for type conversions
-    var added = {};
-    typed.conversions
-        .filter(function (conversion) {
-          return this.childs[conversion.to] && !this.childs[conversion.from];
-        }.bind(this))
-        .forEach(function (conversion) {
-          if (!added[conversion.from]) {
-            added[conversion.from] = true;
+    this._conversions().forEach(function (conversion) {
+        var arg = 'arg' + args.length;
+        var child = this.childs[conversion.to];
+        var test = refs.add(getTypeTest(conversion.from), 'test') + '(' + arg + ')';
+        var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
 
-            var arg = 'arg' + args.length;
-            var child = this.childs[conversion.to];
-            var test = refs.add(getTypeTest(conversion.from), 'test') + '(' + arg + ')';
-            var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
-
-            code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-            code = code.concat(child._contentToCode(refs, args.concat(convert), types.concat(child.type), prefix + '  '));
-            code.push(prefix + '}');
-          }
-        }.bind(this));
+        code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
+        code = code.concat(child._contentToCode(refs, args.concat(convert), types.concat(child.type), prefix + '  '));
+        code.push(prefix + '}');
+      }.bind(this));
 
     return code;
+  };
+
+  /**
+   * Get filtered conversions, only conversions which are relevant for this
+   * node are returned.
+   * @returns {Object[]} Returns an array with conversions for this node
+   * @private
+   */
+  Node.prototype._conversions = function () {
+    var added = {};
+    return typed.conversions
+        .filter(function (conversion) {
+          if (this.childs[conversion.to] !== undefined &&
+              this.childs[conversion.from] === undefined &&
+              !added[conversion.from]) {
+            added[conversion.from] = true;
+            return true;
+          }
+          return false;
+        }.bind(this));
   };
 
   /**
@@ -440,10 +454,10 @@
     code = code.concat(this._contentToCode(refs, args, types, prefix + '  '));
     code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the actual signature
     code.push('}');
-    
+
     return code.join('\n');
   };
-  
+
   /**
    * Split all raw signatures into an array with (split) Signatures
    * @param {Object.<string, function>} rawSignatures
