@@ -255,32 +255,34 @@
    * @param {Refs} refs         Object to store function references
    * @param {string[]} args     Argument names, like ['arg0', 'arg1', ...],
    *                            but can also contain conversions like ['arg0', 'convert1(arg1)']
+   *                            args must include the argument for the current node
+   *                            (i.e. args.length >= 1)
    * @param {Param[]} types     Array with parameter types parsed so far
+   *                            types must include the type of the current node
+   *                            i.e. types.length >= 1)
    * @param {string} prefix     A number of spaces to prefix for every line of code
    * @return {string} code
+   * @protected
    */
-  Node.prototype.toCode = function (refs, args, types, prefix) {
+  Node.prototype._toCode = function (refs, args, types, prefix) {
     var code = [];
     var type = (this.type !== undefined) ? this.type.types[0] : undefined;
-    var arg = this.variable ? 'varArgs' : ('arg' + args.length);
-    var nodeArgs  = args.concat(arg);
-    var nodeTypes = types.concat(this.type);
     var test;
 
     if (this.variable) {
       if (type == '*') { // any type (ordered last)
         code.push(prefix + 'var varArgs = [];');
-        code.push(prefix + 'for (var i = ' + args.length + '; i < arguments.length; i++) {');
+        code.push(prefix + 'for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
         code.push(prefix + '  varArgs.push(arguments[i]);');
         code.push(prefix + '}');
-        code = code.concat(this._contentToCode(refs, nodeArgs, nodeTypes, prefix));
+        code = code.concat(this._contentToCode(refs, args, types, prefix));
       }
       else {
         test = refs.add(getTypeTest(type), 'test');
 
         code.push(prefix + 'var match = true;');
         code.push(prefix + 'var varArgs = [];');
-        code.push(prefix + 'for (var i = ' + args.length + '; i < arguments.length; i++) {');
+        code.push(prefix + 'for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
         code.push(prefix + '  if (' + test + '(arguments[i])) {');
         code.push(prefix + '    varArgs.push(arguments[i]);');
         code.push(prefix + '  } else {');
@@ -289,43 +291,23 @@
         code.push(prefix + '  }');
         code.push(prefix + '}');
         code.push(prefix + 'if (match) {');
-        code = code.concat(this._contentToCode(refs, nodeArgs, nodeTypes, prefix + '  '));
+        code = code.concat(this._contentToCode(refs, args, types, prefix + '  '));
         code.push(prefix + '}');
       }
     }
     else {
       if (type == '*') { // any type (ordered last)
-        code = code.concat(this._contentToCode(refs, nodeArgs, nodeTypes, prefix));
+        code = code.concat(this._contentToCode(refs, args, types, prefix));
       }
       else {
         test = refs.add(getTypeTest(type), 'test');
+        var arg = 'arg' + (args.length - 1);
 
         code.push(prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
-        code = code.concat(this._contentToCode(refs, nodeArgs, nodeTypes, prefix + '  '));
+        code = code.concat(this._contentToCode(refs, args, types, prefix + '  '));
         code.push(prefix + '}');
       }
     }
-
-    // TODO
-    //// add entries for type conversions
-    //var added = {};
-    //typed.conversions
-    //    .filter(function (conversion) {
-    //      return childs[conversion.to] && !childs[conversion.from];
-    //    })
-    //    .forEach(function (conversion) {
-    //      if (!added[conversion.from]) {
-    //        added[conversion.from] = true;
-    //
-    //        var arg = 'arg' + args.length;
-    //        var test = refs.add(getTypeTest(conversion.from), 'test') + '(' + arg + ')';
-    //        var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
-    //
-    //        code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-    //        code.push(childs[conversion.to].toCode(refs, args.concat(convert), types.concat(this.type), prefix + '  '));
-    //        code.push(prefix + '}');
-    //      }
-    //    }.bind(this));
 
     return code.join('\n');
   };
@@ -336,13 +318,18 @@
    * @param {Refs} refs         Object to store function references
    * @param {string[]} args     Argument names, like ['arg0', 'arg1', ...],
    *                            but can also contain conversions like ['arg0', 'convert1(arg1)']
+   *                            args must include the argument for the current node
+   *                            (i.e. args.length >= 1)
    * @param {Param[]} types     Array with parameter types parsed so far
+   *                            types must include the type of the current node
+   *                            i.e. types.length >= 1)
    * @param {string} prefix     A number of spaces to prefix for every line of code
    * @return {string[]} code
    * @private
    */
   Node.prototype._contentToCode = function (refs, args, types, prefix) {
     var code = [];
+
     if (this.fn) {
       var compare = this.variable ? '>=' : '===';
       var ref = refs.add(this.fn, 'signature');
@@ -353,10 +340,56 @@
 
     // iterate over childs
     this.forEach(function (child) {
-      code.push(child.toCode(refs, args, types, prefix));
+      var arg = child.variable ? 'varArgs' : ('arg' + args.length);
+      code.push(child._toCode(refs, args.concat(arg), types.concat(child.type), prefix));
     });
 
-    // TODO: conversion of arguments
+    //// add entries for type conversions
+    //code = code.concat(this._conversionsToCode(refs, args, types, prefix)); // TODO
+
+    // TODO: throw error
+
+    return code;
+  };
+
+  /**
+   * Create a code representation for iterating over conversions
+   * @param {Refs} refs         Object to store function references
+   * @param {string[]} args     Argument names, like ['arg0', 'arg1', ...],
+   *                            but can also contain conversions like ['arg0', 'convert1(arg1)']
+   * @param {Param[]} types     Array with parameter types parsed so far
+   * @param {string} prefix     A number of spaces to prefix for every line of code
+   * @return {string[]} code
+   * @private
+   */
+  Node.prototype._conversionsToCode = function (refs, args, types, prefix) {
+    var code = [];
+
+    // add entries for type conversions
+    console.log('CONVERSIONS', typed.conversions.length, Object.keys(this.childs))
+    var added = {};
+    typed.conversions
+        .filter(function (conversion) {
+          return this.childs[conversion.to] && !this.childs[conversion.from];
+        }.bind(this))
+        .forEach(function (conversion) {
+          if (!added[conversion.from]) {
+            added[conversion.from] = true;
+
+            var arg = 'arg' + args.length;
+            var child = this.childs[conversion.to];
+            var test = refs.add(getTypeTest(conversion.from), 'test') + '(' + arg + ')';
+            var convert = refs.add(conversion.convert, 'convert') + '(' + arg + ')';
+            var convertArgs = args.concat(convert);
+            var convertTypes = types.concat(child.type);
+
+            console.log('CONVERT', convertArgs, convertTypes)
+
+            code.push(prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
+            code.push(child._toCode(refs, convertArgs, convertTypes, prefix + '  '));
+            code.push(prefix + '}');
+          }
+        }.bind(this));
 
     return code;
   };
@@ -529,11 +562,11 @@
       '})'
     ].join('\n');
 
-    //console.log('FACTORY', factory) // TODO: cleanup
+    console.log('CODE', treeCode) // TODO: cleanup
 
-    if (typed.config.minify) {
-      factory = minify(factory);
-    }
+    //if (typed.config.minify) {
+    //  factory = minify(factory);
+    //}
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
