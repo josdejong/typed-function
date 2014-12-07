@@ -491,7 +491,25 @@ describe('typed-function', function() {
       assert.equal(fn('foo', 'foo'), 'string, string');
     });
 
-    it('should add conversions to a function with variable arguments', function() {
+    it('should add conversions to a function with variable arguments (1)', function() {
+      var sum = typed('...number', function (values) {
+        assert(Array.isArray(values));
+        var sum = 0;
+        for (var i = 0; i < values.length; i++) {
+          sum += values[i];
+        }
+        return sum;
+      });
+
+      assert.equal(sum(2,3,4), 9);
+      assert.equal(sum(2,true,4), 7);
+      assert.equal(sum(1,2,false), 3);
+      assert.equal(sum(1,2,true), 4);
+      assert.equal(sum(true,1,2), 4);
+      assert.equal(sum(true,false, true), 2);
+    });
+
+    it('should add conversions to a function with variable arguments (2)', function() {
       var sum = typed('string, ...number', function (name, values) {
         assert.equal(typeof name, 'string');
         assert(Array.isArray(values));
@@ -510,6 +528,35 @@ describe('typed-function', function() {
       assert.equal(sum('foo', true,false, true), 2);
       assert.equal(sum(123, 2,3), 5);
       assert.equal(sum(false, 2,3), 5);
+    });
+
+    it('should add conversions to a function with variable arguments in a non-conflicting way', function() {
+      // note that a series of booleans can be converted to numbers, but a single
+      // boolean should call the second signature `boolean`
+      var fn = typed({
+        '...number': function (values) {
+          assert(Array.isArray(values));
+          var sum = 0;
+          for (var i = 0; i < values.length; i++) {
+            sum += values[i];
+          }
+          return sum;
+        },
+        'boolean': function (value) {
+          assert.equal(typeof value, 'boolean');
+          return 'boolean';
+        }
+      });
+
+      assert.equal(fn(2,3,4), 9);
+      assert.equal(fn(2,true,4), 7);
+      assert.equal(fn(1,2,false), 3);
+      assert.equal(fn(1,2,true), 4);
+      assert.equal(fn(true,1,2), 4);
+      assert.equal(fn(true,false, true), 2);
+      assert.equal(fn(2,3), 5);
+      assert.equal(fn(false), 'boolean');
+      assert.equal(fn(true), 'boolean');
     });
 
     it('should add non-conflicting conversions to a function with one argument', function() {

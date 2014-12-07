@@ -374,7 +374,6 @@
     typed.conversions
         .filter(function (conversion) {
           if (this.childs[conversion.to] !== undefined &&
-              this.childs[conversion.from] === undefined &&
               !added[conversion.from]) {
             added[conversion.from] = true;
             return true;
@@ -603,11 +602,13 @@
       '})'
     ].join('\n');
 
-    //console.log('CODE', treeCode) // TODO: cleanup
-
     if (typed.config.minify) {
       factory = minify(factory);
     }
+
+    // TODO: cleanup
+    typed.config.minify = false;
+    console.log('CODE', treeCode);
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
