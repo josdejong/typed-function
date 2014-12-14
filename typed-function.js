@@ -265,9 +265,29 @@
    * @protected
    */
   Node.prototype._toCode = function (refs, args, types, prefix) {
+    var me = this;
     var code = [];
     var type = (this.type !== undefined) ? this.type.types[0] : undefined;
     var test;
+
+    // test whether to invoke a signature function
+    function testInvoke (prefix) {
+      if (me.fn) {
+        var compare = me.variable ? '>=' : '===';
+        var ref = refs.add(me.fn, 'signature');
+        code.push(prefix + 'if (arguments.length ' + compare + ' ' + args.length + ') {');
+        code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
+        code.push(prefix + '}');
+      }
+    }
+
+    // iterate over all childs
+    function iterateChilds (prefix) {
+      me.forEach(function (child) {
+        var arg = child.variable ? 'varArgs' : ('arg' + args.length);
+        code.push(child._toCode(refs, args.concat(arg), types.concat(child.type), prefix));
+      });
+    }
 
     if (this.variable) {
       if (type == 'any') { // any type (ordered last)
@@ -275,7 +295,8 @@
         code.push(prefix + 'for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
         code.push(prefix + '  varArgs.push(arguments[i]);');
         code.push(prefix + '}');
-        code = code.concat(this._contentToCode(refs, args, types, prefix));
+        testInvoke(prefix);
+        iterateChilds(prefix);
       }
       else {
         test = refs.add(getTypeTest(type), 'test');
@@ -291,20 +312,24 @@
         code.push(prefix + '  }');
         code.push(prefix + '}');
         code.push(prefix + 'if (match) {');
-        code = code.concat(this._contentToCode(refs, args, types, prefix + '  '));
+        testInvoke(prefix + '  ');
+        iterateChilds(prefix + '  ');
         code.push(prefix + '}');
       }
     }
     else {
-      if (type == 'any') { // any type (ordered last)
-        code = code.concat(this._contentToCode(refs, args, types, prefix));
+      if (type == 'any' || type === undefined) {
+        // any type (ordered last) or undefined (in case of a root node)
+        testInvoke(prefix);
+        iterateChilds(prefix);
       }
       else {
         test = refs.add(getTypeTest(type), 'test');
         var arg = 'arg' + (args.length - 1);
 
         code.push(prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
-        code = code.concat(this._contentToCode(refs, args, types, prefix + '  '));
+        testInvoke(prefix + '  ');
+        iterateChilds(prefix + '  ');
         code.push(prefix + '}');
       }
     }
@@ -327,6 +352,7 @@
    * @return {string[]} code
    * @private
    */
+  // TODO: cleanup
   Node.prototype._contentToCode = function (refs, args, types, prefix) {
     var code = [];
 
@@ -345,7 +371,8 @@
     });
 
     // add entries for type conversions
-    code = code.concat(this._conversionsToCode(refs, args, types, prefix));
+    // TODO: cleanup
+    //code = code.concat(this._conversionsToCode(refs, args, types, prefix));
 
     // TODO: throw error
 
@@ -479,7 +506,8 @@
     var types = [];
     var prefix = '';
     code.push('return function ' + this.name + '(' + params.join(', ') + ') {');
-    code = code.concat(this._contentToCode(refs, args, types, prefix + '  '));
+    //code = code.concat(this._contentToCode(refs, args, types, prefix + '  ')); // TODO: cleanup
+    code = code.concat(this._toCode(refs, args, types, prefix + '  '));
     code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the actual signature
     code.push('}');
 
