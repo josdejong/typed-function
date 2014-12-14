@@ -282,7 +282,7 @@
   /**
    * Returns a string with JavaScript code for this function
    *
-   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{refs: Refs, args: string[], types: string[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -290,10 +290,10 @@
    *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
    *                          args must include the argument for the current node
    *                          (i.e. args.length >= 1)
-   *   {Param[]} types        Array with parameter types parsed so far
+   *   {string[]} types        Array with parameter type names parsed so far
    *                          types must include the type of the current node
    *                          i.e. types.length >= 1)
-   *   {string[]} tests       Type tests, like ['test0(arg0)', 'test2(arg1)', ...]
+   *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
    *   {string} prefix        A number of spaces to prefix for every line of code
    *   {boolean} conversions  A boolean which is true when the generated
    *                          code must do type conversions
@@ -353,7 +353,7 @@
    * Create a code representation for calling a function signature,
    * iterating over it's childs, and iterating over conversions
    *
-   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{refs: Refs, args: string[], types: string[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -361,10 +361,10 @@
    *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
    *                          args must include the argument for the current node
    *                          (i.e. args.length >= 1)
-   *   {Param[]} types        Array with parameter types parsed so far
+   *   {string[]} types        Array with parameter type names parsed so far
    *                          types must include the type of the current node
    *                          i.e. types.length >= 1)
-   *   {string[]} tests       Type tests, like ['test0(arg0)', 'test2(arg1)', ...]
+   *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
    *   {string} prefix        A number of spaces to prefix for every line of code
    *   {boolean} conversions  A boolean which is true when the generated
    *                          code must do type conversions
@@ -391,13 +391,11 @@
       this.forEach(function (child) {
         var arg = child.variable ? 'varArgs' : ('arg' + params.args.length);
         var type = (child.type !== undefined) ? child.type.types[0] : undefined;
-        var test = type == 'any' ?
-            '' :
-            (params.refs.add(getTypeTest(type), 'test') + '(' + arg + ')');
+        var test = (type != 'any') ? params.refs.add(getTypeTest(type), 'test') : '';
 
         code.push(child._toCode(merge(params, {
           args: params.args.concat(arg),
-          types: params.types.concat(child.type),
+          types: params.types.concat(type),
           tests: params.tests.concat(test)
         })));
       });
@@ -413,7 +411,7 @@
 
         code.push(child._toCode(merge(params, {
           args: params.args.concat(arg),
-          types: params.types.concat(child.type),
+          types: params.types.concat(type),
           tests: params.tests.concat(test)
         })));
       });
@@ -429,7 +427,7 @@
   /**
    * Create a code representation for iterating over conversions
    *
-   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{refs: Refs, args: string[], types: string[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -437,10 +435,10 @@
    *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
    *                          args must include the argument for the current node
    *                          (i.e. args.length >= 1)
-   *   {Param[]} types        Array with parameter types parsed so far
+   *   {string[]} types        Array with parameter type names parsed so far
    *                          types must include the type of the current node
    *                          i.e. types.length >= 1)
-   *   {string[]} tests       Type tests, like ['test0(arg0)', 'test2(arg1)', ...]
+   *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
    *   {string} prefix        A number of spaces to prefix for every line of code
    *   {boolean} conversions  A boolean which is true when the generated
    *                          code must do type conversions
@@ -505,7 +503,7 @@
             code.push(params.prefix + 'if (match) {');
             code = code.concat(child._innerCode(merge(params, {
               args: params.args.concat('varArgs'),
-              types: params.types.concat(child.type),
+              types: params.types.concat(type),
               tests: params.tests.concat(test),
               prefix: params.prefix + '  '
             })));
@@ -518,7 +516,7 @@
             code.push(params.prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
             code = code.concat(child._innerCode(merge(params, {
               args: params.args.concat(convert),
-              types: params.types.concat(child.type),
+              types: params.types.concat(type),
               tests: params.tests.concat(test),
               prefix: params.prefix + '  '
             })));
