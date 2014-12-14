@@ -367,6 +367,7 @@
    * @protected
    */
   Node.prototype._conversionsToCode = function (refs, args, types, prefix) {
+    // TODO: _conversionsToCode is quite a mess, simplify this
     var code = [];
     var added = {};
 
@@ -495,6 +496,7 @@
       var fn = rawSignatures[params];
       var signature = new Signature(params, fn);
 
+      // TODO: maybe we don't have to split signatures at all?
       return signatures.concat(signature.split());
     }, []);
   }
@@ -607,8 +609,8 @@
     }
 
     // TODO: cleanup
-    typed.config.minify = false;
-    console.log('CODE', treeCode);
+    //typed.config.minify = false;
+    //console.log('CODE', treeCode);
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
