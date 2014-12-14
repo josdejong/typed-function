@@ -10,8 +10,8 @@ var fn2 = typed('string, number | boolean', function (a, b) {
   return 'a is a string, b is a number or a boolean';
 });
 
-// create a typed function with any type argument *
-var fn3 = typed('string, *', function (a, b) {
+// create a typed function with any type argument
+var fn3 = typed('string, any', function (a, b) {
   return 'a is a string, b can be anything';
 });
 

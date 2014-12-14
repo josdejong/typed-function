@@ -4,6 +4,7 @@
 
 - Support for multiple types per parameter like `number | string, number'`.
 - Support for variable parameters like `sting, ...number'`.
+- Changed any type notation `'*'` to `'any'`.
 - Implemented option `typed.config.minify`.
 
 

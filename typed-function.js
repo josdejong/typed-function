@@ -22,11 +22,11 @@
   'use strict';
 
   // order types
-  // any type (*) will be ordered last, and object as second last (as other types
+  // any type ('any') will be ordered last, and object as second last (as other types
   // may be an object as well, like Array)
   function compareTypes(a, b) {
-    if (a === '*') return 1;
-    if (b === '*') return -1;
+    if (a === 'any') return 1;
+    if (b === 'any') return -1;
 
     if (a === 'Object') return 1;
     if (b === 'Object') return -1;
@@ -131,7 +131,7 @@
 
     // parse variable arguments operator (ellipses '...number')
     if (this.types[0] !== undefined && this.types[0].substring(0, 3) == '...') {
-      this.types[0] = this.types[0].substring(3) || '*';
+      this.types[0] = this.types[0].substring(3) || 'any';
       this.variable = true;
     }
     else {
@@ -270,7 +270,7 @@
     var test;
 
     if (this.variable) {
-      if (type == '*') { // any type (ordered last)
+      if (type == 'any') { // any type (ordered last)
         code.push(prefix + 'var varArgs = [];');
         code.push(prefix + 'for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
         code.push(prefix + '  varArgs.push(arguments[i]);');
@@ -296,7 +296,7 @@
       }
     }
     else {
-      if (type == '*') { // any type (ordered last)
+      if (type == 'any') { // any type (ordered last)
         code = code.concat(this._contentToCode(refs, args, types, prefix));
       }
       else {

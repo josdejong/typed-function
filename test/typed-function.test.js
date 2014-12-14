@@ -209,7 +209,7 @@ describe('typed-function', function() {
     });
 
     it('should create a typed function with any type arguments (1)', function() {
-      var fn = typed('string, ...*', function (str, values) {
+      var fn = typed('string, ...any', function (str, values) {
         assert.equal(typeof str, 'string');
         assert(Array.isArray(values));
         return str + ': ' + values.join(', ');
@@ -237,7 +237,7 @@ describe('typed-function', function() {
     });
 
     it('should create a typed function with any type arguments (2)', function() {
-      var fn = typed('*, ...number', function (any, values) {
+      var fn = typed('any, ...number', function (any, values) {
         assert(Array.isArray(values));
         return any + ': ' + values.join(', ');
       });
@@ -359,7 +359,7 @@ describe('typed-function', function() {
 
     it('should compose a function with one any type argument', function() {
       var fn = typed({
-        '*': function (value) {
+        'any': function (value) {
           return 'any type:' + value;
         },
         'string': function (value) {
@@ -380,10 +380,10 @@ describe('typed-function', function() {
 
     it('should compose a function with multiple any type arguments (1)', function() {
       var fn = typed({
-        '*,boolean': function () {
+        'any,boolean': function () {
           return 'any type,boolean';
         },
-        '*,string': function () {
+        'any,string': function () {
           return 'any type,string';
         }
       });
@@ -398,13 +398,13 @@ describe('typed-function', function() {
 
     it('should compose a function with multiple any type arguments (2)', function() {
       var fn = typed({
-        '*,boolean': function () {
+        'any,boolean': function () {
           return 'any type,boolean';
         },
-        '*,number': function () {
+        'any,number': function () {
           return 'any type,number';
         },
-        'string,*': function () {
+        'string,any': function () {
           return 'string,any type';
         }
       });
@@ -420,10 +420,10 @@ describe('typed-function', function() {
 
     it('should compose a function with multiple any type arguments (3)', function() {
       var fn = typed({
-        'string,*': function () {
+        'string,any': function () {
           return 'string,any type';
         },
-        '*': function () {
+        'any': function () {
           return 'any type';
         }
       });

@@ -1,7 +1,7 @@
 var typed = require('../typed-function');
 
-// create a typed function with an any type argument '*'
-var log = typed('string, *', function (event, data) {
+// create a typed function with an any type argument
+var log = typed('string, any', function (event, data) {
     console.log('event: ' + event + ', data: ' + JSON.stringify(data));
   });
 

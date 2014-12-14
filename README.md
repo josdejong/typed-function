@@ -37,7 +37,7 @@ var fn2 = typed('string, number | boolean', function (a, b) {
 });
 
 // create a typed function with any type argument
-var fn3 = typed('string, *', function (a, b) {
+var fn3 = typed('string, any', function (a, b) {
   return 'a is a string, b can be anything';
 });
 
@@ -87,7 +87,7 @@ The following type expressions are supported:
 - Multiple parameters: `string, number, function`
 - Union types: `number | string`
 - Variable parameters: `...number`
-- Any type: `*`
+- Any type: `any`
 
 
 ## API
