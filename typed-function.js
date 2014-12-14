@@ -54,6 +54,16 @@
   }
 
   /**
+   * Returns the last element of an array
+   * @param {Array} array
+   * @returns {*} The last element of the array, or undefined when the array
+   *              is empty
+   */
+  function last(array) {
+    return array[array.length - 1];
+  }
+
+  /**
    * Get a type test function for a specific data type
    * @param {string} type                   A data type like 'number' or 'string'
    * @returns {function(obj: *) : boolean}  Returns a type testing function.
@@ -272,7 +282,7 @@
   /**
    * Returns a string with JavaScript code for this function
    *
-   * @param {{refs: Refs, args: string[], types: Param[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -283,6 +293,7 @@
    *   {Param[]} types        Array with parameter types parsed so far
    *                          types must include the type of the current node
    *                          i.e. types.length >= 1)
+   *   {string[]} tests       Type tests, like ['test0(arg0)', 'test2(arg1)', ...]
    *   {string} prefix        A number of spaces to prefix for every line of code
    *   {boolean} conversions  A boolean which is true when the generated
    *                          code must do type conversions
@@ -295,8 +306,9 @@
    */
   Node.prototype._toCode = function (params) {
     var code = [];
-    var type = (this.type !== undefined) ? this.type.types[0] : undefined;
-    var test;
+    var arg  = last(params.args);
+    var type = last(params.types);
+    var test = last(params.tests);
 
     if (this.variable) {
       if (type == 'any') { // any type (ordered last)
@@ -307,8 +319,6 @@
         code = code.concat(this._innerCode(params));
       }
       else {
-        test = params.refs.add(getTypeTest(type), 'test');
-
         code.push(params.prefix + 'var match = true;');
         code.push(params.prefix + 'var varArgs = [];');
         code.push(params.prefix + 'for (var i = ' + (params.args.length - 1) + '; i < arguments.length; i++) {');
@@ -330,9 +340,6 @@
         code = code.concat(this._innerCode(params));
       }
       else {
-        test = params.refs.add(getTypeTest(type), 'test');
-        var arg = 'arg' + (params.args.length - 1);
-
         code.push(params.prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
         code = code.concat(this._innerCode(merge(params, {prefix: params.prefix + '  '})));
         code.push(params.prefix + '}');
@@ -346,7 +353,7 @@
    * Create a code representation for calling a function signature,
    * iterating over it's childs, and iterating over conversions
    *
-   * @param {{refs: Refs, args: string[], types: Param[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -357,6 +364,7 @@
    *   {Param[]} types        Array with parameter types parsed so far
    *                          types must include the type of the current node
    *                          i.e. types.length >= 1)
+   *   {string[]} tests       Type tests, like ['test0(arg0)', 'test2(arg1)', ...]
    *   {string} prefix        A number of spaces to prefix for every line of code
    *   {boolean} conversions  A boolean which is true when the generated
    *                          code must do type conversions
@@ -382,9 +390,15 @@
       // TODO: merge defined childs and conversions
       this.forEach(function (child) {
         var arg = child.variable ? 'varArgs' : ('arg' + params.args.length);
+        var type = (child.type !== undefined) ? child.type.types[0] : undefined;
+        var test = type == 'any' ?
+            '' :
+            (params.refs.add(getTypeTest(type), 'test') + '(' + arg + ')');
+
         code.push(child._toCode(merge(params, {
           args: params.args.concat(arg),
-          types: params.types.concat(child.type)
+          types: params.types.concat(child.type),
+          tests: params.tests.concat(test)
         })));
       });
 
@@ -394,9 +408,13 @@
       // iterate over childs
       this.forEach(function (child) {
         var arg = child.variable ? 'varArgs' : ('arg' + params.args.length);
+        var type = (child.type !== undefined) ? child.type.types[0] : undefined;
+        var test = (type != 'any') ? params.refs.add(getTypeTest(type), 'test') : '';
+
         code.push(child._toCode(merge(params, {
           args: params.args.concat(arg),
-          types: params.types.concat(child.type)
+          types: params.types.concat(child.type),
+          tests: params.tests.concat(test)
         })));
       });
     }
@@ -411,7 +429,7 @@
   /**
    * Create a code representation for iterating over conversions
    *
-   * @param {{refs: Refs, args: string[], types: Param[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -422,6 +440,7 @@
    *   {Param[]} types        Array with parameter types parsed so far
    *                          types must include the type of the current node
    *                          i.e. types.length >= 1)
+   *   {string[]} tests       Type tests, like ['test0(arg0)', 'test2(arg1)', ...]
    *   {string} prefix        A number of spaces to prefix for every line of code
    *   {boolean} conversions  A boolean which is true when the generated
    *                          code must do type conversions
@@ -461,8 +480,8 @@
             code.push(params.prefix + 'for (var i = ' + params.args.length + '; i < arguments.length; i++) {');
 
             // unconverted type
-            test = params.refs.add(getTypeTest(type), 'test');
-            code.push(params.prefix + '  if (' + test + '(arguments[i])) { // type: ' + conversion.to);
+            test = params.refs.add(getTypeTest(type), 'test') + '(arguments[i])';
+            code.push(params.prefix + '  if (' + test + ') { // type: ' + conversion.to);
             code.push(params.prefix + '    varArgs.push(arguments[i]);');
 
             // all convertable types
@@ -487,6 +506,7 @@
             code = code.concat(child._innerCode(merge(params, {
               args: params.args.concat('varArgs'),
               types: params.types.concat(child.type),
+              tests: params.tests.concat(test),
               prefix: params.prefix + '  '
             })));
             code.push(params.prefix + '}');
@@ -499,6 +519,7 @@
             code = code.concat(child._innerCode(merge(params, {
               args: params.args.concat(convert),
               types: params.types.concat(child.type),
+              tests: params.tests.concat(test),
               prefix: params.prefix + '  '
             })));
             code.push(params.prefix + '}');
@@ -548,10 +569,6 @@
       params[i] = 'arg' + i;
     }
 
-    var args = [];
-    var types = [];
-    var prefix = '';
-
     // TODO: check beforehand if the function will have conversions
     var withConversions = (typed.conversions.length > 0);
 
@@ -569,17 +586,19 @@
         refs: refs,
         args: [],
         types: [],
+        tests: [],
         prefix: '  ',
         conversions: false,
         exceptions: false
       }));
 
-      // conversions
+      // matches and conversions
       code.push('  // convert into matching signatures');
       code = code.concat(this._conversionsToCode({
         refs: refs,
         args: [],
         types: [],
+        tests: [],
         prefix: '  ',
         conversions: true,
         exceptions: true
@@ -592,6 +611,7 @@
         refs: refs,
         args: [],
         types: [],
+        tests: [],
         prefix: '  ',
         conversions: false,
         exceptions: true
