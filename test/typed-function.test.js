@@ -567,11 +567,11 @@ describe('typed-function', function() {
         }
       });
 
-      strictArrayEqual(fn(2,3,4), [2,3,4]);
-      strictArrayEqual(fn(2,true,4), [2,1,4]);
-      strictArrayEqual(fn(2,'str'), [2,'str']);
-      strictArrayEqual(fn('str', true, false), ['str', 1, 0]);
-      strictArrayEqual(fn('str', true, false), ['str', 1, 0]);
+      strictEqualArray(fn(2,3,4), [2,3,4]);
+      strictEqualArray(fn(2,true,4), [2,1,4]);
+      strictEqualArray(fn(2,'str'), [2,'str']);
+      strictEqualArray(fn('str', true, false), ['str', 1, 0]);
+      strictEqualArray(fn('str', 2, false), ['str', 2, 0]);
 
       assert.throws(function () {fn([new Date(), '2'])}, /Wrong function signature/)
     });
@@ -599,10 +599,10 @@ describe('typed-function', function() {
   // TODO: test compose.tests
 });
 
-function strictArrayEqual(a, b) {
-  assert.equal(a.length, b.length);
+function strictEqualArray(a, b) {
+  assert.strictEqual(a.length, b.length);
 
   for (var i = 0; i < a.length; a++) {
-    assert.equal(a[i], b[i]);
+    assert.strictEqual(a[i], b[i]);
   }
 }
