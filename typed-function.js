@@ -387,19 +387,6 @@
     }
 
     if (params.conversions) {
-      // TODO: merge defined childs and conversions
-      this.forEach(function (child) {
-        var arg = child.variable ? 'varArgs' : ('arg' + params.args.length);
-        var type = (child.type !== undefined) ? child.type.types[0] : undefined;
-        var test = (type != 'any') ? params.refs.add(getTypeTest(type), 'test') : '';
-
-        code.push(child._toCode(merge(params, {
-          args: params.args.concat(arg),
-          types: params.types.concat(type),
-          tests: params.tests.concat(test)
-        })));
-      });
-
       code = code.concat(this._conversionsToCode(params));
     }
     else {
@@ -453,6 +440,19 @@
     // TODO: _conversionsToCode is quite a mess, simplify this
     var code = [];
     var added = {};
+
+    // add entries for exact types
+    this.forEach(function (child) {
+      var arg = child.variable ? 'varArgs' : ('arg' + params.args.length);
+      var type = (child.type !== undefined) ? child.type.types[0] : undefined;
+      var test = (type != 'any') ? params.refs.add(getTypeTest(type), 'test') : '';
+
+      code.push(child._toCode(merge(params, {
+        args: params.args.concat(arg),
+        types: params.types.concat(type),
+        tests: params.tests.concat(test)
+      })));
+    });
 
     // add entries for type conversions
     typed.conversions
@@ -746,8 +746,8 @@
     }
 
     // TODO: cleanup
-    typed.config.minify = false;
-    console.log('CODE', treeCode);
+    //typed.config.minify = false;
+    //console.log('CODE', treeCode);
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);

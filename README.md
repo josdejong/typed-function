@@ -172,6 +172,8 @@ checking done by `typed-function` anyway.
 - Extend function signatures:
   - Optional arguments like `'[number], array'` or like `number=, array`
   - Nullable arguments like `'?Object'`
+- Be able to merge typed functions into a new typed function, like
+  `fn1 = merged(fn2, fn3)`.
 - Detailed error messages.
 - Create a good benchmark, to get insight in the overhead.
 - Allow conversions not to be able to convert any input (for example string to

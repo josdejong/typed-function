@@ -559,6 +559,23 @@ describe('typed-function', function() {
       assert.equal(fn(true), 'boolean');
     });
 
+    it('should add conversions to a function with variable and union arguments', function() {
+      var fn = typed({
+        '...string | number': function (values) {
+          assert(Array.isArray(values));
+          return values;
+        }
+      });
+
+      strictArrayEqual(fn(2,3,4), [2,3,4]);
+      strictArrayEqual(fn(2,true,4), [2,1,4]);
+      strictArrayEqual(fn(2,'str'), [2,'str']);
+      strictArrayEqual(fn('str', true, false), ['str', 1, 0]);
+      strictArrayEqual(fn('str', true, false), ['str', 1, 0]);
+
+      assert.throws(function () {fn([new Date(), '2'])}, /Wrong function signature/)
+    });
+
     it('should add non-conflicting conversions to a function with one argument', function() {
       var fn = typed({
         'number': function (a) {
@@ -581,3 +598,11 @@ describe('typed-function', function() {
 
   // TODO: test compose.tests
 });
+
+function strictArrayEqual(a, b) {
+  assert.equal(a.length, b.length);
+
+  for (var i = 0; i < a.length; a++) {
+    assert.equal(a[i], b[i]);
+  }
+}
