@@ -693,11 +693,16 @@
   function minify (code) {
     return code
         .replace(/\/\/.*/g, '')     // remove comments
-        .replace(/\s*\n\s*/gm, '') // remove spaces and returns
-        .replace(/ \{/g, '{')     // other whitespaces
-        .replace(/ \(/g, '(')     // other whitespaces
-        .replace(/(signature|test|convert|arg)(?=\d)/g, function (v) {
-          // replace long variable names like 'signature1' with their first letter 's1'
+        .replace(/\s*\n\s*/gm, '')  // remove spaces and returns
+
+        // remove whitespaces
+        .replace(/\s?([{}()=<>;,]+)\s?/g, function (match, delimiter) {
+          return delimiter;
+        })
+
+        // replace long variable names like 'signature1' with their first letter 's1'
+        .replace(/(signature|test|convert|arg)(?=\d)|varArgs|match/g, function (v) {
+          // NOTE: all matched variable names must have a unique first letter!!
           return v.charAt(0);
         });
   }
@@ -740,7 +745,6 @@
     }
 
     // TODO: cleanup
-    typed.config.minify = false;
     console.log('CODE', treeCode);
 
     // evaluate the JavaScript code and attach function references
