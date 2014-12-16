@@ -382,51 +382,67 @@
     else {
       if (type.anyType) {
         // any type (ordered last)
-        if (ref) {
-          code.push(params.prefix + 'if (arguments.length === ' + args.length + ') {');
-          code.push(params.prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
-          code.push(params.prefix + '}');
-        }
-
-        // iterate over the childs
-        this._getChilds().forEach(function (child) {
-          code = code.concat(child._toCode(nextParams));
-        });
-
-        // handle conversions
-        if (params.conversions) {
-          code = code.concat(this._conversionsToCode(merge(nextParams, {prefix: params.prefix + '  '})));
-        }
-
-        if (params.exceptions) {
-          // TODO: throw errors
-        }
+        code.push(this._innerCode(nextParams));
       }
       else {
         code.push(params.prefix + 'if (' + test + '(' + arg + ')) { ' +
           '// type: ' + (convert ? (conversion.from + ', convert to ' + type) : type));
-        if (ref) {
-          code.push(params.prefix + '  if (arguments.length === ' + args.length + ') {');
-          code.push(params.prefix + '    return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
-          code.push(params.prefix + '  }');
-        }
 
-        // iterate over the childs
-        this._getChilds().forEach(function (child) {
-          code = code.concat(child._toCode(merge(nextParams, {prefix: params.prefix + '  '})));
-        });
-
-        // handle conversions
-        if (params.conversions) {
-          code = code.concat(this._conversionsToCode(merge(nextParams, {prefix: params.prefix + '  '})));
-        }
-
-        if (params.exceptions) {
-          // TODO: throw errors
-        }
+        code.push(this._innerCode(merge(nextParams, {params: params.prefix + '  '})));
 
         code.push(params.prefix + '}');
       }
+    }
+
+    return code.join('\n');
+  };
+
+  /**
+   * Sub function of Node.prototype._toNode
+   *
+   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   *
+   * Where:
+   *   {Refs} refs            Object to store function references
+   *   {string[]} args        Argument names, like ['arg0', 'arg1', ...],
+   *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
+   *                          Must include the arg of the current node.
+   *   {Param[]} types        Array with parameter types parsed so far
+   *                          Must include the type of the current node.
+   *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
+   *                          Must include the test of the current node.
+   *   {string} prefix        A number of spaces to prefix for every line of code
+   *   {boolean} conversions  A boolean which is true when the generated
+   *                          code must do type conversions
+   *   {boolean} exceptions   A boolean which is true when the generated code
+   *                          must throw exceptions when there is no signature match
+   *
+   * @returns {string} code
+   *
+   * @private
+   */
+  Node.prototype._innerCode = function (params) {
+    var code = [];
+    var ref = this.fn ? params.refs.add(this.fn, 'signature') : undefined;
+
+    if (ref) {
+      code.push(params.prefix + '  if (arguments.length === ' + params.args.length + ') {');
+      code.push(params.prefix + '    return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
+      code.push(params.prefix + '  }');
+    }
+
+    // iterate over the childs
+    this._getChilds().forEach(function (child) {
+      code.push(child._toCode(params));
+    });
+
+    // handle conversions
+    if (params.conversions) {
+      code.push(this._conversionsToCode(params));
+    }
+
+    if (params.exceptions) {
+      // TODO: throw errors
     }
 
     return code.join('\n');
@@ -449,7 +465,7 @@
    *   {boolean} exceptions   A boolean which is true when the generated code
    *                          must throw exceptions when there is no signature match
    *
-   * @returns {string[]} code
+   * @returns {string} code
    *
    * @protected
    */
@@ -461,10 +477,10 @@
           var type = conversion.to;
           var child = this.childs[type];
 
-          code = code.concat(child._toCode(params, conversion));
+          code.push(child._toCode(params, conversion));
         }.bind(this));
 
-    return code;
+    return code.join('\n');
   };
 
   /**
@@ -561,7 +577,7 @@
       // iterate over the childs
       code.push('  // exactly matching signatures');
       this._getChilds().forEach(function (child) {
-        code = code.concat(child._toCode(merge(params, {
+        code.push(child._toCode(merge(params, {
           conversions: false,
           exceptions: false
         })));
@@ -570,12 +586,12 @@
       // matches and conversions
       code.push('  // convert into matching signatures');
       this._getChilds().forEach(function (child) {
-        code = code.concat(child._toCode(merge(params, {
+        code.push(child._toCode(merge(params, {
           conversions: true,
           exceptions: true
         })));
       });
-      code = code.concat(this._conversionsToCode(merge(params, {
+      code.push(this._conversionsToCode(merge(params, {
         conversions: true,
         exceptions: true
       })));
@@ -584,7 +600,7 @@
       // no conversions needed for this function. Create one recursive tree to test exact matches
       code.push('  // exactly matching signatures');
       this._getChilds().forEach(function (child) {
-        code = code.concat(child._toCode(merge(params, {
+        code.push(child._toCode(merge(params, {
           conversions: false,
           exceptions: true
         })));
