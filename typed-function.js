@@ -239,9 +239,15 @@
     function _iterate(signature, types, index) {
       if (index < signature.params.length) {
         var param = signature.params[index];
-        param.types.forEach(function (type) {
-          _iterate(signature, types.concat(new Param(type, param.varArgs)), index + 1);
-        });
+        if (index == signature.params.length - 1 && signature.varArgs) {
+          // last parameter of a varArgs signature. Do not split the varArgs parameter
+          _iterate(signature, types.concat(param), index + 1);
+        }
+        else {
+          param.types.forEach(function (type) {
+            _iterate(signature, types.concat(new Param(type, param.varArgs)), index + 1);
+          });
+        }
       }
       else {
         signatures.push(new Signature(types, signature.fn));
@@ -311,6 +317,7 @@
     var arg = this.varArgs ? 'varArgs' : ('arg' + params.args.length);
     var type = (this.type !== undefined) ? this.type : undefined;
     var test = (type && !type.anyType) ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
+    // TODO: dangerous to suppose type.tests.length === 1
 
     var args = params.args.concat(arg);
     var types = params.types.concat(type);
@@ -336,11 +343,17 @@
       }
       else {
         if (ref) {
+          var varTests = type.types.map(function (type) {
+                var test = params.refs.add(getTypeTest(type), 'test');
+                return test + '(arguments[i])';
+              })
+              .join(' || ');
+
           code.push(params.prefix + 'if (arguments.length >= ' + args.length + ') {');
           code.push(params.prefix + '  var match = true;');
           code.push(params.prefix + '  var varArgs = [];');
           code.push(params.prefix + '  for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
-          code.push(params.prefix + '    if (' + test + '(arguments[i])) {');
+          code.push(params.prefix + '    if (' + varTests + ') {');
           code.push(params.prefix + '      varArgs.push(arguments[i]);');
           code.push(params.prefix + '    } else {');
           code.push(params.prefix + '      match = false;');
@@ -744,8 +757,7 @@
       factory = minify(factory);
     }
 
-    // TODO: cleanup
-    console.log('CODE', treeCode);
+    console.log('CODE\n' + treeCode);  // TODO: cleanup
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
