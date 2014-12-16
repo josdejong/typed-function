@@ -313,39 +313,68 @@
     var arg  = last(params.args);
     var type = last(params.types);
     var test = last(params.tests);
+    var ref = this.fn ? params.refs.add(this.fn, 'signature') : undefined;
 
     if (this.varArgs) {
-      if (type.anyType) { // any type (ordered last)
-        code.push(params.prefix + 'var varArgs = [];');
-        code.push(params.prefix + 'for (var i = ' + (params.args.length - 1) + '; i < arguments.length; i++) {');
-        code.push(params.prefix + '  varArgs.push(arguments[i]);');
-        code.push(params.prefix + '}');
-        code = code.concat(this._innerCode(params));
+      // varArgs cannot have childs, it's the last argument
+      if (type.anyType) {
+        if (ref) {
+          code.push(params.prefix + 'if (arguments.length >= ' + params.args.length + ') {');
+          code.push(params.prefix + '  var varArgs = [];');
+          code.push(params.prefix + '  for (var i = ' + (params.args.length - 1) + '; i < arguments.length; i++) {');
+          code.push(params.prefix + '    varArgs.push(arguments[i]);');
+          code.push(params.prefix + '  }');
+          code.push(params.prefix + '  return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
+          code.push(params.prefix + '}');
+        }
       }
       else {
-        code.push(params.prefix + 'var match = true;');
-        code.push(params.prefix + 'var varArgs = [];');
-        code.push(params.prefix + 'for (var i = ' + (params.args.length - 1) + '; i < arguments.length; i++) {');
-        code.push(params.prefix + '  if (' + test + '(arguments[i])) {');
-        code.push(params.prefix + '    varArgs.push(arguments[i]);');
-        code.push(params.prefix + '  } else {');
-        code.push(params.prefix + '    match = false;');
-        code.push(params.prefix + '    break;');
-        code.push(params.prefix + '  }');
-        code.push(params.prefix + '}');
-        code.push(params.prefix + 'if (match) {');
-        code = code.concat(this._innerCode(merge(params, {prefix: params.prefix + '  '})));
-        code.push(params.prefix + '}');
+        if (ref) {
+          code.push(params.prefix + 'if (arguments.length >= ' + params.args.length + ') {');
+          code.push(params.prefix + '  var match = true;');
+          code.push(params.prefix + '  var varArgs = [];');
+          code.push(params.prefix + '  for (var i = ' + (params.args.length - 1) + '; i < arguments.length; i++) {');
+          code.push(params.prefix + '    if (' + test + '(arguments[i])) {');
+          code.push(params.prefix + '      varArgs.push(arguments[i]);');
+          code.push(params.prefix + '    } else {');
+          code.push(params.prefix + '      match = false;');
+          code.push(params.prefix + '      break;');
+          code.push(params.prefix + '    }');
+          code.push(params.prefix + '  }');
+          code.push(params.prefix + '  if (match) {');
+          code.push(params.prefix + '    return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
+          code.push(params.prefix + '  }');
+          code.push(params.prefix + '}');
+        }
       }
     }
     else {
       if (type === undefined || type.anyType) {
         // any type (ordered last) or undefined (in case of a root node)
-        code = code.concat(this._innerCode(params));
+        if (ref) {
+          code.push(params.prefix + 'if (arguments.length === ' + params.args.length + ') {');
+          code.push(params.prefix + '  return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
+          code.push(params.prefix + '}');
+        }
+        code = code.concat(this._childsToCode(params));
+
+        if (params.exceptions) {
+          // TODO: throw errors
+        }
       }
       else {
         code.push(params.prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
-        code = code.concat(this._innerCode(merge(params, {prefix: params.prefix + '  '})));
+        if (ref) {
+          code.push(params.prefix + '  if (arguments.length === ' + params.args.length + ') {');
+          code.push(params.prefix + '    return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
+          code.push(params.prefix + '  }');
+        }
+        code = code.concat(this._childsToCode(merge(params, {prefix: params.prefix + '  '})));
+
+        if (params.exceptions) {
+          // TODO: throw errors
+        }
+
         code.push(params.prefix + '}');
       }
     }
@@ -354,8 +383,7 @@
   };
 
   /**
-   * Create a code representation for calling a function signature,
-   * iterating over it's childs, and iterating over conversions
+   * Iterate over the nodes childs
    *
    * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
@@ -379,38 +407,28 @@
    *
    * @private
    */
-  Node.prototype._innerCode = function (params) {
+  Node.prototype._childsToCode = function (params) {
     var code = [];
 
-    if (this.fn) {
-      var compare = this.varArgs ? '>=' : '===';
-      var ref = params.refs.add(this.fn, 'signature');
-      code.push(params.prefix + 'if (arguments.length ' + compare + ' ' + params.args.length + ') {');
-      code.push(params.prefix + '  return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
-      code.push(params.prefix + '}');
-    }
+    // order the childs by type
+    var childs = Object.keys(this.childs)
+        .sort(compareTypes)
+        .map(function (type) {
+          return this.childs[type];
+        }.bind(this));
 
-    if (params.conversions) {
-      code = code.concat(this._conversionsToCode(params));
-    }
-    else {
-      // iterate over childs
-      this.forEach(function (child) {
-        var arg = child.varArgs ? 'varArgs' : ('arg' + params.args.length);
-        var type = (child.type !== undefined) ? child.type : undefined;
-        var test = (type && !type.anyType) ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
+    // iterate over childs
+    childs.forEach(function (child) {
+      var arg = child.varArgs ? 'varArgs' : ('arg' + params.args.length);
+      var type = (child.type !== undefined) ? child.type : undefined;
+      var test = (type && !type.anyType) ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
 
-        code.push(child._toCode(merge(params, {
-          args: params.args.concat(arg),
-          types: params.types.concat(type),
-          tests: params.tests.concat(test)
-        })));
-      });
-    }
-
-    if (params.exceptions) {
-      // TODO: throw errors
-    }
+      code.push(child._toCode(merge(params, {
+        args: params.args.concat(arg),
+        types: params.types.concat(type),
+        tests: params.tests.concat(test)
+      })));
+    });
 
     return code;
   };
@@ -444,19 +462,6 @@
     // TODO: _conversionsToCode is quite a mess, simplify this
     var code = [];
     var added = {};
-
-    // add entries for exact types
-    this.forEach(function (child) {
-      var arg = child.varArgs ? 'varArgs' : ('arg' + params.args.length);
-      var type = (child.type !== undefined) ? child.type : undefined;
-      var test = (type != 'any') ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
-
-      code.push(child._toCode(merge(params, {
-        args: params.args.concat(arg),
-        types: params.types.concat(type),
-        tests: params.tests.concat(test)
-      })));
-    });
 
     // add entries for type conversions
     typed.conversions
@@ -505,9 +510,19 @@
             code.push(params.prefix + '  }');
             code.push(params.prefix + '}');
             code.push(params.prefix + 'if (match) {');
-            code = code.concat(child._innerCode(merge(params, {
-              args: params.args.concat('varArgs'),
-              types: params.types.concat(type),
+
+            var nextArgs = params.args.concat('varArgs');
+            var nextTypes = params.types.concat(type);
+            if (child.fn) {
+              var compare = this.varArgs ? '>=' : '===';
+              var ref = params.refs.add(child.fn, 'signature');
+              code.push(params.prefix + '  if (arguments.length ' + compare + ' ' + nextArgs.length + ') {');
+              code.push(params.prefix + '    return ' + ref + '(' + nextArgs.join(', ') + '); // signature: ' + nextTypes.join(', '));
+              code.push(params.prefix + '  }');
+            }
+            code = code.concat(child._conversionsToCode(merge(params, {
+              args: nextArgs,
+              types: nextTypes,
               tests: params.tests.concat(test),
               prefix: params.prefix + '  '
             })));
@@ -517,10 +532,20 @@
             test = params.refs.add(getTypeTest(conversion.from), 'test') + '(arg' + params.args.length + ')';
             convert = params.refs.add(conversion.convert, 'convert') + '(arg' + params.args.length + ')';
 
+            var nextArgs = params.args.concat(convert);
+            var nextTypes = params.types.concat(type);
+
             code.push(params.prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-            code = code.concat(child._innerCode(merge(params, {
-              args: params.args.concat(convert),
-              types: params.types.concat(type),
+            if (child.fn) {
+              var compare = child.varArgs ? '>=' : '===';
+              var ref = params.refs.add(child.fn, 'signature');
+              code.push(params.prefix + '  if (arguments.length ' + compare + ' ' + nextArgs.length + ') {');
+              code.push(params.prefix + '    return ' + ref + '(' + nextArgs.join(', ') + '); // signature: ' + nextTypes.join(', '));
+              code.push(params.prefix + '  }');
+            }
+            code = code.concat(child._conversionsToCode(merge(params, {
+              args: nextArgs,
+              types: nextTypes,
               tests: params.tests.concat(test),
               prefix: params.prefix + '  '
             })));
@@ -535,6 +560,7 @@
    * Execute a callback for all childs of a Node
    * @param {function(node: Node)} callback
    */
+  // TODO: cleanup?
   Node.prototype.forEach = function (callback) {
     Object.keys(this.childs)
         .sort(compareTypes)

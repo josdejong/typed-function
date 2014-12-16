@@ -128,7 +128,7 @@ describe('typed-function', function() {
     }, /Error: Unknown type "Function". Did you mean "function"?/);
   });
 
-  describe('configuration', function () {
+  describe.skip('configuration', function () {
 
     it('option minify should be true by default', function () {
       assert.equal(typed.config.minify, true)
