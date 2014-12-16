@@ -249,6 +249,20 @@ describe('typed-function', function() {
       assert.throws(function () {fn('string', 'string')}, /Wrong function signature/);
     });
 
+    it('should create a typed function with union type arguments', function() {
+      var fn = typed('...number|string', function (values) {
+        assert(Array.isArray(values));
+        return values;
+      });
+
+      strictEqualArray(fn(2,3,4), [2,3,4]);
+      strictEqualArray(fn('a','b','c'), ['a','b','c']);
+      strictEqualArray(fn('a',2,'c',3), ['a',2,'c',3]);
+      assert.throws(function () {fn()}, /Wrong function signature/);
+      assert.throws(function () {fn('string', true)}, /Wrong function signature/);
+      assert.throws(function () {fn(2, false)}, /Wrong function signature/);
+    });
+
     it('should create a composed function with variable arguments', function() {
       var fn = typed({
         'string, ...number': function (str, values) {

@@ -138,10 +138,10 @@
    * A function parameter
    * @param {string | string[] | Param} types    A parameter type like 'string',
    *                                             'number | boolean'
-   * @param {boolean} [variable=false]           Variable arguments if true
+   * @param {boolean} [varArgs=false]            Variable arguments if true
    * @constructor
    */
-  function Param(types, variable) {
+  function Param(types, varArgs) {
     // parse the types, can be a string with types separated by pipe characters |
     if (typeof types === 'string') {
       this.types = types.split('|').map(function (type) {
@@ -161,10 +161,10 @@
     // parse variable arguments operator (ellipses '...number')
     if (this.types[0] !== undefined && this.types[0].substring(0, 3) == '...') {
       this.types[0] = this.types[0].substring(3) || 'any';
-      this.variable = true;
+      this.varArgs = true;
     }
     else {
-      this.variable = variable || false;
+      this.varArgs = varArgs || false;
     }
 
     this.anyType = this.types.some(function (type) {
@@ -177,7 +177,7 @@
    * @returns {Param} A cloned version of this param
    */
   Param.prototype.clone = function () {
-    return new Param(this.types.slice(), this.variable);
+    return new Param(this.types.slice(), this.varArgs);
   };
 
   /**
@@ -186,7 +186,7 @@
    * @returns {string}
    */
   Param.prototype.toString = function () {
-    return (this.variable ? '...' : '') + this.types.join('|');
+    return (this.varArgs ? '...' : '') + this.types.join('|');
   };
 
   /**
@@ -213,13 +213,13 @@
     
     // check variable arguments operator '...'
     var withVarArgs = this.params.filter(function (param) {
-      return param.variable;
+      return param.varArgs;
     });
     if (withVarArgs.length === 0) {
-      this.variable = false;
+      this.varArgs = false;
     }
     else if (withVarArgs[0] === this.params[this.params.length - 1]) {
-      this.variable = true;
+      this.varArgs = true;
     }
     else {
       throw new SyntaxError('Unexpected variable arguments operator "..."');
@@ -240,7 +240,7 @@
       if (index < signature.params.length) {
         var param = signature.params[index];
         param.types.forEach(function (type) {
-          _iterate(signature, types.concat(new Param(type, param.variable)), index + 1);
+          _iterate(signature, types.concat(new Param(type, param.varArgs)), index + 1);
         });
       }
       else {
@@ -264,7 +264,7 @@
   function Node (type) {
     this.type = type;
     this.fn = null;
-    this.variable = false; // true if variable args '...'
+    this.varArgs = false; // true if variable args '...'
     this.childs = {};
   }
 
@@ -314,7 +314,7 @@
     var type = last(params.types);
     var test = last(params.tests);
 
-    if (this.variable) {
+    if (this.varArgs) {
       if (type.anyType) { // any type (ordered last)
         code.push(params.prefix + 'var varArgs = [];');
         code.push(params.prefix + 'for (var i = ' + (params.args.length - 1) + '; i < arguments.length; i++) {');
@@ -383,7 +383,7 @@
     var code = [];
 
     if (this.fn) {
-      var compare = this.variable ? '>=' : '===';
+      var compare = this.varArgs ? '>=' : '===';
       var ref = params.refs.add(this.fn, 'signature');
       code.push(params.prefix + 'if (arguments.length ' + compare + ' ' + params.args.length + ') {');
       code.push(params.prefix + '  return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
@@ -396,7 +396,7 @@
     else {
       // iterate over childs
       this.forEach(function (child) {
-        var arg = child.variable ? 'varArgs' : ('arg' + params.args.length);
+        var arg = child.varArgs ? 'varArgs' : ('arg' + params.args.length);
         var type = (child.type !== undefined) ? child.type : undefined;
         var test = (type && !type.anyType) ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
 
@@ -447,7 +447,7 @@
 
     // add entries for exact types
     this.forEach(function (child) {
-      var arg = child.variable ? 'varArgs' : ('arg' + params.args.length);
+      var arg = child.varArgs ? 'varArgs' : ('arg' + params.args.length);
       var type = (child.type !== undefined) ? child.type : undefined;
       var test = (type != 'any') ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
 
@@ -476,7 +476,7 @@
           var type = conversion.to;
           var child = this.childs[type];
 
-          if (child.variable) {
+          if (child.varArgs) {
             code.push(params.prefix + 'var match = true;');
             code.push(params.prefix + 'var varArgs = [];');
             code.push(params.prefix + 'for (var i = ' + params.args.length + '; i < arguments.length; i++) {');
@@ -688,7 +688,7 @@
 
       // add the function as leaf of the innermost node
       node.fn = signature.fn;
-      node.variable = signature.variable;
+      node.varArgs = signature.varArgs;
     });
 
     return root;
