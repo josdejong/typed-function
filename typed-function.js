@@ -166,6 +166,10 @@
     else {
       this.variable = variable || false;
     }
+
+    this.anyType = this.types.some(function (type) {
+      return type == 'any';
+    });
   }
 
   /**
@@ -282,7 +286,7 @@
   /**
    * Returns a string with JavaScript code for this function
    *
-   * @param {{refs: Refs, args: string[], types: string[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -290,7 +294,7 @@
    *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
    *                          args must include the argument for the current node
    *                          (i.e. args.length >= 1)
-   *   {string[]} types        Array with parameter type names parsed so far
+   *   {Param[]} types        Array with parameter types parsed so far
    *                          types must include the type of the current node
    *                          i.e. types.length >= 1)
    *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
@@ -311,7 +315,7 @@
     var test = last(params.tests);
 
     if (this.variable) {
-      if (type == 'any') { // any type (ordered last)
+      if (type.anyType) { // any type (ordered last)
         code.push(params.prefix + 'var varArgs = [];');
         code.push(params.prefix + 'for (var i = ' + (params.args.length - 1) + '; i < arguments.length; i++) {');
         code.push(params.prefix + '  varArgs.push(arguments[i]);');
@@ -335,7 +339,7 @@
       }
     }
     else {
-      if (type == 'any' || type === undefined) {
+      if (type === undefined || type.anyType) {
         // any type (ordered last) or undefined (in case of a root node)
         code = code.concat(this._innerCode(params));
       }
@@ -353,7 +357,7 @@
    * Create a code representation for calling a function signature,
    * iterating over it's childs, and iterating over conversions
    *
-   * @param {{refs: Refs, args: string[], types: string[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -361,7 +365,7 @@
    *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
    *                          args must include the argument for the current node
    *                          (i.e. args.length >= 1)
-   *   {string[]} types        Array with parameter type names parsed so far
+   *   {Param[]} types        Array with parameter types parsed so far
    *                          types must include the type of the current node
    *                          i.e. types.length >= 1)
    *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
@@ -393,8 +397,8 @@
       // iterate over childs
       this.forEach(function (child) {
         var arg = child.variable ? 'varArgs' : ('arg' + params.args.length);
-        var type = (child.type !== undefined) ? child.type.types[0] : undefined;
-        var test = (type != 'any') ? params.refs.add(getTypeTest(type), 'test') : '';
+        var type = (child.type !== undefined) ? child.type : undefined;
+        var test = (type && !type.anyType) ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
 
         code.push(child._toCode(merge(params, {
           args: params.args.concat(arg),
@@ -414,7 +418,7 @@
   /**
    * Create a code representation for iterating over conversions
    *
-   * @param {{refs: Refs, args: string[], types: string[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -422,7 +426,7 @@
    *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
    *                          args must include the argument for the current node
    *                          (i.e. args.length >= 1)
-   *   {string[]} types        Array with parameter type names parsed so far
+   *   {Param[]} types        Array with parameter types parsed so far
    *                          types must include the type of the current node
    *                          i.e. types.length >= 1)
    *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
@@ -444,8 +448,8 @@
     // add entries for exact types
     this.forEach(function (child) {
       var arg = child.variable ? 'varArgs' : ('arg' + params.args.length);
-      var type = (child.type !== undefined) ? child.type.types[0] : undefined;
-      var test = (type != 'any') ? params.refs.add(getTypeTest(type), 'test') : '';
+      var type = (child.type !== undefined) ? child.type : undefined;
+      var test = (type != 'any') ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
 
       code.push(child._toCode(merge(params, {
         args: params.args.concat(arg),
@@ -628,12 +632,11 @@
    * @param {Object.<string, function>} rawSignatures
    * @return {Signature[]} Returns an array with split signatures
    */
-  function splitSignatures(rawSignatures) {
+  function parseSignatures(rawSignatures) {
     return Object.keys(rawSignatures).reduce(function (signatures, params) {
       var fn = rawSignatures[params];
       var signature = new Signature(params, fn);
 
-      // TODO: maybe we don't have to split signatures at all?
       return signatures.concat(signature.split());
     }, []);
   }
@@ -664,7 +667,7 @@
    * @param {Signature[]} signatures   An array with split signatures
    * @return {RootNode}                Returns a node tree
    */
-  function parseSignatures(name, signatures) {
+  function parseTree(name, signatures) {
     var root = new RootNode(name);
 
     signatures.forEach(function (signature) {
@@ -725,12 +728,12 @@
     var refs = new Refs();
 
     // parse signatures, create a node tree
-    var structure = splitSignatures(signatures);
-    var tree = parseSignatures(name, structure);
+    var _signatures = parseSignatures(signatures);
+    var tree = parseTree(name, _signatures);
 
     //console.log('TREE', JSON.stringify(tree, null, 2)) // TODO: cleanup
 
-    var treeCode = tree.toCode(refs); // TODO: do not create references in toCode but in parseSignatures
+    var treeCode = tree.toCode(refs); // TODO: do not create references in toCode but in parseTree
     var refsCode = refs.toCode();
 
     // generate JavaScript code
@@ -746,14 +749,14 @@
     }
 
     // TODO: cleanup
-    //typed.config.minify = false;
-    //console.log('CODE', treeCode);
+    typed.config.minify = false;
+    console.log('CODE', treeCode);
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
 
     // attach the signatures with sub-functions to the constructed function
-    fn.signatures = normalizeSignatures(structure); // normalized signatures
+    fn.signatures = normalizeSignatures(_signatures); // normalized signatures
 
     return fn;
   }
