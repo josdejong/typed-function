@@ -292,11 +292,7 @@
    *   {Refs} refs            Object to store function references
    *   {string[]} args        Argument names, like ['arg0', 'arg1', ...],
    *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
-   *                          args must include the argument for the current node
-   *                          (i.e. args.length >= 1)
    *   {Param[]} types        Array with parameter types parsed so far
-   *                          types must include the type of the current node
-   *                          i.e. types.length >= 1)
    *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
    *   {string} prefix        A number of spaces to prefix for every line of code
    *   {boolean} conversions  A boolean which is true when the generated
@@ -310,30 +306,40 @@
    */
   Node.prototype._toCode = function (params) {
     var code = [];
-    var arg  = last(params.args);
-    var type = last(params.types);
-    var test = last(params.tests);
+
     var ref = this.fn ? params.refs.add(this.fn, 'signature') : undefined;
+    var arg = this.varArgs ? 'varArgs' : ('arg' + params.args.length);
+    var type = (this.type !== undefined) ? this.type : undefined;
+    var test = (type && !type.anyType) ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
+
+    var args = params.args.concat(arg);
+    var types = params.types.concat(type);
+    var tests = params.tests.concat(test);
+    var nextParams = merge(params, {
+      args: args,
+      types: types,
+      tests: tests
+    });
 
     if (this.varArgs) {
       // varArgs cannot have childs, it's the last argument
       if (type.anyType) {
         if (ref) {
-          code.push(params.prefix + 'if (arguments.length >= ' + params.args.length + ') {');
+          code.push(params.prefix + 'if (arguments.length >= ' + args.length + ') {');
           code.push(params.prefix + '  var varArgs = [];');
-          code.push(params.prefix + '  for (var i = ' + (params.args.length - 1) + '; i < arguments.length; i++) {');
+          code.push(params.prefix + '  for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
           code.push(params.prefix + '    varArgs.push(arguments[i]);');
           code.push(params.prefix + '  }');
-          code.push(params.prefix + '  return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
+          code.push(params.prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
           code.push(params.prefix + '}');
         }
       }
       else {
         if (ref) {
-          code.push(params.prefix + 'if (arguments.length >= ' + params.args.length + ') {');
+          code.push(params.prefix + 'if (arguments.length >= ' + args.length + ') {');
           code.push(params.prefix + '  var match = true;');
           code.push(params.prefix + '  var varArgs = [];');
-          code.push(params.prefix + '  for (var i = ' + (params.args.length - 1) + '; i < arguments.length; i++) {');
+          code.push(params.prefix + '  for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
           code.push(params.prefix + '    if (' + test + '(arguments[i])) {');
           code.push(params.prefix + '      varArgs.push(arguments[i]);');
           code.push(params.prefix + '    } else {');
@@ -342,21 +348,25 @@
           code.push(params.prefix + '    }');
           code.push(params.prefix + '  }');
           code.push(params.prefix + '  if (match) {');
-          code.push(params.prefix + '    return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
+          code.push(params.prefix + '    return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
           code.push(params.prefix + '  }');
           code.push(params.prefix + '}');
         }
       }
     }
     else {
-      if (type === undefined || type.anyType) {
-        // any type (ordered last) or undefined (in case of a root node)
+      if (type.anyType) {
+        // any type (ordered last)
         if (ref) {
-          code.push(params.prefix + 'if (arguments.length === ' + params.args.length + ') {');
-          code.push(params.prefix + '  return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
+          code.push(params.prefix + 'if (arguments.length === ' + args.length + ') {');
+          code.push(params.prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
           code.push(params.prefix + '}');
         }
-        code = code.concat(this._childsToCode(params));
+
+        // iterate over the childs
+        this._getChilds().forEach(function (child) {
+          code = code.concat(child._toCode(nextParams));
+        });
 
         if (params.exceptions) {
           // TODO: throw errors
@@ -365,11 +375,15 @@
       else {
         code.push(params.prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
         if (ref) {
-          code.push(params.prefix + '  if (arguments.length === ' + params.args.length + ') {');
-          code.push(params.prefix + '    return ' + ref + '(' + params.args.join(', ') + '); // signature: ' + params.types.join(', '));
+          code.push(params.prefix + '  if (arguments.length === ' + args.length + ') {');
+          code.push(params.prefix + '    return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
           code.push(params.prefix + '  }');
         }
-        code = code.concat(this._childsToCode(merge(params, {prefix: params.prefix + '  '})));
+
+        // iterate over the childs
+        this._getChilds().forEach(function (child) {
+          code = code.concat(child._toCode(merge(nextParams, {prefix: params.prefix + '  '})));
+        });
 
         if (params.exceptions) {
           // TODO: throw errors
@@ -383,57 +397,6 @@
   };
 
   /**
-   * Iterate over the nodes childs
-   *
-   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
-   *
-   * Where:
-   *   {Refs} refs            Object to store function references
-   *   {string[]} args        Argument names, like ['arg0', 'arg1', ...],
-   *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
-   *                          args must include the argument for the current node
-   *                          (i.e. args.length >= 1)
-   *   {Param[]} types        Array with parameter types parsed so far
-   *                          types must include the type of the current node
-   *                          i.e. types.length >= 1)
-   *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
-   *   {string} prefix        A number of spaces to prefix for every line of code
-   *   {boolean} conversions  A boolean which is true when the generated
-   *                          code must do type conversions
-   *   {boolean} exceptions   A boolean which is true when the generated code
-   *                          must throw exceptions when there is no signature match
-   *
-   * @returns {string[]} code
-   *
-   * @private
-   */
-  Node.prototype._childsToCode = function (params) {
-    var code = [];
-
-    // order the childs by type
-    var childs = Object.keys(this.childs)
-        .sort(compareTypes)
-        .map(function (type) {
-          return this.childs[type];
-        }.bind(this));
-
-    // iterate over childs
-    childs.forEach(function (child) {
-      var arg = child.varArgs ? 'varArgs' : ('arg' + params.args.length);
-      var type = (child.type !== undefined) ? child.type : undefined;
-      var test = (type && !type.anyType) ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
-
-      code.push(child._toCode(merge(params, {
-        args: params.args.concat(arg),
-        types: params.types.concat(type),
-        tests: params.tests.concat(test)
-      })));
-    });
-
-    return code;
-  };
-
-  /**
    * Create a code representation for iterating over conversions
    *
    * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
@@ -442,11 +405,7 @@
    *   {Refs} refs            Object to store function references
    *   {string[]} args        Argument names, like ['arg0', 'arg1', ...],
    *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
-   *                          args must include the argument for the current node
-   *                          (i.e. args.length >= 1)
    *   {Param[]} types        Array with parameter types parsed so far
-   *                          types must include the type of the current node
-   *                          i.e. types.length >= 1)
    *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
    *   {string} prefix        A number of spaces to prefix for every line of code
    *   {boolean} conversions  A boolean which is true when the generated
@@ -557,15 +516,15 @@
   };
 
   /**
-   * Execute a callback for all childs of a Node
-   * @param {function(node: Node)} callback
+   * Get the childs of this node ordered by type
+   * @return {Node[]} Returns an array with Nodes
+   * @protected
    */
-  // TODO: cleanup?
-  Node.prototype.forEach = function (callback) {
-    Object.keys(this.childs)
+  Node.prototype._getChilds = function () {
+    return Object.keys(this.childs)
         .sort(compareTypes)
-        .forEach(function (type) {
-          callback(this.childs[type]);
+        .map(function (type) {
+          return this.childs[type];
         }.bind(this));
   };
 
@@ -592,16 +551,32 @@
 
     // create an array with all argument names
     var argCount = this.depth();
-    var params = [];
+    var args = [];
     for (var i = 0; i < argCount; i++) {
-      params[i] = 'arg' + i;
+      args[i] = 'arg' + i;
     }
 
     // TODO: check beforehand if the function will have conversions
     var withConversions = (typed.conversions.length > 0);
 
     // function begin
-    code.push('return function ' + this.name + '(' + params.join(', ') + ') {');
+    code.push('return function ' + this.name + '(' + args.join(', ') + ') {');
+
+    // function signature with zero arguments
+    var ref = this.fn ? refs.add(this.fn, 'signature') : undefined;
+    if (ref) {
+      code.push('  if (arguments.length === 0) {');
+      code.push('    return ' + ref + '(); // signature: (empty)');
+      code.push('  }');
+    }
+
+    var params = {
+      refs: refs,
+      args: [],
+      types: [],
+      tests: [],
+      prefix: '  '
+    };
 
     if (withConversions) {
       // create two recursive trees: the first checks exact matches, the second
@@ -609,41 +584,31 @@
       // loops, else you can get unnecessary conversions.
 
       // exact matches
+      // iterate over the childs
       code.push('  // exactly matching signatures');
-      code = code.concat(this._toCode({
-        refs: refs,
-        args: [],
-        types: [],
-        tests: [],
-        prefix: '  ',
-        conversions: false,
-        exceptions: false
-      }));
+      this._getChilds().forEach(function (child) {
+        code = code.concat(child._toCode(merge(params, {
+          conversions: false,
+          exceptions: false
+        })));
+      });
 
       // matches and conversions
       code.push('  // convert into matching signatures');
-      code = code.concat(this._conversionsToCode({
-        refs: refs,
-        args: [],
-        types: [],
-        tests: [],
-        prefix: '  ',
+      code = code.concat(this._conversionsToCode(merge(params, {
         conversions: true,
         exceptions: true
-      }));
+      })));
     }
     else {
       // no conversions needed for this function. Create one recursive tree to test exact matches
       code.push('  // exactly matching signatures');
-      code = code.concat(this._toCode({
-        refs: refs,
-        args: [],
-        types: [],
-        tests: [],
-        prefix: '  ',
-        conversions: false,
-        exceptions: true
-      }));
+      this._getChilds().forEach(function (child) {
+        code = code.concat(child._toCode(merge(params, {
+          conversions: false,
+          exceptions: true
+        })));
+      });
     }
 
     // function end
