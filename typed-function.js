@@ -293,6 +293,7 @@
    * Returns a string with JavaScript code for this function
    *
    * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {{from: string, to: string, convert: function}} [conversion]
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -310,16 +311,26 @@
    *
    * @protected
    */
-  Node.prototype._toCode = function (params) {
+  Node.prototype._toCode = function (params, conversion) {
     var code = [];
 
     var ref = this.fn ? params.refs.add(this.fn, 'signature') : undefined;
     var arg = this.varArgs ? 'varArgs' : ('arg' + params.args.length);
-    var type = (this.type !== undefined) ? this.type : undefined;
-    var test = (type && !type.anyType) ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
-    // TODO: dangerous to suppose type.tests.length === 1
+    var type = this.type;
 
-    var args = params.args.concat(arg);
+    var test;
+    var nextArg;
+    if (conversion) {
+      test = params.refs.add(getTypeTest(conversion.from), 'test');
+      var convert = params.refs.add(conversion.convert, 'convert');
+      nextArg = convert + '(' + arg + ')';
+    }
+    else {
+      test = (type.anyType === false) ? params.refs.add(getTypeTest(type.types[0]), 'test') : '';
+      nextArg = arg;
+    }
+
+    var args = params.args.concat(nextArg);
     var types = params.types.concat(type);
     var tests = params.tests.concat(test);
     var nextParams = merge(params, {
@@ -348,6 +359,7 @@
                 return test + '(arguments[i])';
               })
               .join(' || ');
+          // TODO: conversions
 
           code.push(params.prefix + 'if (arguments.length >= ' + args.length + ') {');
           code.push(params.prefix + '  var match = true;');
@@ -381,12 +393,18 @@
           code = code.concat(child._toCode(nextParams));
         });
 
+        // handle conversions
+        if (params.conversions) {
+          code = code.concat(this._conversionsToCode(merge(nextParams, {prefix: params.prefix + '  '})));
+        }
+
         if (params.exceptions) {
           // TODO: throw errors
         }
       }
       else {
-        code.push(params.prefix + 'if (' + test + '(' + arg + ')) { // type: ' + type);
+        code.push(params.prefix + 'if (' + test + '(' + arg + ')) { ' +
+          '// type: ' + (convert ? (conversion.from + ', convert to ' + type) : type));
         if (ref) {
           code.push(params.prefix + '  if (arguments.length === ' + args.length + ') {');
           code.push(params.prefix + '    return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
@@ -397,6 +415,11 @@
         this._getChilds().forEach(function (child) {
           code = code.concat(child._toCode(merge(nextParams, {prefix: params.prefix + '  '})));
         });
+
+        // handle conversions
+        if (params.conversions) {
+          code = code.concat(this._conversionsToCode(merge(nextParams, {prefix: params.prefix + '  '})));
+        }
 
         if (params.exceptions) {
           // TODO: throw errors
@@ -431,98 +454,14 @@
    * @protected
    */
   Node.prototype._conversionsToCode = function (params) {
-    // TODO: _conversionsToCode is quite a mess, simplify this
     var code = [];
-    var added = {};
 
-    // add entries for type conversions
-    typed.conversions
-        .filter(function (conversion) {
-          if (this.childs[conversion.to] !== undefined &&
-              !added[conversion.from]) {
-            added[conversion.from] = true;
-            return true;
-          }
-          return false;
-        }.bind(this))
-        .forEach(function (conversion) {
-          var test, convert;
-
-          // note: at this point, each child of our node can be pointed to by
-          //       by one conversion or no conversions
+    // iterate over the type conversions
+    this._getConversions().forEach(function (conversion) {
           var type = conversion.to;
           var child = this.childs[type];
 
-          if (child.varArgs) {
-            code.push(params.prefix + 'var match = true;');
-            code.push(params.prefix + 'var varArgs = [];');
-            code.push(params.prefix + 'for (var i = ' + params.args.length + '; i < arguments.length; i++) {');
-
-            // unconverted type
-            test = params.refs.add(getTypeTest(type), 'test') + '(arguments[i])';
-            code.push(params.prefix + '  if (' + test + ') { // type: ' + conversion.to);
-            code.push(params.prefix + '    varArgs.push(arguments[i]);');
-
-            // all convertable types
-            typed.conversions
-                .filter(function (c) {
-                  return c.to == type;
-                })
-                .forEach(function (c) {
-                  var test = params.refs.add(getTypeTest(c.from), 'test') + '(arguments[i])';
-                  var convert = params.refs.add(c.convert, 'convert') + '(arguments[i])';
-
-                  code.push(params.prefix + '  } else if (' + test + ') { // type: ' + c.from + ', convert to ' + c.to);
-                  code.push(params.prefix + '    varArgs.push(' + convert + ');');
-                });
-
-            code.push(params.prefix + '  } else {');
-            code.push(params.prefix + '    match = false;');
-            code.push(params.prefix + '    break;');
-            code.push(params.prefix + '  }');
-            code.push(params.prefix + '}');
-            code.push(params.prefix + 'if (match) {');
-
-            var nextArgs = params.args.concat('varArgs');
-            var nextTypes = params.types.concat(type);
-            if (child.fn) {
-              var compare = this.varArgs ? '>=' : '===';
-              var ref = params.refs.add(child.fn, 'signature');
-              code.push(params.prefix + '  if (arguments.length ' + compare + ' ' + nextArgs.length + ') {');
-              code.push(params.prefix + '    return ' + ref + '(' + nextArgs.join(', ') + '); // signature: ' + nextTypes.join(', '));
-              code.push(params.prefix + '  }');
-            }
-            code = code.concat(child._conversionsToCode(merge(params, {
-              args: nextArgs,
-              types: nextTypes,
-              tests: params.tests.concat(test),
-              prefix: params.prefix + '  '
-            })));
-            code.push(params.prefix + '}');
-          }
-          else {
-            test = params.refs.add(getTypeTest(conversion.from), 'test') + '(arg' + params.args.length + ')';
-            convert = params.refs.add(conversion.convert, 'convert') + '(arg' + params.args.length + ')';
-
-            var nextArgs = params.args.concat(convert);
-            var nextTypes = params.types.concat(type);
-
-            code.push(params.prefix + 'if (' + test + ') { // type: ' + conversion.from + ', convert to ' + conversion.to);
-            if (child.fn) {
-              var compare = child.varArgs ? '>=' : '===';
-              var ref = params.refs.add(child.fn, 'signature');
-              code.push(params.prefix + '  if (arguments.length ' + compare + ' ' + nextArgs.length + ') {');
-              code.push(params.prefix + '    return ' + ref + '(' + nextArgs.join(', ') + '); // signature: ' + nextTypes.join(', '));
-              code.push(params.prefix + '  }');
-            }
-            code = code.concat(child._conversionsToCode(merge(params, {
-              args: nextArgs,
-              types: nextTypes,
-              tests: params.tests.concat(test),
-              prefix: params.prefix + '  '
-            })));
-            code.push(params.prefix + '}');
-          }
+          code = code.concat(child._toCode(params, conversion));
         }.bind(this));
 
     return code;
@@ -538,6 +477,28 @@
         .sort(compareTypes)
         .map(function (type) {
           return this.childs[type];
+        }.bind(this));
+  };
+
+  /**
+   * Get the conversions relevant for this Node
+   * @returns {Array} Array with conversion objects
+   * @private
+   */
+  Node.prototype._getConversions = function () {
+    // filter the relevant type conversions
+    var handled = {};
+    return typed.conversions
+        .filter(function (conversion) {
+          if (this.childs[conversion.from] === undefined &&
+              this.childs[conversion.to] !== undefined &&
+              !handled[conversion.from]) {
+            handled[conversion.from] = true;
+            return true;
+          }
+          else {
+            return false;
+          }
         }.bind(this));
   };
 
@@ -569,7 +530,7 @@
       args[i] = 'arg' + i;
     }
 
-    // TODO: check beforehand if the function will have conversions
+    // TODO: check beforehand if the function at hand needs conversions, create a function Node.hasConversions()
     var withConversions = (typed.conversions.length > 0);
 
     // function begin
@@ -608,6 +569,12 @@
 
       // matches and conversions
       code.push('  // convert into matching signatures');
+      this._getChilds().forEach(function (child) {
+        code = code.concat(child._toCode(merge(params, {
+          conversions: true,
+          exceptions: true
+        })));
+      });
       code = code.concat(this._conversionsToCode(merge(params, {
         conversions: true,
         exceptions: true

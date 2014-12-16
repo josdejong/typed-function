@@ -452,7 +452,7 @@ describe('typed-function', function() {
 
   });
 
-  describe.skip('conversions' , function () {
+  describe('conversions', function () {
 
     before(function () {
       typed.conversions = [
