@@ -54,16 +54,6 @@
   }
 
   /**
-   * Returns the last element of an array
-   * @param {Array} array
-   * @returns {*} The last element of the array, or undefined when the array
-   *              is empty
-   */
-  function last(array) {
-    return array[array.length - 1];
-  }
-
-  /**
    * Get a type test function for a specific data type
    * @param {string} type                   A data type like 'number' or 'string'
    * @returns {function(obj: *) : boolean}  Returns a type testing function.
@@ -167,6 +157,7 @@
       this.varArgs = varArgs || false;
     }
 
+    // check for any type arguments
     this.anyType = this.types.some(function (type) {
       return type == 'any';
     });
@@ -287,6 +278,30 @@
     }.bind(this));
 
     return level;
+  };
+
+  /**
+   * Test recursively whether this Node or any of it's childs need conversions
+   */
+  Node.prototype.hasConversions = function () {
+    if (this._getConversions().length > 0) {
+      return true;
+    }
+    if (this.type && this.type.varArgs && this._getVarArgConversions().length > 0) {
+      return true;
+    }
+
+    if (this.childs) {
+      for (var type in this.childs) {
+        if (this.childs.hasOwnProperty(type)) {
+          if (this.childs[type].hasConversions()) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
   };
 
   /**
@@ -520,6 +535,15 @@
    * @protected
    */
   Node.prototype._getConversions = function () {
+    // if there is a varArgs child, there is no need to do conversions separately,
+    // that is handled by the varArg loop
+    var hasVarArgs = this._getChilds().some(function (child) {
+      return child.type.varArgs;
+    });
+    if (hasVarArgs) {
+      return [];
+    }
+
     // filter the relevant type conversions
     var handled = {};
     return typed.conversions
@@ -559,21 +583,6 @@
   };
 
   /**
-   * Test whether any of the childs of this Node has variable arguments
-   * @returns {boolean} Returns true if any of the nodes childs has varArgs
-   */
-  Node.prototype.hasVarArgs = function () {
-    for (var type in this.childs) {
-      if (this.childs.hasOwnProperty(type)) {
-        if (this.childs[type].type.varArgs) {
-          return true;
-        }
-      }
-    }
-    return false;
-  };
-
-  /**
    * The root node of a node tree
    * @param {string} [name]         Optional function name
    * @constructor
@@ -601,8 +610,8 @@
       args[i] = 'arg' + i;
     }
 
-    // TODO: check beforehand if the function at hand needs conversions, create a function Node.hasConversions()
-    var withConversions = (typed.conversions.length > 0);
+    // check whether the function at hand needs conversions
+    var hasConversions = this.hasConversions();
 
     // function begin
     code.push('return function ' + this.name + '(' + args.join(', ') + ') {');
@@ -623,7 +632,7 @@
       prefix: '  '
     };
 
-    if (withConversions) {
+    if (hasConversions) {
       // create two recursive trees: the first checks exact matches, the second
       // checks all possible conversions. This must be done in two separate
       // loops, else you can get unnecessary conversions.
@@ -646,12 +655,10 @@
           exceptions: true
         })));
       });
-      if (!this.hasVarArgs()) {
-        code.push(this._conversionsToCode(merge(params, {
-          conversions: true,
-          exceptions: true
-        })));
-      }
+      code.push(this._conversionsToCode(merge(params, {
+        conversions: true,
+        exceptions: true
+      })));
     }
     else {
       // no conversions needed for this function. Create one recursive tree to test exact matches
@@ -783,7 +790,7 @@
     //console.log('TREE\n' + JSON.stringify(tree, null, 2)); // TODO: cleanup
     //console.log('TREE', tree); // TODO: cleanup
 
-    var treeCode = tree.toCode(refs); // TODO: do not create references in toCode but in parseTree
+    var treeCode = tree.toCode(refs);
     var refsCode = refs.toCode();
 
     // generate JavaScript code
@@ -798,7 +805,7 @@
       factory = minify(factory);
     }
 
-    //console.log('CODE\n' + treeCode);  // TODO: cleanup
+    console.log('CODE\n' + treeCode);  // TODO: cleanup
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);

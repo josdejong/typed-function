@@ -285,8 +285,6 @@ describe('typed-function', function() {
       assert.throws(function () {fn('string', true)}, /Wrong function signature/);
     });
 
-    // TODO: test combination of varArgs and conversion
-
     it('should throw an error in case of unexpected variable arguments', function() {
       assert.throws(function () {
         typed('...number, string', function () {});
@@ -609,9 +607,26 @@ describe('typed-function', function() {
       assert.equal(fn(2), 2);
       assert.equal(fn('foo'), 'foo');
     });
+
+
+    it('should add non-conflicting conversions to a function with one argument', function() {
+      var fn = typed({
+        'boolean': function (a) {
+          return a;
+        }
+      });
+
+      // booleans should be converted to number
+      assert.equal(fn(false), 0);
+      assert.equal(fn(true), 1);
+
+    });
   });
 
+
   // TODO: test compose.tests
+  // TODO: test the generated .signatures object on a typed function
+
 });
 
 function strictEqualArray(a, b) {
