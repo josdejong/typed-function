@@ -404,7 +404,7 @@
 
           if (params.exceptions) {
             var err = params.refs.add(unexpectedType, 'err');
-            code.push(prefix + 'throw ' + err + '(\'' + this.type.types.join(' or ') + '\', arguments[i], i); // Unexpected type');
+            code.push(prefix + '      throw ' + err + '(\'' + this.type.types + '\', arguments[i], i); // Unexpected type');
           }
           else {
             code.push(prefix + '      match = false;');
@@ -492,19 +492,38 @@
 
   /**
    * Create an unsupported type error
-   * @param {string} expected    String with expected types, comma separated
+   * @param {string} expected    String with comma separated types
    * @param {*} actual           The actual argument
    * @param {number} index       Index of the argument
    * @returns {TypeError} Returns a TypeError
    */
   function unexpectedType (expected, actual, index) {
+    var arr = expected.split(',');
     var message = 'Unexpected type of argument';
     var actualType = getTypeOf(actual);
-    var err = new TypeError(message + '. Expected: ' + expected + ', actual: ' + actualType + ', index: ' + index + '.');
+    var err = new TypeError(message + '. Expected: ' + arr.join(' or ') + ', actual: ' + actualType + ', index: ' + index + '.');
     err.data = {
       message: message,
-      expected: expected,
+      expected: arr,
       actual: actual,
+      index: index
+    };
+    return err;
+  }
+
+  /**
+   * Create a too-few-arguments error
+   * @param {string} expected    String with comma separated types
+   * @param {number} index       index of the argument
+   * @returns {TypeError} Returns a TypeError
+   */
+  function tooFewArguments(expected, index) {
+    var arr = expected.split(',');
+    var message = 'Too few arguments';
+    var err = new TypeError(message + '. Expected: ' + arr.join(' or ') + ', index: ' + index + '.');
+    err.data = {
+      message: message,
+      expected: arr,
       index: index
     };
     return err;
@@ -526,22 +545,6 @@
     };
     return err;
   }
-
-  /**
-   * Create a missing-arguments error
-   * @param {string} expected    String with expected types, comma separated
-   * @returns {TypeError} Returns a TypeError
-   */
-  function missingArgument(expected) {
-    var message = 'Arguments missing';
-    var err = new TypeError(message + '. Expected: ' + expected + '.');
-    err.data = {
-      message: message,
-      expected: expected
-    };
-    return err;
-  }
-
   /**
    * Create code to throw an error
    *
@@ -577,8 +580,8 @@
 
     var firstChild = types.length > 0 ? this.childs[types[0]] : undefined;
     if (firstChild && firstChild.varArgs) {
-      err = params.refs.add(missingArgument, 'err');
-      code.push(prefix + 'throw ' + err + '(\'' + firstChild.type.types.join(' or ') + '\'); // Missing arguments');
+      err = params.refs.add(tooFewArguments, 'err');
+      code.push(prefix + 'throw ' + err + '(\'' + firstChild.type.types.join(',') + '\', arguments.length); // Too few arguments');
     }
     else {
       if (types.length === 0) {
@@ -589,12 +592,13 @@
       }
       else {
         if (types.indexOf('any') === -1) {
-          var errA = params.refs.add(unexpectedType, 'err');
-          var errB = params.refs.add(missingArgument, 'err');
+          var errA = params.refs.add(tooFewArguments, 'err');
           code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
-          code.push(prefix + '  throw ' + errB + '(\'' + types.join(' or ') + '\'); // Missing arguments');
+          code.push(prefix + '  throw ' + errA + '(\'' + types.join(',') + '\', arguments.length); // Too few arguments');
           code.push(prefix + '}');
-          code.push(prefix + 'throw ' + errA + '(\'' + types.join(' or ') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
+
+          var errB = params.refs.add(unexpectedType, 'err');
+          code.push(prefix + 'throw ' + errB + '(\'' + types.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
           // TODO: add "Actual: ..." to the error message
         }
       }
