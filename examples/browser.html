@@ -12,15 +12,7 @@
   });
 
   // use the function
-  document.write(fn1(2, 'foo') + '<br>');     // outputs 'a is a number, b is a string'
-
-  // calling the function with a non-supported type signature will throw an error
-  try {
-    fn1('hello', 'world');
-  }
-  catch (err) {
-    document.write(err.toString() + '<br>'); // outputs: 'TypeError: Wrong function signature'
-  }
+  document.write(fn1(2, 'foo') + '<br>'); // outputs 'a is a number, b is a string'
 </script>
 </body>
 </html>

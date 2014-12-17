@@ -369,6 +369,7 @@
           code.push(prefix + '  }');
           code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
           code.push(prefix + '}');
+          // TODO: throw Exception
         }
       }
       else {
@@ -400,8 +401,16 @@
           }
 
           code.push(prefix + '    } else {');
-          code.push(prefix + '      match = false;');
-          code.push(prefix + '      break;');
+
+          if (params.exceptions) {
+            var err = params.refs.add(unexpectedType, 'err');
+            code.push(prefix + 'throw ' + err + '(\'' + this.type.types.join(' or ') + '\', arguments[i], i); // Unexpected type');
+          }
+          else {
+            code.push(prefix + '      match = false;');
+            code.push(prefix + '      break;');
+          }
+
           code.push(prefix + '    }');
           code.push(prefix + '  }');
           code.push(prefix + '  if (match) {');
@@ -475,7 +484,120 @@
     }
 
     if (params.exceptions) {
-      // TODO: throw errors
+      code.push(this._exceptions(params));
+    }
+
+    return code.join('\n');
+  };
+
+  /**
+   * Create an unsupported type error
+   * @param {string} expected    String with expected types, comma separated
+   * @param {*} actual           The actual argument
+   * @param {number} index       Index of the argument
+   * @returns {TypeError} Returns a TypeError
+   */
+  function unexpectedType (expected, actual, index) {
+    var message = 'Unexpected type of argument';
+    var actualType = getTypeOf(actual);
+    var err = new TypeError(message + '. Expected: ' + expected + ', actual: ' + actualType + ', index: ' + index + '.');
+    err.data = {
+      message: message,
+      expected: expected,
+      actual: actual,
+      index: index
+    };
+    return err;
+  }
+
+  /**
+   * Create an too-many-arguments error
+   * @param {number} expected  The expected number of arguments
+   * @param {number} actual    The actual number of arguments
+   * @returns {TypeError}Returns a TypeError
+   */
+  function tooManyArguments(expected, actual) {
+    var message = 'Too many arguments';
+    var err = new TypeError(message + '. Expected: ' + expected + ', actual: ' + actual + '.');
+    err.data = {
+      message: message,
+      expected: expected,
+      actual: actual
+    };
+    return err;
+  }
+
+  /**
+   * Create a missing-arguments error
+   * @param {string} expected    String with expected types, comma separated
+   * @returns {TypeError} Returns a TypeError
+   */
+  function missingArgument(expected) {
+    var message = 'Arguments missing';
+    var err = new TypeError(message + '. Expected: ' + expected + '.');
+    err.data = {
+      message: message,
+      expected: expected
+    };
+    return err;
+  }
+
+  /**
+   * Create code to throw an error
+   *
+   * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   *
+   * Where:
+   *   {Refs} refs            Object to store function references
+   *   {string[]} args        Argument names, like ['arg0', 'arg1', ...],
+   *                          but can also contain conversions like ['arg0', 'convert1(arg1)']
+   *                          Must include the arg of the current node.
+   *   {Param[]} types        Array with parameter types parsed so far
+   *                          Must include the type of the current node.
+   *   {string[]} tests       Type tests, like ['test0', 'test2', ...]
+   *                          Must include the test of the current node.
+   *   {string} prefix        A number of spaces to prefix for every line of code
+   *   {boolean} conversions  A boolean which is true when the generated
+   *                          code must do type conversions
+   *   {boolean} exceptions   A boolean which is true when the generated code
+   *                          must throw exceptions when there is no signature match
+   *
+   * @returns {string} Code throwing an error
+   *
+   * @private
+   */
+  Node.prototype._exceptions = function (params) {
+    var code = [];
+    var prefix = params.prefix;
+    var argCount = params.args.length;
+    var arg = 'arg' + params.args.length;
+    var err;
+
+    var types = Object.keys(this.childs);
+
+    var firstChild = types.length > 0 ? this.childs[types[0]] : undefined;
+    if (firstChild && firstChild.varArgs) {
+      err = params.refs.add(missingArgument, 'err');
+      code.push(prefix + 'throw ' + err + '(\'' + firstChild.type.types.join(' or ') + '\'); // Missing arguments');
+    }
+    else {
+      if (types.length === 0) {
+        code.push(prefix + 'if (arguments.length > ' + argCount + ') {');
+        err = params.refs.add(tooManyArguments, 'err');
+        code.push(prefix + '  throw ' + err + '(' + argCount + ', arguments.length); // Too many arguments');
+        code.push(prefix + '}');
+      }
+      else {
+        if (types.indexOf('any') === -1) {
+          var errA = params.refs.add(unexpectedType, 'err');
+          var errB = params.refs.add(missingArgument, 'err');
+          code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
+          code.push(prefix + '  throw ' + errB + '(\'' + types.join(' or ') + '\'); // Missing arguments');
+          code.push(prefix + '}');
+          code.push(prefix + 'throw ' + errA + '(\'' + types.join(' or ') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
+          // TODO: add "Actual: ..." to the error message
+        }
+      }
     }
 
     return code.join('\n');
@@ -672,7 +794,7 @@
     }
 
     // function end
-    code.push('  throw new TypeError(\'Wrong function signature\');');  // TODO: output the expected signature
+    code.push(this._exceptions(params));
     code.push('}');
 
     return code.join('\n');
@@ -787,6 +909,10 @@
     var _signatures = parseSignatures(signatures);
     var tree = parseTree(name, _signatures);
 
+    if (_signatures.length == 0) {
+      throw new Error('No signatures provided');
+    }
+
     //console.log('TREE\n' + JSON.stringify(tree, null, 2)); // TODO: cleanup
     //console.log('TREE', tree); // TODO: cleanup
 
@@ -805,7 +931,7 @@
       factory = minify(factory);
     }
 
-    console.log('CODE\n' + treeCode);  // TODO: cleanup
+    //console.log('CODE\n' + treeCode);  // TODO: cleanup
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
@@ -821,6 +947,7 @@
   // data type tests
   var types = {
     'null':     function (x) {return x === null},
+    'undefined':function (x) {return x === undefined},
     'boolean':  function (x) {return typeof x === 'boolean'},
     'number':   function (x) {return typeof x === 'number'},
     'string':   function (x) {return typeof x === 'string'},
@@ -830,6 +957,20 @@
     'RegExp':   function (x) {return x instanceof RegExp},
     'Object':   function (x) {return typeof x === 'object'}
   };
+
+  /**
+   * Get the type of a value
+   * @param {*} x
+   * @returns {string} Returns a string with the type of value
+   */
+  function getTypeOf(x) {
+    for (var type in types) {
+      if (types.hasOwnProperty(type)) {
+        if (types[type](x)) return type;
+      }
+    }
+    return 'unknown';
+  }
 
   // configuration
   var config = {

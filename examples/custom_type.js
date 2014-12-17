@@ -27,5 +27,7 @@ try {
   stringify('ooops');
 }
 catch (err) {
-  console.log(err.toString()); // outputs: 'TypeError: Wrong function signature'
+  console.log(err.toString());
+  // outputs: TypeError: Unexpected type of argument.
+  //          Expected: Person, actual: string, index: 0.
 }

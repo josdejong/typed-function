@@ -8,6 +8,7 @@ Features:
 - Automatic type conversion of arguments.
 - Compose typed functions with multiple signatures.
 - Supports union types, any type, variable arguments.
+- Detailed error messaging.
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
@@ -63,7 +64,9 @@ try {
   fn4('hello world');
 }
 catch (err) {
-  console.log(err.toString());   // outputs: 'TypeError: Wrong function signature'
+  console.log(err.toString());
+  // outputs: TypeError: Unexpected type of argument.
+  //                     Expected: number, actual: string, index: 0.
 }
 ```
 
@@ -174,7 +177,6 @@ checking done by `typed-function` anyway.
   - Nullable arguments like `'?Object'`
 - Be able to merge typed functions into a new typed function, like
   `fn1 = merged(fn2, fn3)`.
-- Detailed error messages.
 - Create a good benchmark, to get insight in the overhead.
 - Allow conversions not to be able to convert any input (for example string to
   number is not always possible).

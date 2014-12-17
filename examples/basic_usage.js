@@ -17,12 +17,14 @@ var fn3 = typed('string, any', function (a, b) {
 
 
 // use the function
-console.log(fn1(2, 'foo'));      // outputs 'a is a number, b is a number'
+console.log(fn1(2, 'foo')); // outputs 'a is a number, b is a number'
 
 // calling the function with a non-supported type signature will throw an error
 try {
   fn1('hello', 'world');
 }
 catch (err) {
-  console.log(err.toString()); // outputs: 'TypeError: Wrong function signature'
+  console.log(err.toString());
+  // outputs: TypeError: Unexpected type of argument.
+  //                     Expected: number, actual: string, index: 0.
 }
