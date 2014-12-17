@@ -1,7 +1,7 @@
 var typed = require('../typed-function');
 
 // define type conversions that we want to support
-// order is important.
+// order is important
 typed.conversions = [
   {
     from: 'boolean',

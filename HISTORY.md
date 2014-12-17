@@ -1,18 +1,14 @@
 # History
 
-## not yet released, version 0.3.3
+## 2014-12-17, version 0.4.0
 
+- Introduced new constructor options, create a typed function as
+  `typed([name,] signature, fn)` or `typed([name,] signatures)`.
 - Support for multiple types per parameter like `number | string, number'`.
 - Support for variable parameters like `sting, ...number'`.
 - Changed any type notation `'*'` to `'any'`.
 - Implemented detailed error messages.
 - Implemented option `typed.config.minify`.
-
-
-## 2014-11-05, version 0.3.2
-
-- Introduced new constructor options, create a typed function as
-  `typed([name,] signature, fn)` or `typed([name,] signatures)`.
 
 
 ## 2014-11-05, version 0.3.1
