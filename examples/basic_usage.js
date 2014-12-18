@@ -21,10 +21,11 @@ console.log(fn1(2, 'foo')); // outputs 'a is a number, b is a string'
 
 // calling the function with a non-supported type signature will throw an error
 try {
-  fn1('hello', 'world');
+  fn2('hello', 'world');
 }
 catch (err) {
-  console.log(err.toString());
-  // outputs: TypeError: Unexpected type of argument.
-  //                     Expected: number, actual: string, index: 0.
+  console.log('Wrong input will throw an error:');
+  console.log('  ' + err.toString());
+  // outputs:  TypeError: Unexpected type of argument.
+  //           Expected: number or boolean, actual: string, index: 1.
 }

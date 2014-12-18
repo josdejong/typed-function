@@ -2,7 +2,52 @@
 
 Type checking for JavaScript functions.
 
-Features:
+In JavaScript, functions can be called with any number and any type of arguments.
+When writing a function, the easiest way is to just assume that the function
+will be called with the correct input. This leaves the function's behavior on
+invalid input undefined. The function may throw some error, or worse,
+it may silently fail or return wrong results. Typical errors are
+*TypeError: undefined is not a function* or *TypeError: Cannot call method
+'request' of undefined*. These error messages are not very helpful. It can be
+hard to debug them, as they can be the result of a series of nested function
+calls manipulating and propagating invalid or incomplete data.
+
+Often, JavaScript developers add some basic type checking where it is important,
+using checks like `typeof fn === 'function'`, `date instanceof Date`, and
+`Array.isArray(arr)`. For functions supporting multiple signatures,
+the type checking logic can grow quite a bit, and distract from the actual
+logic of the function.
+
+For functions dealing with a considerable amount of type checking logic,
+or functions facing a public API, it can be very useful to use the
+`typed-function` module to handle the type-checking logic. This way:
+
+-   Users of the function get useful and consistent error messages when using
+    the function wrongly.
+-   The function cannot silently fail or silently give wrong results due to
+    invalid input.
+-   Correct type of input is assured inside the function. The function's code
+    becomes easier to understand as it only contains the actual function logic.
+    Lower level utility functions called by the type-checked function can
+    possibly be kept simpler as they don't need to do additional type checking.
+
+It's important however not to *overuse* type checking:
+
+-   Locking down the type of input that a function accepts can unnecessary limit
+    it's flexibility. Keep functions as flexible and forgiving as possible,
+    follow the
+    [robustness principle](http://en.wikipedia.org/wiki/Robustness_principle)
+    here: "be liberal in what you accept and conservative in what you send"
+    (Postel's law).
+-   There is no need to apply type checking to *all* functions. It may be
+    enough to apply type checking to one tier of public facing functions.
+-   There is a performance penalty involved for all type checking, so applying
+    it everywhere can unnecessarily worsen the performance.
+
+
+## Features
+
+typed-function has the following features:
 
 - Type-checking of input arguments.
 - Automatic type conversion of arguments.
@@ -61,12 +106,12 @@ console.log(fn4(2));             // outputs 'a is a number'
 
 // calling the function with a non-supported type signature will throw an error
 try {
-  fn4('hello world');
+  fn2('hello', 'world');
 }
 catch (err) {
   console.log(err.toString());
-  // outputs: TypeError: Unexpected type of argument.
-  //                     Expected: number, actual: string, index: 0.
+  // outputs:  TypeError: Unexpected type of argument.
+  //           Expected: number or boolean, actual: string, index: 1.
 }
 ```
 
@@ -87,9 +132,9 @@ typed-function has the following built-in types:
 
 The following type expressions are supported:
 
-- Multiple parameters: `string, number, function`
+- Multiple arguments: `string, number, function`
 - Union types: `number | string`
-- Variable parameters: `...number`
+- Variable arguments: `...number`
 - Any type: `any`
 
 
@@ -99,7 +144,7 @@ The following type expressions are supported:
 
 A typed function can be constructed as:
 
-```js
+```
 typed(signature: string, fn: function) : function
 typed(name: string, signature: string, fn: function) : function
 
@@ -157,15 +202,6 @@ The functions generated with `typed({...})` have:
   be used to see what the function exactly does. For debugging purposes.
 - A property `signatures`, which holds a map with the (normalized)
   signatures as key and the original sub-functions as value.
-
-
-## Performance
-
-Type checking input arguments adds some overhead to a function. For very small
-functions this overhead can be larger than the function execution itself is,
-but for any non-trivial function the overhead is typically small to neglectable.
-You need to keep in mind though that you probably would have to do the type
-checking done by `typed-function` anyway.
 
 
 ## Roadmap
