@@ -2,6 +2,22 @@
 
 Type checking for JavaScript functions.
 
+
+## Features
+
+typed-function has the following features:
+
+- Type-checking of input arguments.
+- Automatic type conversion of arguments.
+- Compose typed functions with multiple signatures.
+- Supports union types, any type, variable arguments.
+- Detailed error messaging.
+
+Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
+
+
+## Why?
+
 In JavaScript, functions can be called with any number and any type of arguments.
 When writing a function, the easiest way is to just assume that the function
 will be called with the correct input. This leaves the function's behavior on
@@ -43,19 +59,6 @@ It's important however not to *overuse* type checking:
     enough to apply type checking to one tier of public facing functions.
 -   There is a performance penalty involved for all type checking, so applying
     it everywhere can unnecessarily worsen the performance.
-
-
-## Features
-
-typed-function has the following features:
-
-- Type-checking of input arguments.
-- Automatic type conversion of arguments.
-- Compose typed functions with multiple signatures.
-- Supports union types, any type, variable arguments.
-- Detailed error messaging.
-
-Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
 
 
 ## Load
