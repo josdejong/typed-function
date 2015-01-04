@@ -34,8 +34,8 @@ using checks like `typeof fn === 'function'`, `date instanceof Date`, and
 the type checking logic can grow quite a bit, and distract from the actual
 logic of the function.
 
-For functions dealing with a considerable amount of type checking logic,
-or functions facing a public API, it can be very useful to use the
+For functions dealing with a considerable amount of type checking and conversion
+logic, or functions facing a public API, it can be very useful to use the
 `typed-function` module to handle the type-checking logic. This way:
 
 -   Users of the function get useful and consistent error messages when using

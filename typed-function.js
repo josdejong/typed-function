@@ -404,12 +404,12 @@
 
           if (params.exceptions) {
             var err = params.refs.add(unexpectedType, 'err');
-            code.push(prefix + '      throw ' + err + '(\'' + this.type.types + '\', arguments[i], i); // Unexpected type');
+            code.push(prefix + '      if (i > ' + (args.length - 1) + ') {');
+            code.push(prefix + '        throw ' + err + '(\'' + this.type.types + '\', arguments[i], i); // Unexpected type');
+            code.push(prefix + '      }');
           }
-          else {
-            code.push(prefix + '      match = false;');
-            code.push(prefix + '      break;');
-          }
+          code.push(prefix + '      match = false;');
+          code.push(prefix + '      break;');
 
           code.push(prefix + '    }');
           code.push(prefix + '  }');
@@ -580,8 +580,13 @@
 
     var firstChild = types.length > 0 ? this.childs[types[0]] : undefined;
     if (firstChild && firstChild.varArgs) {
-      err = params.refs.add(tooFewArguments, 'err');
-      code.push(prefix + 'throw ' + err + '(\'' + firstChild.type.types.join(',') + '\', arguments.length); // Too few arguments');
+      var errC = params.refs.add(tooFewArguments, 'err');
+      var errD = params.refs.add(unexpectedType, 'err');
+      code.push(prefix + 'if (arguments.length === ' + argCount + ') { // CHILD TEST');
+      code.push(prefix + '  throw ' + errC + '(\'' + firstChild.type.types.join(',') + '\', arguments.length); // Too few arguments');
+      code.push(prefix + '} else {');
+      code.push(prefix + '  throw ' + errD + '(\'' + firstChild.type.types.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
+      code.push(prefix + '}');
     }
     else {
       if (types.length === 0) {
@@ -593,13 +598,17 @@
       else {
         if (types.indexOf('any') === -1) {
           var errA = params.refs.add(tooFewArguments, 'err');
-          code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
-          code.push(prefix + '  throw ' + errA + '(\'' + types.join(',') + '\', arguments.length); // Too few arguments');
-          code.push(prefix + '}');
-
           var errB = params.refs.add(unexpectedType, 'err');
-          code.push(prefix + 'throw ' + errB + '(\'' + types.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
+          var typeNames = types.map(function (type) {
+            return type.replace(/\.\.\./, '');
+          });
           // TODO: add "Actual: ..." to the error message
+          code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
+          code.push(prefix + '  throw ' + errA + '(\'' + typeNames.join(',') + '\', arguments.length); // Too few arguments');
+          code.push(prefix + '}');
+          code.push(prefix + 'else {');
+          code.push(prefix + '  throw ' + errB + '(\'' + typeNames.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
+          code.push(prefix + '}');
         }
       }
     }
@@ -1018,7 +1027,38 @@
       signatures[signature] = fn;
       return _typed(name, signatures);
     }
+    /*,
+    '...function': function (fns) {
+      var signatures = fns.reduce(function (signatures, fn, index) {
+        // test whether this is a typed-function
+        if (!(typeof fn.signatures === 'object')) {
+          throw new TypeError('Function is no typed-function (index: ' + index + ')');
+        }
+
+        // merge the signatures
+        for (var signature in fn.signatures) {
+          if (fn.signatures.hasOwnProperty(signature)) {
+            if (signatures.hasOwnProperty(signature)) {
+              throw new Error('Conflicting signatures: "' + signature + '" is defined twice.');
+            }
+            else {
+              signatures[signature] = fn.signatures[signature];
+            }
+          }
+        }
+
+        // TODO: merge function name
+
+        return signatures;
+      }, {});
+
+      return _typed(null, signatures);
+    }
+    */
   });
+
+  console.log(typed.toString())
+
 
   // attach types and conversions to the final `typed` function
   typed.config = config;

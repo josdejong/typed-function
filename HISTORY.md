@@ -1,5 +1,11 @@
 # History
 
+## not yet released, version 0.5.0
+
+- Fixed a bug where a regular argument was not matched when there was a
+  signature with variable arguments too.
+
+
 ## 2014-12-17, version 0.4.0
 
 - Introduced new constructor options, create a typed function as

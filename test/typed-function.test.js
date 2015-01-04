@@ -281,9 +281,25 @@ describe('typed-function', function() {
       assert.equal(fn('foo', 2, 4), 'foo: 2, 4');
       assert.equal(fn(true, false, false), 'booleans');
       // FIXME: error should be Expected: string or boolean
-      assert.throws(function () {fn(2, 4)},           /TypeError: Unexpected type of argument. Expected: boolean, actual: number, index: 0./);
+      assert.throws(function () {fn(2, 4)},           /TypeError: Unexpected type of argument. Expected: string or boolean, actual: number, index: 0./);
       assert.throws(function () {fn('string')},       /TypeError: Too few arguments. Expected: number, index: 1./);
       assert.throws(function () {fn('string', true)}, /TypeError: Unexpected type of argument. Expected: number, actual: boolean, index: 1./);
+    });
+
+    it('should continue with other options if varArgs do not match', function() {
+      var fn = typed({
+        '...number': function (values) {
+          return '...number';
+        },
+
+        'Object': function (value) {
+          return 'Object';
+        }
+      });
+
+      assert.equal(fn(2, 3), '...number');
+      assert.equal(fn(2), '...number');
+      assert.equal(fn({}), 'Object');
     });
 
     it('should throw an error in case of unexpected variable arguments', function() {
@@ -622,6 +638,31 @@ describe('typed-function', function() {
       // booleans should be converted to number
       assert.equal(fn(false), 0);
       assert.equal(fn(true), 1);
+
+    });
+  });
+
+
+  describe.skip('merge', function () {
+    it('should merge two typed-functions', function () {
+      var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
+      var typed2 = typed('number', function (value) { return 'number:' + value; });
+
+      var typed3 = typed(typed1, typed2);
+
+      assert.deepEqual(Object.keys(typed3.signatures).sort(), ['boolean', 'number']);
+
+      assert.strictEqual(typed3(true), 'boolean:true');
+      assert.strictEqual(typed3(2), 'number:2');
+      assert.throws(function () {typed3('foo')}, /TypeError: Unexpected type of argument. Expected: boolean or number, actual: string, index: 0./);
+
+    });
+
+    it('should merge three typed-functions', function () {
+
+    });
+
+    it('should throw an error when merging conflicting typed-functions', function () {
 
     });
   });
