@@ -953,7 +953,6 @@
 
     // attach the signatures with sub-functions to the constructed function
     fn.signatures = normalizeSignatures(_signatures); // normalized signatures
-    fn.typedName = name;
 
     return fn;
   }
@@ -1021,7 +1020,7 @@
     'string, function': function (signature, fn) {
       var signatures = {};
       signatures[signature] = fn;
-      return _typed(null, signatures);
+      return _typed(fn.name || null, signatures);
     },
     'string, string, function': function(name, signature, fn) {
       var signatures = {};
@@ -1029,10 +1028,11 @@
       return _typed(name, signatures);
     },
     '...function': function (fns) {
-      var name = null;
-      var err;
+      var name = '';
       var signatures = {};
       fns.forEach(function (fn, index) {
+        var err;
+
         // test whether this is a typed-function
         if (!(typeof fn.signatures === 'object')) {
           err = new TypeError('Function is no typed-function (index: ' + index + ')');
@@ -1055,14 +1055,14 @@
         }
 
         // merge function name
-        if (fn.typedName !== null) {
-          if (name === null) {
-            name = fn.typedName;
+        if (fn.name != '') {
+          if (name == '') {
+            name = fn.name;
           }
-          else if (name !== fn.typedName) {
-            var err = new Error('Function names do not match: "' + name + '" != "' + fn.typedName + '".');
+          else if (name != fn.name) {
+            err = new Error('Function names do not match: "' + name + '" != "' + fn.name + '".');
             err.data = {
-              actual: fn.typedName,
+              actual: fn.name,
               expected: name
             };
             throw err;

@@ -19,7 +19,6 @@ describe('typed-function', function() {
 
     assert.equal(fn('bar'), 'foo');
     assert.equal(fn.name, 'myFunction');
-    assert.equal(fn.typedName, 'myFunction');
   });
 
   it('should create an unnamed function', function() {
@@ -29,7 +28,15 @@ describe('typed-function', function() {
 
     assert.equal(fn('bar'), 'foo');
     assert.equal(fn.name, '');
-    assert.equal(fn.typedName, null);
+  });
+
+  it('should inherit the name of the function implementation', function() {
+    var fn = typed('string', function fn1 (str) {
+      return 'foo';
+    });
+
+    assert.equal(fn('bar'), 'foo');
+    assert.equal(fn.name, 'fn1');
   });
 
   it('should compose a function with zero arguments', function() {
@@ -69,7 +76,6 @@ describe('typed-function', function() {
 
     assert.equal(fn('hi', true), 'noargs');
     assert.equal(fn.name, 'myFunction');
-    assert.equal(fn.typedName, 'myFunction');
   });
 
   it('should correctly recognize Date from Object (both are an Object)', function() {
@@ -704,7 +710,6 @@ describe('typed-function', function() {
 
       var typed4 = typed(typed2, typed3);
       assert.equal(typed4.name, 'fn2');
-      assert.equal(typed4.typedName, 'fn2');
     });
   });
 

@@ -216,8 +216,6 @@ The functions generated with `typed({...})` have:
 - A property `signatures`, which holds a map with the (normalized)
   signatures as key and the original sub-functions as value.
 - A property `name` containing name of the typed function or an empty string.
-- A property `typedName` containing the name of the typed function or null if
-  not specified.
 
 
 ## Roadmap
@@ -227,11 +225,9 @@ The functions generated with `typed({...})` have:
 - Extend function signatures:
   - Optional arguments like `'[number], array'` or like `number=, array`
   - Nullable arguments like `'?Object'`
-- Be able to merge typed functions into a new typed function, like
-  `fn1 = merged(fn2, fn3)`.
 - Create a good benchmark, to get insight in the overhead.
-- Allow conversions not to be able to convert any input (for example string to
-  number is not always possible).
+- Allow conversions to fail (for example string to number is not always
+  possible). Call this `fallible` or `optional`?
 
 ### Version 2
 
