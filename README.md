@@ -215,6 +215,9 @@ The functions generated with `typed({...})` have:
   be used to see what the function exactly does. For debugging purposes.
 - A property `signatures`, which holds a map with the (normalized)
   signatures as key and the original sub-functions as value.
+- A property `name` containing name of the typed function or an empty string.
+- A property `typedName` containing the name of the typed function or null if
+  not specified.
 
 
 ## Roadmap

@@ -953,6 +953,7 @@
 
     // attach the signatures with sub-functions to the constructed function
     fn.signatures = normalizeSignatures(_signatures); // normalized signatures
+    fn.typedName = name;
 
     return fn;
   }
@@ -1028,17 +1029,24 @@
       return _typed(name, signatures);
     },
     '...function': function (fns) {
-      var signatures = fns.reduce(function (signatures, fn, index) {
+      var name = null;
+      var err;
+      var signatures = {};
+      fns.forEach(function (fn, index) {
         // test whether this is a typed-function
         if (!(typeof fn.signatures === 'object')) {
-          throw new TypeError('Function is no typed-function (index: ' + index + ')');
+          err = new TypeError('Function is no typed-function (index: ' + index + ')');
+          err.data = {index: index};
+          throw err;
         }
 
         // merge the signatures
         for (var signature in fn.signatures) {
           if (fn.signatures.hasOwnProperty(signature)) {
             if (signatures.hasOwnProperty(signature)) {
-              throw new Error('Conflicting signatures: "' + signature + '" is defined twice.');
+              err = new Error('Conflicting signatures: "' + signature + '" is defined twice.');
+              err.data = {signature: signature};
+              throw err;
             }
             else {
               signatures[signature] = fn.signatures[signature];
@@ -1046,12 +1054,23 @@
           }
         }
 
-        // TODO: merge function name
+        // merge function name
+        if (fn.typedName !== null) {
+          if (name === null) {
+            name = fn.typedName;
+          }
+          else if (name !== fn.typedName) {
+            var err = new Error('Function names do not match: "' + name + '" != "' + fn.typedName + '".');
+            err.data = {
+              actual: fn.typedName,
+              expected: name
+            };
+            throw err;
+          }
+        }
+      });
 
-        return signatures;
-      }, {});
-
-      return _typed(null, signatures);
+      return _typed(name, signatures);
     }
   });
 

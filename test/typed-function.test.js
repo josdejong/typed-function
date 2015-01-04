@@ -19,6 +19,17 @@ describe('typed-function', function() {
 
     assert.equal(fn('bar'), 'foo');
     assert.equal(fn.name, 'myFunction');
+    assert.equal(fn.typedName, 'myFunction');
+  });
+
+  it('should create an unnamed function', function() {
+    var fn = typed('string', function (str) {
+      return 'foo';
+    });
+
+    assert.equal(fn('bar'), 'foo');
+    assert.equal(fn.name, '');
+    assert.equal(fn.typedName, null);
   });
 
   it('should compose a function with zero arguments', function() {
@@ -58,6 +69,7 @@ describe('typed-function', function() {
 
     assert.equal(fn('hi', true), 'noargs');
     assert.equal(fn.name, 'myFunction');
+    assert.equal(fn.typedName, 'myFunction');
   });
 
   it('should correctly recognize Date from Object (both are an Object)', function() {
@@ -672,13 +684,27 @@ describe('typed-function', function() {
       assert.throws(function () {typed4(new Date())}, /TypeError: Unexpected type of argument. Expected: boolean or number or string, actual: Date, index: 0./);
     });
 
-    it('should throw an error when merging conflicting typed-functions', function () {
+    it('should throw an error in case of conflicting signatures when merging', function () {
       var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
       var typed2 = typed('boolean', function (value) { return 'boolean:' + value; });
 
       assert.throws(function () {
         typed(typed1, typed2)
       }, /Error: Conflicting signatures: "boolean" is defined twice/);
+    });
+
+    it('should throw an error in case of conflicting names when merging', function () {
+      var typed1 = typed('fn1', 'boolean', function () {});
+      var typed2 = typed('fn2', 'string', function () {});
+      var typed3 = typed('number', function () {});
+
+      assert.throws(function () {
+        typed(typed1, typed2)
+      }, /Error: Function names do not match: "fn1" != "fn2"./);
+
+      var typed4 = typed(typed2, typed3);
+      assert.equal(typed4.name, 'fn2');
+      assert.equal(typed4.typedName, 'fn2');
     });
   });
 
