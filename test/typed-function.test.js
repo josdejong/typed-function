@@ -643,7 +643,7 @@ describe('typed-function', function() {
   });
 
 
-  describe.skip('merge', function () {
+  describe('merge', function () {
     it('should merge two typed-functions', function () {
       var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
       var typed2 = typed('number', function (value) { return 'number:' + value; });
@@ -655,15 +655,30 @@ describe('typed-function', function() {
       assert.strictEqual(typed3(true), 'boolean:true');
       assert.strictEqual(typed3(2), 'number:2');
       assert.throws(function () {typed3('foo')}, /TypeError: Unexpected type of argument. Expected: boolean or number, actual: string, index: 0./);
-
     });
 
     it('should merge three typed-functions', function () {
+      var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
+      var typed2 = typed('number', function (value) { return 'number:' + value; });
+      var typed3 = typed('string', function (value) { return 'string:' + value; });
 
+      var typed4 = typed(typed1, typed2, typed3);
+
+      assert.deepEqual(Object.keys(typed4.signatures).sort(), ['boolean', 'number', 'string']);
+
+      assert.strictEqual(typed4(true), 'boolean:true');
+      assert.strictEqual(typed4(2), 'number:2');
+      assert.strictEqual(typed4('foo'), 'string:foo');
+      assert.throws(function () {typed4(new Date())}, /TypeError: Unexpected type of argument. Expected: boolean or number or string, actual: Date, index: 0./);
     });
 
     it('should throw an error when merging conflicting typed-functions', function () {
+      var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
+      var typed2 = typed('boolean', function (value) { return 'boolean:' + value; });
 
+      assert.throws(function () {
+        typed(typed1, typed2)
+      }, /Error: Conflicting signatures: "boolean" is defined twice/);
     });
   });
 

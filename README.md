@@ -145,15 +145,25 @@ The following type expressions are supported:
 
 ### Construction
 
-A typed function can be constructed as:
+A typed function can be constructed in three ways:
 
-```
-typed(signature: string, fn: function) : function
-typed(name: string, signature: string, fn: function) : function
+-   With a single signature:
+    ```
+    typed(signature: string, fn: function) : function
+    typed(name: string, signature: string, fn: function) : function
+    ```
 
-typed(signatures: Object.<string, function>) : function
-typed(name: string, signatures: Object.<string, function>) : function
-```
+-   With multiple signatures:
+    ```
+    typed(signatures: Object.<string, function>) : function
+    typed(name: string, signatures: Object.<string, function>) : function
+    ```
+
+-   Merge multiple typed functions into a new typed function
+    ```
+    typed(functions: ...function) : function
+    ```
+
 
 ### Properties
 

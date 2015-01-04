@@ -574,15 +574,15 @@
     var prefix = params.prefix;
     var argCount = params.args.length;
     var arg = 'arg' + params.args.length;
-    var err;
 
     var types = Object.keys(this.childs);
 
     var firstChild = types.length > 0 ? this.childs[types[0]] : undefined;
     if (firstChild && firstChild.varArgs) {
+      // TODO: call firstChild._exceptions here?
       var errC = params.refs.add(tooFewArguments, 'err');
       var errD = params.refs.add(unexpectedType, 'err');
-      code.push(prefix + 'if (arguments.length === ' + argCount + ') { // CHILD TEST');
+      code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
       code.push(prefix + '  throw ' + errC + '(\'' + firstChild.type.types.join(',') + '\', arguments.length); // Too few arguments');
       code.push(prefix + '} else {');
       code.push(prefix + '  throw ' + errD + '(\'' + firstChild.type.types.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
@@ -591,7 +591,7 @@
     else {
       if (types.length === 0) {
         code.push(prefix + 'if (arguments.length > ' + argCount + ') {');
-        err = params.refs.add(tooManyArguments, 'err');
+        var err = params.refs.add(tooManyArguments, 'err');
         code.push(prefix + '  throw ' + err + '(' + argCount + ', arguments.length); // Too many arguments');
         code.push(prefix + '}');
       }
@@ -1026,8 +1026,7 @@
       var signatures = {};
       signatures[signature] = fn;
       return _typed(name, signatures);
-    }
-    /*,
+    },
     '...function': function (fns) {
       var signatures = fns.reduce(function (signatures, fn, index) {
         // test whether this is a typed-function
@@ -1054,10 +1053,9 @@
 
       return _typed(null, signatures);
     }
-    */
   });
 
-  console.log(typed.toString())
+  //console.log(typed.toString())
 
 
   // attach types and conversions to the final `typed` function
