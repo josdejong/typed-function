@@ -1,11 +1,12 @@
 # History
 
-## not yet released, version 0.5.0
+## 2015-01-07, version 0.5.0
 
 - Implemented support for merging typed functions.
 - Typed functions inherit the name of the function in case of one signature.
 - Fixed a bug where a regular argument was not matched when there was a
   signature with variable arguments too.
+- Slightly changed the error messages.
 
 
 ## 2014-12-17, version 0.4.0

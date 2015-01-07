@@ -39,7 +39,6 @@ var fn = typed({
     return 'Name: ' + name + ', length: ' + name.length;
   },
   'string, number': function (name, value) {
-    // note that the toFixed function is only available on numbers
     return 'Name: ' + name + ', length: ' + name.length + ', value: ' + value.toFixed(3);
   }
 });

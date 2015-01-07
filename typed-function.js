@@ -501,7 +501,7 @@
     var arr = expected.split(',');
     var message = 'Unexpected type of argument';
     var actualType = getTypeOf(actual);
-    var err = new TypeError(message + '. Expected: ' + arr.join(' or ') + ', actual: ' + actualType + ', index: ' + index + '.');
+    var err = new TypeError(message + ' (expected: ' + arr.join(' or ') + ', actual: ' + actualType + ', index: ' + index + ')');
     err.data = {
       message: message,
       expected: arr,
@@ -520,7 +520,7 @@
   function tooFewArguments(expected, index) {
     var arr = expected.split(',');
     var message = 'Too few arguments';
-    var err = new TypeError(message + '. Expected: ' + arr.join(' or ') + ', index: ' + index + '.');
+    var err = new TypeError(message + ' (expected: ' + arr.join(' or ') + ', index: ' + index + ')');
     err.data = {
       message: message,
       expected: arr,
@@ -537,7 +537,7 @@
    */
   function tooManyArguments(expected, actual) {
     var message = 'Too many arguments';
-    var err = new TypeError(message + '. Expected: ' + expected + ', actual: ' + actual + '.');
+    var err = new TypeError(message + ' (expected: ' + expected + ', actual: ' + actual + ')');
     err.data = {
       message: message,
       expected: expected,
@@ -1060,7 +1060,7 @@
             name = fn.name;
           }
           else if (name != fn.name) {
-            err = new Error('Function names do not match: "' + name + '" != "' + fn.name + '".');
+            err = new Error('Function names do not match (expected: ' + name + ', actual: ' + fn.name + ')');
             err.data = {
               actual: fn.name,
               expected: name

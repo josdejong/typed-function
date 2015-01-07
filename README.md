@@ -1,16 +1,18 @@
 # typed-function
 
-Type checking for JavaScript functions.
+Move type checking logic and type conversions outside of your function in a
+flexible, organized way. Automatically throw informative errors in case of
+wrong input arguments.
 
 
 ## Features
 
 typed-function has the following features:
 
-- Type-checking of input arguments.
+- Runtime type-checking of input arguments.
 - Automatic type conversion of arguments.
 - Compose typed functions with multiple signatures.
-- Supports union types, any type, variable arguments.
+- Supports union types, any type, and variable arguments.
 - Detailed error messaging.
 
 Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
@@ -70,7 +72,8 @@ Install via npm:
 
 ## Usage
 
-Example usage:
+Here some usage examples. More examples are available in the
+[/examples](/examples) folder.
 
 ```js
 var typed = require('typed-function');
@@ -222,6 +225,7 @@ The functions generated with `typed({...})` have:
 
 ### Version 1
 
+- Be able to turn off exception throwing.
 - Extend function signatures:
   - Optional arguments like `'[number], array'` or like `number=, array`
   - Nullable arguments like `'?Object'`
@@ -236,6 +240,9 @@ The functions generated with `typed({...})` have:
   - Object definitions like `'{name: string, age: number}'`
   - Object definitions like `'Object.<string, Person>'`
   - Array definitions like `'Array.<Person>'`
+- Improve performance of both generating a typed function as well as
+  the performance and memory footprint of a typed function.
+
 
 ## Test
 
