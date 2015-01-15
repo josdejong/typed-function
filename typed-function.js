@@ -22,31 +22,19 @@
   'use strict';
 
   /**
-   * order types
+   * Order Params
    * any type ('any') will be ordered last, and object as second last (as other types
    * may be an object as well, like Array)
-   * @param {Node} a
-   * @param {Node} b
+   * @param {Param} a
+   * @param {Param} b
    * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
    */
-  function compareNodes(a, b) {
-    if (a.type.anyType) return 1;
-    if (a.type.anyType) return -1;
+  function compareParams(a, b) {
+    if (a.anyType) return 1;
+    if (a.anyType) return -1;
 
-    if (a.type.types.indexOf('Object') !== -1) return 1;
-    if (b.type.types.indexOf('Object') !== -1) return -1;
-
-    for (var i = 0; i < typed.conversions.length; i++) {
-      var conversion = typed.conversions[i];
-      if (a.type.types.indexOf(conversion.from) !== -1 &&
-          b.type.types.indexOf(conversion.to) !== -1) {
-        return -1;
-      }
-      if (a.type.types.indexOf(conversion.to) !== -1 &&
-          b.type.types.indexOf(conversion.from) !== -1) {
-        return 1;
-      }
-    }
+    if (a.types.indexOf('Object') !== -1) return 1;
+    if (b.types.indexOf('Object') !== -1) return -1;
 
     return 0;
   }
@@ -406,10 +394,6 @@
           // handled by node's siblings)
           var parent = this.parent;
           var allTests = this._getVarArgConversions()
-            // TODO: cleanup
-              //.filter(function (conversion) {
-              //  return parent.childs[conversion.from] === undefined;
-              //})
               .map(function (conversion) {
                 return conversion.from;
               })
@@ -691,7 +675,9 @@
         .map(function (type) {
           return this.childs[type];
         }.bind(this))
-        .sort(compareNodes)
+        .sort(function (a, b) {
+          return compareParams(a.type, b.type);
+        })
   };
 
   /**
@@ -737,6 +723,7 @@
         .filter(function (conversion) {
           if (this.type.types.indexOf(conversion.from) === -1 &&
               this.type.types.indexOf(conversion.to) !== -1 &&
+              !this.parent.childs[conversion.from] &&
               !handled[conversion.from]) {
             handled[conversion.from] = true;
             return true;
@@ -744,7 +731,7 @@
           else {
             return false;
           }
-        }.bind(this));
+        }.bind(this))
   };
 
   /**
@@ -949,7 +936,7 @@
       '})'
     ].join('\n');
 
-    typed.config.minify = false; // TODO: cleanup
+    //typed.config.minify = false; // TODO: cleanup
 
     if (typed.config.minify) {
       factory = minify(factory);
@@ -958,7 +945,7 @@
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
 
-    console.log('FN\n' + fn.toString()); // TODO: cleanup
+    //console.log('FN\n' + fn.toString()); // TODO: cleanup
 
     // attach the signatures with sub-functions to the constructed function
     fn.signatures = normalizeSignatures(_signatures); // normalized signatures

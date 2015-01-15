@@ -1,5 +1,11 @@
 # History
 
+## not yet released, version 0.5.1
+
+- Internal code simplifications.
+- Some bug fixes.
+
+
 ## 2015-01-07, version 0.5.0
 
 - Implemented support for merging typed functions.

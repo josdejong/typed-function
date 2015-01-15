@@ -609,8 +609,6 @@ describe('typed-function', function() {
     });
 
     it('should add conversions to a function with variable arguments in a non-conflicting way', function() {
-      // note that a series of booleans can be converted to numbers, but a single
-      // boolean should call the second signature `boolean`
       var fn = typed({
         '...number': function (values) {
           assert(Array.isArray(values));
@@ -627,14 +625,10 @@ describe('typed-function', function() {
       });
 
       assert.equal(fn(2,3,4), 9);
-      assert.equal(fn(2,true,4), 7);
-      assert.equal(fn(1,2,false), 3);
-      assert.equal(fn(1,2,true), 4);
-      assert.equal(fn(true,1,2), 4);
-      assert.equal(fn(true,false, true), 2);
-      assert.equal(fn(2,3), 5);
       assert.equal(fn(false), 'boolean');
       assert.equal(fn(true), 'boolean');
+      assert.throws(function () {fn(2,true,4)}, /TypeError: Unexpected type of argument \(expected: number, actual: boolean, index: 1\)/);
+      assert.throws(function () {fn(true,2,4)}, /TypeError: Too many arguments \(expected: 1, actual: 3\)/);
     });
 
     it('should add conversions to a function with variable and union arguments', function() {
