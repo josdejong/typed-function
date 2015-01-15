@@ -21,15 +21,32 @@
 }(this, function () {
   'use strict';
 
-  // order types
-  // any type ('any') will be ordered last, and object as second last (as other types
-  // may be an object as well, like Array)
-  function compareTypes(a, b) {
-    if (a === 'any') return 1;
-    if (b === 'any') return -1;
+  /**
+   * order types
+   * any type ('any') will be ordered last, and object as second last (as other types
+   * may be an object as well, like Array)
+   * @param {Node} a
+   * @param {Node} b
+   * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
+   */
+  function compareNodes(a, b) {
+    if (a.type.anyType) return 1;
+    if (a.type.anyType) return -1;
 
-    if (a === 'Object') return 1;
-    if (b === 'Object') return -1;
+    if (a.type.types.indexOf('Object') !== -1) return 1;
+    if (b.type.types.indexOf('Object') !== -1) return -1;
+
+    for (var i = 0; i < typed.conversions.length; i++) {
+      var conversion = typed.conversions[i];
+      if (a.type.types.indexOf(conversion.from) !== -1 &&
+          b.type.types.indexOf(conversion.to) !== -1) {
+        return -1;
+      }
+      if (a.type.types.indexOf(conversion.to) !== -1 &&
+          b.type.types.indexOf(conversion.from) !== -1) {
+        return 1;
+      }
+    }
 
     return 0;
   }
@@ -256,9 +273,11 @@
    * - No child nodes but a function `fn`, the function to be called for 
    *   This signature.
    * @param {Param} type   The parameter type of this node
+   * @param {Node | RootNode} parent
    * @constructor
    */
-  function Node (type) {
+  function Node (type, parent) {
+    this.parent = parent;
     this.type = type;
     this.fn = null;
     this.varArgs = false; // true if variable args '...'
@@ -374,20 +393,35 @@
       }
       else {
         if (ref) {
-          var varTests = type.types.map(function (type) {
-                var test = params.refs.add(getTypeTest(type), 'test');
-                return test + '(arguments[i])';
-              })
-              .join(' || ');
+          var varTests = function (tests, arg) {
+            return tests
+                .map(function (type) {
+                  var test = params.refs.add(getTypeTest(type), 'test');
+                  return test + '(' + arg + ')';
+                })
+                .join(' || ');
+          };
 
-          code.push(prefix + 'if (arguments.length >= ' + args.length + ') {');
-          code.push(prefix + '  var match = true;');
+          // collect all types (exact types and conversions, excluding types
+          // handled by node's siblings)
+          var parent = this.parent;
+          var allTests = this._getVarArgConversions()
+            // TODO: cleanup
+              //.filter(function (conversion) {
+              //  return parent.childs[conversion.from] === undefined;
+              //})
+              .map(function (conversion) {
+                return conversion.from;
+              })
+              .concat(type.types);
+
+          code.push(prefix + 'if (' + varTests(allTests, 'arg' + params.args.length) + ') {');
           code.push(prefix + '  var varArgs = [];');
           code.push(prefix + '  for (var i = ' + (args.length - 1) + '; i < arguments.length; i++) {');
-          code.push(prefix + '    if (' + varTests + ') { // type: ' + type.types.join(' or '));
+          code.push(prefix + '    if (' + varTests(type.types, 'arguments[i]') + ') { // type: ' + type.types.join(' or '));
           code.push(prefix + '      varArgs.push(arguments[i]);');
 
-          // iterate over the type conversions
+          // iterate over all type conversions (including types handled by this node's siblings)
           if (params.conversions) {
             this._getVarArgConversions().forEach(function (conversion) {
               var test = params.refs.add(getTypeTest(conversion.from), 'test');
@@ -404,18 +438,12 @@
 
           if (params.exceptions) {
             var err = params.refs.add(unexpectedType, 'err');
-            code.push(prefix + '      if (i > ' + (args.length - 1) + ') {');
-            code.push(prefix + '        throw ' + err + '(\'' + this.type.types + '\', arguments[i], i); // Unexpected type');
-            code.push(prefix + '      }');
+            code.push(prefix + '      throw ' + err + '(\'' + this.type.types + '\', arguments[i], i); // Unexpected type');
           }
-          code.push(prefix + '      match = false;');
-          code.push(prefix + '      break;');
 
           code.push(prefix + '    }');
           code.push(prefix + '  }');
-          code.push(prefix + '  if (match) {');
-          code.push(prefix + '    return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
-          code.push(prefix + '  }');
+          code.push(prefix + '  return ' + ref + '(' + args.join(', ') + '); // signature: ' + types.join(', '));
           code.push(prefix + '}');
         }
       }
@@ -477,10 +505,7 @@
 
     // handle conversions
     if (params.conversions) {
-      var conversionsCode = this._conversionsToCode(params);
-      if (conversionsCode.length > 0) {
-        code.push(conversionsCode);
-      }
+      code = code.concat(this._conversionsToCode(params));
     }
 
     if (params.exceptions) {
@@ -576,41 +601,46 @@
     var arg = 'arg' + params.args.length;
 
     var types = Object.keys(this.childs);
+    var typeNames = types
+        .reduce(function (typeNames, type) {
+          var child = this.childs[type];
+          return typeNames.concat(child.type.types);
+        }.bind(this), []);
 
     var firstChild = types.length > 0 ? this.childs[types[0]] : undefined;
     if (firstChild && firstChild.varArgs) {
-      // TODO: call firstChild._exceptions here?
-      var errC = params.refs.add(tooFewArguments, 'err');
-      var errD = params.refs.add(unexpectedType, 'err');
+      // variable arguments
       code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
-      code.push(prefix + '  throw ' + errC + '(\'' + firstChild.type.types.join(',') + '\', arguments.length); // Too few arguments');
+      code.push(prefix + '  throw ' + params.refs.add(tooFewArguments, 'err') +
+          '(\'' + typeNames.join(',') + '\', arguments.length); // Too few arguments');
       code.push(prefix + '} else {');
-      code.push(prefix + '  throw ' + errD + '(\'' + firstChild.type.types.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
+      code.push(prefix + '  throw ' + params.refs.add(unexpectedType, 'err') +
+          '(\'' + typeNames.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
       code.push(prefix + '}');
     }
+    else if (types.length === 0) {
+      // no childs
+      code.push(prefix + 'if (arguments.length > ' + argCount + ') {');
+      code.push(prefix + '  throw ' + params.refs.add(tooManyArguments, 'err') +
+          '(' + argCount + ', arguments.length); // Too many arguments');
+      code.push(prefix + '}');
+    }
+    else if (types.indexOf('any') !== -1) {
+      // any type
+      code.push(prefix + 'throw ' + params.refs.add(tooFewArguments, 'err') +
+      '(\'any\', arguments.length); // Too few arguments');
+    }
     else {
-      if (types.length === 0) {
-        code.push(prefix + 'if (arguments.length > ' + argCount + ') {');
-        var err = params.refs.add(tooManyArguments, 'err');
-        code.push(prefix + '  throw ' + err + '(' + argCount + ', arguments.length); // Too many arguments');
-        code.push(prefix + '}');
-      }
-      else {
-        if (types.indexOf('any') === -1) {
-          var errA = params.refs.add(tooFewArguments, 'err');
-          var errB = params.refs.add(unexpectedType, 'err');
-          var typeNames = types.map(function (type) {
-            return type.replace(/\.\.\./, '');
-          });
-          // TODO: add "Actual: ..." to the error message
-          code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
-          code.push(prefix + '  throw ' + errA + '(\'' + typeNames.join(',') + '\', arguments.length); // Too few arguments');
-          code.push(prefix + '}');
-          code.push(prefix + 'else {');
-          code.push(prefix + '  throw ' + errB + '(\'' + typeNames.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
-          code.push(prefix + '}');
-        }
-      }
+      // regular type
+      // TODO: add "Actual: ..." to the error message
+      code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
+      code.push(prefix + '  throw ' + params.refs.add(tooFewArguments, 'err') +
+      '(\'' + typeNames.join(',') + '\', arguments.length); // Too few arguments');
+      code.push(prefix + '}');
+      code.push(prefix + 'else {');
+      code.push(prefix + '  throw ' + params.refs.add(unexpectedType, 'err') +
+      '(\'' + typeNames.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
+      code.push(prefix + '}');
     }
 
     return code.join('\n');
@@ -633,7 +663,7 @@
    *   {boolean} exceptions   A boolean which is true when the generated code
    *                          must throw exceptions when there is no signature match
    *
-   * @returns {string} code
+   * @returns {string[]} Returns an array with code lines
    *
    * @protected
    */
@@ -648,7 +678,7 @@
           code.push(child._toCode(params, conversion));
         }.bind(this));
 
-    return code.join('\n');
+    return code;
   };
 
   /**
@@ -658,10 +688,10 @@
    */
   Node.prototype._getChilds = function () {
     return Object.keys(this.childs)
-        .sort(compareTypes)
         .map(function (type) {
           return this.childs[type];
-        }.bind(this));
+        }.bind(this))
+        .sort(compareNodes)
   };
 
   /**
@@ -767,43 +797,22 @@
       prefix: '  '
     };
 
+    // matches
+    code.push(this._getChilds().map(function (child, index) {
+      return child._toCode(merge(params, {
+        conversions: true,
+        exceptions: true
+      }));
+    }).join('\n'));
+
+    // FIXME: variable any type argument matching all argument types instead of the left over types not defined by other signatures.
+
+    // conversions
     if (hasConversions) {
-      // create two recursive trees: the first checks exact matches, the second
-      // checks all possible conversions. This must be done in two separate
-      // loops, else you can get unnecessary conversions.
-
-      // exact matches
-      // iterate over the childs
-      code.push('  // exactly matching signatures');
-      this._getChilds().forEach(function (child) {
-        code.push(child._toCode(merge(params, {
-          conversions: false,
-          exceptions: false
-        })));
-      });
-
-      // matches and conversions
-      code.push('  // convert into matching signatures');
-      this._getChilds().forEach(function (child) {
-        code.push(child._toCode(merge(params, {
-          conversions: true,
-          exceptions: true
-        })));
-      });
-      code.push(this._conversionsToCode(merge(params, {
+      code = code.concat(this._conversionsToCode(merge(params, {
         conversions: true,
         exceptions: true
       })));
-    }
-    else {
-      // no conversions needed for this function. Create one recursive tree to test exact matches
-      code.push('  // exactly matching signatures');
-      this._getChilds().forEach(function (child) {
-        code.push(child._toCode(merge(params, {
-          conversions: false,
-          exceptions: true
-        })));
-      });
     }
 
     // function end
@@ -838,7 +847,7 @@
     signatures.map(function (entry) {
       var signature = entry.params.join(',');
       if (signature in normalized) {
-        throw new Error('Error: signature "' + signature + '" defined twice');
+        throw new Error('Signature "' + signature + '" defined twice');
       }
       normalized[signature] = entry.fn;
     });
@@ -867,7 +876,7 @@
 
         var child = node.childs[type];
         if (child === undefined) {
-          child = node.childs[type] = new Node(param);
+          child = node.childs[type] = new Node(param, node);
         }
         node = child;
       }
@@ -940,16 +949,16 @@
       '})'
     ].join('\n');
 
+    typed.config.minify = false; // TODO: cleanup
+
     if (typed.config.minify) {
       factory = minify(factory);
     }
 
-    //console.log('CODE\n' + treeCode);  // TODO: cleanup
-
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
 
-    //console.log('FN\n' + fn.toString()); // TODO: cleanup
+    console.log('FN\n' + fn.toString()); // TODO: cleanup
 
     // attach the signatures with sub-functions to the constructed function
     fn.signatures = normalizeSignatures(_signatures); // normalized signatures
@@ -1073,9 +1082,6 @@
       return _typed(name, signatures);
     }
   });
-
-  //console.log(typed.toString())
-
 
   // attach types and conversions to the final `typed` function
   typed.config = config;
