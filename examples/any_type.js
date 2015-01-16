@@ -7,4 +7,4 @@ var log = typed('string, any', function (event, data) {
 
 // use the typed function
 log('start', {count: 2});   // output: 'event: start, data: {"count":2}'
-log('end', 'success!');     // output: 'event: start, data: "success"
+log('end', 'success!');     // output: 'event: start, data: "success!"

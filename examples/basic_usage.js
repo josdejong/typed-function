@@ -26,6 +26,6 @@ try {
 catch (err) {
   console.log('Wrong input will throw an error:');
   console.log('  ' + err.toString());
-  // outputs:  TypeError: Unexpected type of argument.
-  //           Expected: number or boolean, actual: string, index: 1.
+  // outputs:  TypeError: Unexpected type of argument (expected: number or
+  //           boolean, actual: string, index: 1)
 }

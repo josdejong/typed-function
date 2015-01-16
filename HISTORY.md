@@ -1,11 +1,11 @@
 # History
 
-## not yet released, version 0.5.1
+## 2015-01-16, version 0.6.0
 
 - Removed the configuration function `minify` (it's not clear yet whether
   minifying really improves the performance).
 - Internal code simplifications.
-- Some bug fixes.
+- Bug fixes.
 
 
 ## 2015-01-07, version 0.5.0

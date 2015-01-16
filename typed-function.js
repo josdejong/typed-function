@@ -41,9 +41,9 @@
 
   /**
    * Merge multiple objects.
-   * @param {...Object} args
+   * Expects one or more Objects as input arguments
    */
-  function merge (args) {
+  function merge () {
     var obj = {};
 
     for (var i = 0; i < arguments.length; i++) {
@@ -392,7 +392,6 @@
 
           // collect all types (exact types and conversions, excluding types
           // handled by node's siblings)
-          var parent = this.parent;
           var allTests = this._getVarArgConversions()
               .map(function (conversion) {
                 return conversion.from;
@@ -785,7 +784,7 @@
     };
 
     // matches
-    code.push(this._getChilds().map(function (child, index) {
+    code.push(this._getChilds().map(function (child) {
       return child._toCode(merge(params, {
         conversions: true,
         exceptions: true

@@ -27,7 +27,8 @@ try {
   stringify('ooops');
 }
 catch (err) {
-  console.log(err.toString());
-  // outputs: TypeError: Unexpected type of argument.
-  //          Expected: Person, actual: string, index: 0.
+  console.log('Wrong input will throw an error:');
+  console.log('  ' + err.toString());
+  // outputs: TypeError: Unexpected type of argument (expected: Person,
+  //          actual: string, index: 0)
 }
