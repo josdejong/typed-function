@@ -2,6 +2,8 @@
 
 ## not yet released, version 0.5.1
 
+- Removed the configuration function `minify` (it's not clear yet whether
+  minifying really improves the performance).
 - Internal code simplifications.
 - Some bug fixes.
 

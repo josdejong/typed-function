@@ -877,28 +877,6 @@
   }
 
   /**
-   * Minify JavaScript code of a typed function
-   * @param {string} code
-   * @return {string} Returns (roughly) minified code
-   */
-  function minify (code) {
-    return code
-        .replace(/\/\/.*/g, '')     // remove comments
-        .replace(/\s*\n\s*/gm, '')  // remove spaces and returns
-
-        // remove whitespaces
-        .replace(/\s?([{}()=<>;,]+)\s?/g, function (match, delimiter) {
-          return delimiter;
-        })
-
-        // replace long variable names like 'signature1' with their first letter 's1'
-        .replace(/(signature|test|convert|arg)(?=\d)|varArgs|match/g, function (v) {
-          // NOTE: all matched variable names must have a unique first letter!!
-          return v.charAt(0);
-        });
-  }
-
-  /**
    * Compose a function from sub-functions each handling a single type signature.
    * Signatures:
    *   typed(signature: string, fn: function)
@@ -935,12 +913,6 @@
       treeCode,
       '})'
     ].join('\n');
-
-    //typed.config.minify = false; // TODO: cleanup
-
-    if (typed.config.minify) {
-      factory = minify(factory);
-    }
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
@@ -982,9 +954,7 @@
   }
 
   // configuration
-  var config = {
-    minify: true
-  };
+  var config = {};
 
   // type conversions. Order is important
   var conversions = [];

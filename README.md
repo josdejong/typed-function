@@ -199,23 +199,12 @@ A typed function can be constructed in three ways:
     });
     ```
 
--   `typed.config: Object`
-
-    An object with configuration options for typed-function:
-
-    -   `minify: boolean`
-
-        If true (default), the functions are generated from minified code.
-        If false the typed-functions have a nicely readable .toString() source.
-
-
 ### Output
 
 The functions generated with `typed({...})` have:
 
-- A function `toString`. When `typed.config.minify` is set to `true` (is `false`
-  by default), the `toString` function will return well readable code which can
-  be used to see what the function exactly does. For debugging purposes.
+- A function `toString`. Returns well readable code which can be used to see
+  what the function exactly does. Mostly for debugging purposes.
 - A property `signatures`, which holds a map with the (normalized)
   signatures as key and the original sub-functions as value.
 - A property `name` containing name of the typed function or an empty string.
