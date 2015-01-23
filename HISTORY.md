@@ -2,8 +2,8 @@
 
 ## 2015-01-16, version 0.6.0
 
-- Removed the configuration function `minify` (it's not clear yet whether
-  minifying really improves the performance).
+- Removed the configuration option `minify`
+  (it's not clear yet whether minifying really improves the performance).
 - Internal code simplifications.
 - Bug fixes.
 
