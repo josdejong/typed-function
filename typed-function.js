@@ -450,6 +450,9 @@
    * Sub function of Node.prototype._toNode
    *
    * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
+   * @param {Object} [childParams]  An object with the same properties as params.
+   *                                If provided, `childParams` will be passed
+   *                                to the childs instead of `params`.
    *
    * Where:
    *   {Refs} refs            Object to store function references
@@ -470,7 +473,7 @@
    *
    * @protected
    */
-  Node.prototype._innerCode = function (params) {
+  Node.prototype._innerCode = function (params, childParams) {
     var code = [];
     var prefix = params.prefix;
     var ref = this.fn ? params.refs.add(this.fn, 'signature') : undefined;
@@ -483,7 +486,7 @@
 
     // iterate over the childs
     this._getChilds().forEach(function (child) {
-      code.push(child._toCode(merge(params)));
+      code.push(child._toCode(childParams || params));
     });
 
     // handle conversions
@@ -491,6 +494,7 @@
       code = code.concat(this._conversionsToCode(params));
     }
 
+    // handle exceptions
     if (params.exceptions) {
       code.push(this._exceptions(params));
     }
@@ -653,7 +657,39 @@
   Node.prototype._conversionsToCode = function (params) {
     var code = [];
 
-    // iterate over the type conversions
+    // iterate over conversions from this node's own type to any of its siblings type
+    if (this.parent) {
+      code.push(params.prefix + '// PARENT ' + (params.args.length - 1) + ' ' + Object.keys(this.parent.childs))
+      this.parent._getChilds().forEach(function (child) {
+        var conversion = typed.conversions.filter(function (conversion) {
+          return this.type.toString() == conversion.from && child.type == conversion.to.toString();
+        }.bind(this))[0];
+
+        if (conversion) {
+          var arg = 'arg' + (params.args.length - 1);
+          var test = params.refs.add(getTypeTest(conversion.from), 'test');
+          var convert = params.refs.add(conversion.convert, 'convert');
+          var nextArg = convert + '(' + arg + ')';
+          var comment = '// convert arg' + (params.args.length - 1) + ' from ' + conversion.from + ' to ' + conversion.to;
+
+          var args  = params.args.slice(0, params.args.length - 1).concat(nextArg);
+          var types = params.args.slice(0, params.types.length - 1).concat(child.type);
+          var nextParams = merge(params, {
+            args: args,
+            types: types
+          });
+
+          // iterate over the childs
+          code.push(params.prefix + comment);
+          child._getChilds().forEach(function (grantChild) {
+            code.push(grantChild._toCode(nextParams));
+          });
+          //code = code.concat(child._conversionsToCode(nextParams)); // TODO:
+        }
+      }.bind(this));
+    }
+
+    // iterate over the type conversions which are not dealt with by child nodes
     this._getConversions().forEach(function (conversion) {
           var type = conversion.to;
           var child = this.childs[type];

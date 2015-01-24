@@ -22,6 +22,7 @@ describe('conversion', function () {
   });
 
   after(function () {
+    // cleanup conversions
     typed.conversions = [];
   });
 
@@ -174,4 +175,47 @@ describe('conversion', function () {
     assert.equal(fn(false), 0);
     assert.equal(fn(true), 1);
   });
+
+  it('should add non-conflicting conversions to a function with two arguments', function() {
+    var fn = typed({
+      'boolean, boolean': function (a, b) {
+        return 'boolean, boolean';
+      },
+      'number, number': function (a, b) {
+        return 'number, number';
+      }
+    });
+
+    //console.log('FN', fn.toString());
+
+    // booleans should be converted to number
+    assert.equal(fn(false, true), 'boolean, boolean');
+    assert.equal(fn(2, 4), 'number, number');
+    assert.equal(fn(false, 4), 'number, number');
+    assert.equal(fn(2, true), 'number, number');
+  });
+
+  it('should add non-conflicting conversions to a function with three arguments', function() {
+    var fn = typed({
+      'boolean, boolean, boolean': function (a, b, c) {
+        return 'booleans';
+      },
+      'number, number, number': function (a, b, c) {
+        return 'numbers';
+      }
+    });
+
+    //console.log('FN', fn.toString());
+
+    // booleans should be converted to number
+    assert.equal(fn(false, true, true), 'booleans');
+    assert.equal(fn(false, false, 5), 'numbers'); // FIXME
+    assert.equal(fn(false, 4, false), 'numbers');
+    assert.equal(fn(2, false, false), 'numbers');
+    assert.equal(fn(false, 4, 5), 'numbers');
+    assert.equal(fn(2, false, 5), 'numbers');
+    assert.equal(fn(2, 4, false), 'numbers');
+    assert.equal(fn(2, 4, 5), 'numbers');
+  });
+
 });
