@@ -222,7 +222,10 @@
     else {
       throw new Error('string or Array expected');
     }
-    
+
+    // can hold a type to which to convert when calling this signature
+    this.conversions = [];
+
     // check variable arguments operator '...'
     var withVarArgs = this.params.filter(function (param) {
       return param.varArgs;
@@ -270,7 +273,6 @@
     _iterate(this, [], 0);
 
     // TODO: expand conversions
-    // TODO: expand optional arguments (later on)
 
     return signatures;
   };
@@ -283,13 +285,12 @@
    */
   Signature.prototype.toCode = function (refs, prefix) {
     var code = [];
-    var args = getArgs(this.params.length).join(', ');
+    var args = this.params.map(function (param, index) {
+      return param.varArgs ? 'varArgs' : ('arg' + index);
+    }).join(', ');
     var ref = this.fn ? refs.add(this.fn, 'signature') : undefined;
     if (ref) {
-      code.push(prefix + 'if (arguments.length === ' + this.params.length + ') {');
-      code.push(prefix + '  return ' + ref + '(' + args  + '); ' +
-          '// signature: ' + this.params.join(', '));
-      code.push(prefix + '}');
+      return prefix + 'return ' + ref + '(' + args  + '); // signature: ' + this.params.join(', ');
     }
 
     return code.join('\n');
@@ -317,18 +318,61 @@
    */
   Node.prototype.toCode = function (refs, prefix) {
     var code = [];
-    var index = this.path.length - 1;
 
-    if (this.param && this.param.anyType === false) {
+    if (this.param) {
+      var index = this.path.length - 1;
       var type = this.param.types[0];
-      var test = refs.add(getTypeTest(type), 'test');
+      var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
       var comment = '// type: ' + type;
 
-      code.push(prefix + 'if (' + test + '(arg' + (index) + ')) { ' + comment);
-      code.push(this._innerCode(refs, prefix + '  '));
-      code.push(prefix + '}');
+      // non-root node (path is non-empty)
+      if (this.param.varArgs) {
+        if (this.param.anyType) {
+          // variable arguments with any type
+          code.push(prefix + 'if (arguments.length > ' + index + ') {');
+          code.push(prefix + '  var varArgs = [];');
+          code.push(prefix + '  for (var i = ' + index + '; i < arguments.length; i++) {');
+          code.push(prefix + '    varArgs.push(arguments[i]);');
+          code.push(prefix + '  }');
+          code.push(this.signature.toCode(refs, prefix + '  '));
+          code.push(prefix + '}');
+        }
+        else {
+          // variable arguments with a fixed type
+
+          // TODO: move the varArgs thing to _innerCode, where looping over the childs
+          // TODO: filter all varArg childs of siblings
+
+          code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
+          code.push(prefix + '  var varArgs = [arg' + index + '];');
+          code.push(prefix + '  for (var i = ' + (index + 1) + '; i < arguments.length; i++) {');
+          code.push(prefix + '    if (' + test + '(arguments[i])) {');
+          code.push(prefix + '      varArgs.push(arguments[i]);');
+          code.push(prefix + '    } else {');
+          code.push(prefix + '      throw ' + refs.add(unexpectedType, 'err') +
+              '(\'' + this.param.types.join(',') + '\', arguments[i], i); // Unexpected type');
+          code.push(prefix + '    }');
+          code.push(prefix + '  }');
+          code.push(this.signature.toCode(refs, prefix + '  '));
+          code.push(prefix + '}');
+        }
+      }
+      else {
+        if (this.param.anyType) {
+          // any type
+          code.push(prefix + '// type: any');
+          code.push(this._innerCode(refs, prefix));
+        }
+        else {
+          // regular type
+          code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
+          code.push(this._innerCode(refs, prefix + '  '));
+          code.push(prefix + '}');
+        }
+      }
     }
     else {
+      // root node (path is empty)
       code.push(this._innerCode(refs, prefix));
     }
 
@@ -347,9 +391,12 @@
     var code = [];
 
     if (this.signature) {
-      code.push(this.signature.toCode(refs, prefix));
+      code.push(prefix + 'if (arguments.length === ' + this.path.length + ') {');
+      code.push(this.signature.toCode(refs, prefix + '  '));
+      code.push(prefix + '}');
     }
 
+    // TODO: split childs in childs with and without varArgs, for the varArgs, create one for-loop to iterate over them
     this.childs.forEach(function (child) {
       code.push(child.toCode(refs, prefix));
     });
@@ -383,6 +430,7 @@
     }
     else {
       var types = this.childs.reduce(function (types, node) {
+        // TODO: filter non-converted types
         return node.param ? types.concat(node.param.types) : types;
       }, []);
 
@@ -1063,10 +1111,6 @@
         .map(function (entry) {
           return parseNode(entry.signatures, params.concat(entry.param))
         });
-
-    // TODO: test for conflicts
-
-    // TODO: conversions
 
     return new Node(params, signature, childs);
   }

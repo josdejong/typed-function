@@ -79,6 +79,7 @@ describe('variable arguments', function () {
   });
 
   it('should create a typed function with union type arguments', function() {
+    console.log('TEST'); // TODO: cleanup
     var fn = typed('...number|string', function (values) {
       assert(Array.isArray(values));
       return values;
@@ -110,7 +111,6 @@ describe('variable arguments', function () {
     assert.equal(fn('foo', 2), 'foo: 2');
     assert.equal(fn('foo', 2, 4), 'foo: 2, 4');
     assert.equal(fn(true, false, false), 'booleans');
-    // FIXME: error should be Expected: string or boolean
     assert.throws(function () {fn(2, 4)},           /TypeError: Unexpected type of argument \(expected: string or boolean, actual: number, index: 0\)/);
     assert.throws(function () {fn('string')},       /TypeError: Too few arguments \(expected: number, index: 1\)/);
     assert.throws(function () {fn('string', true)}, /TypeError: Unexpected type of argument \(expected: number, actual: boolean, index: 1\)/);
