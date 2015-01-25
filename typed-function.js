@@ -10,9 +10,9 @@
     // AMD. Register as an anonymous module.
     define([], factory);
   } else if (typeof exports === 'object') {
-    // Node. Does not work with strict CommonJS, but
+    // OldNode. Does not work with strict CommonJS, but
     // only CommonJS-like environments that support module.exports,
-    // like Node.
+    // like OldNode.
     module.exports = factory();
   } else {
     // Browser globals (root is window)
@@ -297,30 +297,104 @@
 
   /**
    * A group of signatures with the same parameter on given index
-   * @param {number} index
-   * @param {Param} param
-   * @param {Signature[]} signatures
+   * @param {Param[]} path
+   * @param {Signature} [signature]
+   * @param {Node[]} childs
    * @constructor
    */
-  function Group(index, param, signatures) {
-    this.index = index;
-    this.param = param;
-    this.signatures = signatures;
+  function Node(path, signature, childs) {
+    this.path = path || [];
+    this.param = path[path.length - 1] || null;
+    this.signature = signature || null;
+    this.childs = childs || [];
   }
 
-  Group.prototype.toCode = function (refs, recurse, params, prefix) {
+  /**
+   * Generate code for this group of signatures
+   * @param {Refs} refs
+   * @param {string} prefix
+   * @returns {string} Returns the code as string
+   */
+  Node.prototype.toCode = function (refs, prefix) {
     var code = [];
-    var type = this.param.types[0];
-    var comment = '// type: ' + type;
-    var test = (this.param.anyType === false) ? refs.add(getTypeTest(type), 'test') : null;
+    var index = this.path.length - 1;
 
-    if (this.param.anyType === false) {
-      code.push(prefix + 'if (' + test + '(arg' + this.index + ')) { ' + comment);
-      code.push(recurse(this.signatures, params.concat(this.param), prefix + '  '));
+    if (this.param && this.param.anyType === false) {
+      var type = this.param.types[0];
+      var test = refs.add(getTypeTest(type), 'test');
+      var comment = '// type: ' + type;
+
+      code.push(prefix + 'if (' + test + '(arg' + (index) + ')) { ' + comment);
+      code.push(this._innerCode(refs, prefix + '  '));
       code.push(prefix + '}');
     }
     else {
-      code.push(recurse(this.signatures, params.concat(this.param), prefix));
+      code.push(this._innerCode(refs, prefix));
+    }
+
+    return code.join('\n');
+  };
+
+  /**
+   * Generate inner code for this group of signatures.
+   * This is a helper function of Node.prototype.toCode
+   * @param {Refs} refs
+   * @param {string} prefix
+   * @returns {string} Returns the inner code as string
+   * @private
+   */
+  Node.prototype._innerCode = function(refs, prefix) {
+    var code = [];
+
+    if (this.signature) {
+      code.push(this.signature.toCode(refs, prefix));
+    }
+
+    this.childs.forEach(function (child) {
+      code.push(child.toCode(refs, prefix));
+    });
+
+    var exceptions = this._exceptions(refs, prefix);
+    if (exceptions) {
+      code.push(exceptions);
+    }
+
+    return code.join('\n');
+  };
+
+  /**
+   * Generate code to throw exceptions
+   * @param {Refs} refs
+   * @param {string} prefix
+   * @returns {string} Returns the inner code as string
+   * @private
+   */
+  Node.prototype._exceptions = function (refs, prefix) {
+    var code = [];
+    var argCount = this.path.length;
+    var arg = 'arg' + argCount;
+
+    if (this.childs.length === 0) {
+      // no childs
+      code.push(prefix + 'if (arguments.length > ' + argCount + ') {');
+      code.push(prefix + '  throw ' + refs.add(tooManyArguments, 'err') +
+          '(' + argCount + ', arguments.length); // Too many arguments');
+      code.push(prefix + '}');
+    }
+    else {
+      var types = this.childs.reduce(function (types, node) {
+        return node.param ? types.concat(node.param.types) : types;
+      }, []);
+
+      // TODO: add "Actual: ..." to the error message
+      code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
+      code.push(prefix + '  throw ' + refs.add(tooFewArguments, 'err') +
+          '(\'' + types.join(',') + '\', arguments.length); // Too few arguments');
+      code.push(prefix + '}');
+      code.push(prefix + 'else {');
+      code.push(prefix + '  throw ' + refs.add(unexpectedType, 'err') +
+          '(\'' + types.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
+      code.push(prefix + '}');
     }
 
     return code.join('\n');
@@ -333,10 +407,10 @@
    * - No child nodes but a function `fn`, the function to be called for 
    *   This signature.
    * @param {Param} type   The parameter type of this node
-   * @param {Node | RootNode} parent
+   * @param {OldNode | RootNode} parent
    * @constructor
    */
-  function Node (type, parent) {
+  function OldNode (type, parent) {
     this.parent = parent;
     this.type = type;
     this.fn = null;
@@ -349,7 +423,7 @@
    * @return {number} Returns the maximum depth (zero if no childs, one if
    *                  it has childs without childs, etc)
    */
-  Node.prototype.depth = function () {
+  OldNode.prototype.depth = function () {
     var level = 0;
     Object.keys(this.childs).forEach(function (type) {
       var childLevel = this.childs[type].depth() + 1;
@@ -360,9 +434,9 @@
   };
 
   /**
-   * Test recursively whether this Node or any of it's childs need conversions
+   * Test recursively whether this OldNode or any of it's childs need conversions
    */
-  Node.prototype.hasConversions = function () {
+  OldNode.prototype.hasConversions = function () {
     if (this._getConversions().length > 0) {
       return true;
     }
@@ -405,7 +479,7 @@
    *
    * @protected
    */
-  Node.prototype._toCode = function (params, conversion) {
+  OldNode.prototype._toCode = function (params, conversion) {
     var code = [];
 
     var prefix = params.prefix;
@@ -519,7 +593,7 @@
   };
 
   /**
-   * Sub function of Node.prototype._toNode
+   * Sub function of OldNode.prototype._toNode
    *
    * @param {{refs: Refs, args: string[], types: Param[], tests: string[], prefix: string, conversions: boolean, exceptions: boolean}} params
    * @param {Object} [childParams]  An object with the same properties as params.
@@ -545,7 +619,7 @@
    *
    * @protected
    */
-  Node.prototype._innerCode = function (params, childParams) {
+  OldNode.prototype._innerCode = function (params, childParams) {
     var code = [];
     var prefix = params.prefix;
     var ref = this.fn ? params.refs.add(this.fn, 'signature') : undefined;
@@ -653,7 +727,7 @@
    *
    * @private
    */
-  Node.prototype._exceptions = function (params) {
+  OldNode.prototype._exceptions = function (params) {
     var code = [];
     var prefix = params.prefix;
     var argCount = params.args.length;
@@ -726,7 +800,7 @@
    *
    * @protected
    */
-  Node.prototype._conversionsToCode = function (params) {
+  OldNode.prototype._conversionsToCode = function (params) {
     var code = [];
 
     // iterate over conversions from this node's own type to any of its siblings type
@@ -774,10 +848,10 @@
 
   /**
    * Get the childs of this node ordered by type
-   * @return {Node[]} Returns an array with Nodes
+   * @return {OldNode[]} Returns an array with Nodes
    * @protected
    */
-  Node.prototype._getChilds = function () {
+  OldNode.prototype._getChilds = function () {
     return Object.keys(this.childs)
         .map(function (type) {
           return this.childs[type];
@@ -788,11 +862,11 @@
   };
 
   /**
-   * Get the conversions relevant for this Node
+   * Get the conversions relevant for this OldNode
    * @returns {Array} Array with conversion objects
    * @protected
    */
-  Node.prototype._getConversions = function () {
+  OldNode.prototype._getConversions = function () {
     // if there is a varArgs child, there is no need to do conversions separately,
     // that is handled by the varArg loop
     var hasVarArgs = this._getChilds().some(function (child) {
@@ -819,11 +893,11 @@
   };
 
   /**
-   * Get the conversions relevant for a Node with variable arguments
+   * Get the conversions relevant for a OldNode with variable arguments
    * @returns {Array} Array with conversion objects
    * @protected
    */
-  Node.prototype._getVarArgConversions = function () {
+  OldNode.prototype._getVarArgConversions = function () {
     // filter the relevant type conversions
     var handled = {};
     return typed.conversions
@@ -852,7 +926,7 @@
     this.childs = {};
   }
 
-  RootNode.prototype = Object.create(Node.prototype);
+  RootNode.prototype = Object.create(OldNode.prototype);
 
   /**
    * Returns a string with JavaScript code for this function
@@ -940,9 +1014,6 @@
 
     signatures.map(function (entry) {
       var signature = entry.params.join(',');
-      if (signature in normalized) {
-        throw new Error('Signature "' + signature + '" defined twice');
-      }
       normalized[signature] = entry.fn;
     });
 
@@ -950,37 +1021,54 @@
   }
 
   /**
-   * Parse an object with signatures. Creates a recursive node tree for
-   * traversing the number and type of parameters.
-   * @param {string} [name]            Function name. Optional
-   * @param {Signature[]} signatures   An array with split signatures
-   * @return {RootNode}                Returns a node tree
+   * Parse signatures recursively in a node tree.
+   * @param {Signature[]} signatures   An array with signatures
+   * @param {Param[]} params           Path with parameters to this node
+   * @return {Node}                    Returns a node tree
    */
-  function parseTree(name, signatures) {
-    var root = new RootNode(name);
+  function parseNode(signatures, params) {
+    var index = params.length;
 
-    signatures.forEach(function (signature) {
-      var params = signature.params.concat([]);
-
-      // loop over all parameters, create a nested structure
-      var node = root;
-      while(params.length > 0) {
-        var param = params.shift();
-        var type = param.toString();
-
-        var child = node.childs[type];
-        if (child === undefined) {
-          child = node.childs[type] = new Node(param, node);
-        }
-        node = child;
-      }
-
-      // add the function as leaf of the innermost node
-      node.fn = signature.fn;
-      node.varArgs = signature.varArgs;
+    // filter the signatures with the correct number of params
+    var invokable = signatures.filter(function (signature) {
+      return signature.params.length === index;
     });
+    var signature = invokable.shift();
+    if (invokable.length > 0) {
+      throw new Error('Signature "' + signature + '" defined multiple times');
+    }
 
-    return root;
+    // recurse over the signatures
+    var childs = signatures
+        .filter(function (signature) {
+          return signature.params[index] != undefined;
+        })
+        .sort(function (a, b) {
+          return compareParams(a.params[index], b.params[index]);
+        })
+        .reduce(function (entries, signature) {
+          // group signatures with the same param at current index
+          var last = entries[entries.length - 1];
+          if (last && last.param.equalTypes(signature.params[index])) {
+            last.signatures.push(signature);
+          }
+          else {
+            entries.push({
+              param: signature.params[index],
+              signatures: [signature]
+            });
+          }
+          return entries;
+        }, [])
+        .map(function (entry) {
+          return parseNode(entry.signatures, params.concat(entry.param))
+        });
+
+    // TODO: test for conflicts
+
+    // TODO: conversions
+
+    return new Node(params, signature, childs);
   }
 
   function getArgs(count) {
@@ -1011,76 +1099,33 @@
 
     // parse signatures, expand them
     var _signatures = parseSignatures(signatures);
-
-    function recurse (signatures, params, prefix) {
-      var index = params.length;
-      var code = [];
-
-      // filter the signatures with the correct number of params, invoke them
-      signatures
-          .filter(function (signature) {
-            return signature.params.length === index;
-          })
-          .forEach(function (signature) {
-            //code.push(prefix + 'call signature ' + signature.params.join(', '))
-            code.push(signature.toCode(refs, prefix));
-          });
-
-      // recurse over the signatures
-      signatures
-          .filter(function (signature) {
-            return signature.params[index] != undefined;
-          })
-          .sort(function (a, b) {
-            return compareParams(a.params[index], b.params[index]);
-          })
-          .reduce(function (groups, signature) {
-            // group signatures with the same param at current index
-            var last = groups[groups.length - 1];
-            if (last && last.param.equalTypes(signature.params[index])) {
-              last.signatures.push(signature);
-            }
-            else {
-              groups.push(new Group(index, signature.params[index], [signature]));
-            }
-            return groups;
-          }, [])
-          .forEach(function (group) {
-            code.push(group.toCode(refs, recurse, params, prefix));
-          });
-
-      // TODO: test for conflicts
-
-      // TODO: conversions
-
-      return code.join('\n');
-    }
-
-    var code = [];
-    var _name = (name || 'fn');
-    var longest = _signatures.reduce(function (a, b) {
-      return !b ? a : (a.params.length >= b.params.length ? a : b);
-    });
-    var _args = getArgs(longest && longest.params.length || 0);
-    code.push('return function ' + _name + '(' + _args.join(', ') + ') {');
-    code.push(recurse(_signatures, [], '  '));
-    code.push('}');
-
     if (_signatures.length == 0) {
       throw new Error('No signatures provided');
     }
 
-    ////console.log('TREE\n' + JSON.stringify(tree, null, 2)); // TODO: cleanup
-    ////console.log('TREE', tree); // TODO: cleanup
-    //
-    //var treeCode = tree.toCode(refs);
-    //var refsCode = refs.toCode();
+    // parse signatures into a node tree
+    var node = parseNode(_signatures, []);
 
-    // generate JavaScript code
+    //var util = require('util');
+    //console.log('ROOT')
+    //console.log(util.inspect(root, { depth: null }));
+
+    // generate code for the typed function
+    var code = [];
+    var _name = name || '';
+    var longest = _signatures.reduce(function (a, b) {
+      return !b ? a : (a.params.length >= b.params.length ? a : b);
+    });
+    var _args = getArgs(longest && longest.params.length || 0);
+    code.push('function ' + _name + '(' + _args.join(', ') + ') {');
+    code.push(node.toCode(refs, '  '));
+    code.push('}');
+
+    // generate code for the factory function
     var factory = [
       '(function (' + refs.name + ') {',
       refs.toCode(),
-      code.join('\n'),
+      'return ' + code.join('\n'),
       '})'
     ].join('\n');
 
