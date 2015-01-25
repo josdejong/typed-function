@@ -169,6 +169,22 @@
   }
 
   /**
+   * Test whether this parameters types equal an other parameters types.
+   * Does not take into account varArgs.
+   * @param {Param} other
+   * @return {boolean} Returns true when the types are equal.
+   */
+  Param.prototype.equalTypes = function (other) {
+    if (this.types.length !== other.types.length) return false;
+
+    for (var i = 0; i < this.types.length; i++) {
+      if (this.types[i] !== other.types[i]) return false;
+    }
+
+    return true;
+  };
+
+  /**
    * Create a clone of this param
    * @returns {Param} A cloned version of this param
    */
@@ -225,11 +241,13 @@
   }
 
   /**
-   * Split params with multiple types in separate signatures,
-   * for example split a Signature "string | number" into two signatures.
+   * Expand a signature:
+   * - split params with multiple types in separate signatures
+   * - expand signatures for every conversion
+   * For example split a Signature "string | number" into two signatures.
    * @return {Signature[]} Returns an array with signatures (at least one)
    */
-  Signature.prototype.split = function () {
+  Signature.prototype.expand = function () {
     var signatures = [];
 
     function _iterate(signature, types, index) {
@@ -251,7 +269,61 @@
     }
     _iterate(this, [], 0);
 
+    // TODO: expand conversions
+    // TODO: expand optional arguments (later on)
+
     return signatures;
+  };
+
+  /**
+   * Generate the code to invoke this signature
+   * @param {Refs} refs
+   * @param {string} prefix
+   * @returns {string} Returns code
+   */
+  Signature.prototype.toCode = function (refs, prefix) {
+    var code = [];
+    var args = getArgs(this.params.length).join(', ');
+    var ref = this.fn ? refs.add(this.fn, 'signature') : undefined;
+    if (ref) {
+      code.push(prefix + 'if (arguments.length === ' + this.params.length + ') {');
+      code.push(prefix + '  return ' + ref + '(' + args  + '); ' +
+          '// signature: ' + this.params.join(', '));
+      code.push(prefix + '}');
+    }
+
+    return code.join('\n');
+  };
+
+  /**
+   * A group of signatures with the same parameter on given index
+   * @param {number} index
+   * @param {Param} param
+   * @param {Signature[]} signatures
+   * @constructor
+   */
+  function Group(index, param, signatures) {
+    this.index = index;
+    this.param = param;
+    this.signatures = signatures;
+  }
+
+  Group.prototype.toCode = function (refs, recurse, params, prefix) {
+    var code = [];
+    var type = this.param.types[0];
+    var comment = '// type: ' + type;
+    var test = (this.param.anyType === false) ? refs.add(getTypeTest(type), 'test') : null;
+
+    if (this.param.anyType === false) {
+      code.push(prefix + 'if (' + test + '(arg' + this.index + ')) { ' + comment);
+      code.push(recurse(this.signatures, params.concat(this.param), prefix + '  '));
+      code.push(prefix + '}');
+    }
+    else {
+      code.push(recurse(this.signatures, params.concat(this.param), prefix));
+    }
+
+    return code.join('\n');
   };
 
   /**
@@ -854,7 +926,7 @@
       var fn = rawSignatures[params];
       var signature = new Signature(params, fn);
 
-      return signatures.concat(signature.split());
+      return signatures.concat(signature.expand());
     }, []);
   }
 
@@ -911,6 +983,16 @@
     return root;
   }
 
+  function getArgs(count) {
+    // create an array with all argument names
+    var args = [];
+    for (var i = 0; i < count; i++) {
+      args[i] = 'arg' + i;
+    }
+
+    return args;
+  }
+
   /**
    * Compose a function from sub-functions each handling a single type signature.
    * Signatures:
@@ -927,32 +1009,85 @@
   function _typed(name, signatures) {
     var refs = new Refs();
 
-    // parse signatures, create a node tree
+    // parse signatures, expand them
     var _signatures = parseSignatures(signatures);
-    var tree = parseTree(name, _signatures);
+
+    function recurse (signatures, params, prefix) {
+      var index = params.length;
+      var code = [];
+
+      // filter the signatures with the correct number of params, invoke them
+      signatures
+          .filter(function (signature) {
+            return signature.params.length === index;
+          })
+          .forEach(function (signature) {
+            //code.push(prefix + 'call signature ' + signature.params.join(', '))
+            code.push(signature.toCode(refs, prefix));
+          });
+
+      // recurse over the signatures
+      signatures
+          .filter(function (signature) {
+            return signature.params[index] != undefined;
+          })
+          .sort(function (a, b) {
+            return compareParams(a.params[index], b.params[index]);
+          })
+          .reduce(function (groups, signature) {
+            // group signatures with the same param at current index
+            var last = groups[groups.length - 1];
+            if (last && last.param.equalTypes(signature.params[index])) {
+              last.signatures.push(signature);
+            }
+            else {
+              groups.push(new Group(index, signature.params[index], [signature]));
+            }
+            return groups;
+          }, [])
+          .forEach(function (group) {
+            code.push(group.toCode(refs, recurse, params, prefix));
+          });
+
+      // TODO: test for conflicts
+
+      // TODO: conversions
+
+      return code.join('\n');
+    }
+
+    var code = [];
+    var _name = (name || 'fn');
+    var longest = _signatures.reduce(function (a, b) {
+      return !b ? a : (a.params.length >= b.params.length ? a : b);
+    });
+    var _args = getArgs(longest && longest.params.length || 0);
+    code.push('return function ' + _name + '(' + _args.join(', ') + ') {');
+    code.push(recurse(_signatures, [], '  '));
+    code.push('}');
 
     if (_signatures.length == 0) {
       throw new Error('No signatures provided');
     }
 
-    //console.log('TREE\n' + JSON.stringify(tree, null, 2)); // TODO: cleanup
-    //console.log('TREE', tree); // TODO: cleanup
-
-    var treeCode = tree.toCode(refs);
-    var refsCode = refs.toCode();
+    ////console.log('TREE\n' + JSON.stringify(tree, null, 2)); // TODO: cleanup
+    ////console.log('TREE', tree); // TODO: cleanup
+    //
+    //var treeCode = tree.toCode(refs);
+    //var refsCode = refs.toCode();
 
     // generate JavaScript code
     var factory = [
       '(function (' + refs.name + ') {',
-      refsCode,
-      treeCode,
+      refs.toCode(),
+      code.join('\n'),
       '})'
     ].join('\n');
 
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
 
-    //console.log('FN\n' + fn.toString()); // TODO: cleanup
+    console.log('FN\n' + fn.toString()); // TODO: cleanup
 
     // attach the signatures with sub-functions to the constructed function
     fn.signatures = normalizeSignatures(_signatures); // normalized signatures
