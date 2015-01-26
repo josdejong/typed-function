@@ -106,7 +106,6 @@ describe('construction', function() {
   });
 
   it('should throw an error when providing a  Wrong function signature', function() {
-    console.log('TEST')
     var fn = typed({
       'number': function (value) {
         return 'number:' + value;

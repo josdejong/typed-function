@@ -175,13 +175,19 @@
    * @return {boolean} Returns true when the types are equal.
    */
   Param.prototype.equalTypes = function (other) {
-    if (this.types.length !== other.types.length) return false;
+    return this.types.sort().join() == other.types.sort().join();
+  };
 
-    for (var i = 0; i < this.types.length; i++) {
-      if (this.types[i] !== other.types[i]) return false;
-    }
-
-    return true;
+  /**
+   * Test whether this parameters types conflict an other parameters types.
+   * Does not take into account varArgs.
+   * @param {Param} other
+   * @return {boolean} Returns true when there are conflicting types
+   */
+  Param.prototype.conflictingTypes = function (other) {
+    return this.types.some(function (type) {
+      return other.types.indexOf(type) !== -1;
+    });
   };
 
   /**
@@ -321,9 +327,7 @@
 
     if (this.param) {
       var index = this.path.length - 1;
-      var type = this.param.types[0];
-      var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
-      var comment = '// type: ' + type;
+      var comment = '// type: ' + this.param;
 
       // non-root node (path is non-empty)
       if (this.param.varArgs) {
@@ -339,14 +343,18 @@
         }
         else {
           // variable arguments with a fixed type
+          var getTests = function (arg) {
+            return this.param.types
+                .map(function (type) {
+                  return refs.add(getTypeTest(type), 'test') + '(' + arg + ')';
+                })
+                .join(' || ');
+          }.bind(this);
 
-          // TODO: move the varArgs thing to _innerCode, where looping over the childs
-          // TODO: filter all varArg childs of siblings
-
-          code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
+          code.push(prefix + 'if (' + getTests('arg' + index) + ') { ' + comment);
           code.push(prefix + '  var varArgs = [arg' + index + '];');
           code.push(prefix + '  for (var i = ' + (index + 1) + '; i < arguments.length; i++) {');
-          code.push(prefix + '    if (' + test + '(arguments[i])) {');
+          code.push(prefix + '    if (' + getTests('arguments[i]') + ') {');
           code.push(prefix + '      varArgs.push(arguments[i]);');
           code.push(prefix + '    } else {');
           code.push(prefix + '      throw ' + refs.add(unexpectedType, 'err') +
@@ -365,6 +373,9 @@
         }
         else {
           // regular type
+          var type = this.param.types[0];
+          var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
+
           code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
           code.push(this._innerCode(refs, prefix + '  '));
           code.push(prefix + '}');
@@ -396,7 +407,6 @@
       code.push(prefix + '}');
     }
 
-    // TODO: split childs in childs with and without varArgs, for the varArgs, create one for-loop to iterate over them
     this.childs.forEach(function (child) {
       code.push(child.toCode(refs, prefix));
     });
@@ -418,30 +428,33 @@
    */
   Node.prototype._exceptions = function (refs, prefix) {
     var code = [];
-    var argCount = this.path.length;
-    var arg = 'arg' + argCount;
+    var index = this.path.length;
 
     if (this.childs.length === 0) {
       // no childs
-      code.push(prefix + 'if (arguments.length > ' + argCount + ') {');
+      code.push(prefix + 'if (arguments.length > ' + index + ') {');
       code.push(prefix + '  throw ' + refs.add(tooManyArguments, 'err') +
-          '(' + argCount + ', arguments.length); // Too many arguments');
+          '(' + index + ', arguments.length); ' +
+          '// Too many arguments');
       code.push(prefix + '}');
     }
     else {
+      var arg = 'arg' + index;
       var types = this.childs.reduce(function (types, node) {
         // TODO: filter non-converted types
         return node.param ? types.concat(node.param.types) : types;
       }, []);
 
       // TODO: add "Actual: ..." to the error message
-      code.push(prefix + 'if (arguments.length === ' + argCount + ') {');
+      code.push(prefix + 'if (arguments.length === ' + index + ') {');
       code.push(prefix + '  throw ' + refs.add(tooFewArguments, 'err') +
-          '(\'' + types.join(',') + '\', arguments.length); // Too few arguments');
+          '(\'' + types.join(',') + '\', arguments.length); ' +
+          '// Too few arguments');
       code.push(prefix + '}');
       code.push(prefix + 'else {');
       code.push(prefix + '  throw ' + refs.add(unexpectedType, 'err') +
-          '(\'' + types.join(',') + '\', ' + arg + ', ' + argCount + '); // Unexpected type');
+          '(\'' + types.join(',') + '\', ' + arg + ', ' + index + '); ' +
+          '// Unexpected type');
       code.push(prefix + '}');
     }
 
@@ -1074,16 +1087,16 @@
    * @param {Param[]} params           Path with parameters to this node
    * @return {Node}                    Returns a node tree
    */
-  function parseNode(signatures, params) {
+  function parseTree(signatures, params) {
     var index = params.length;
 
     // filter the signatures with the correct number of params
-    var invokable = signatures.filter(function (signature) {
+    var withFn = signatures.filter(function (signature) {
       return signature.params.length === index;
     });
-    var signature = invokable.shift();
-    if (invokable.length > 0) {
-      throw new Error('Signature "' + signature + '" defined multiple times');
+    var signature = withFn.shift();
+    if (withFn.length > 0) {
+      throw new Error('Signature "' + signature.params + '" defined multiple times');
     }
 
     // recurse over the signatures
@@ -1096,9 +1109,12 @@
         })
         .reduce(function (entries, signature) {
           // group signatures with the same param at current index
-          var last = entries[entries.length - 1];
-          if (last && last.param.equalTypes(signature.params[index])) {
-            last.signatures.push(signature);
+          var existing = entries.filter(function (entry) {
+            return entry.param.equalTypes(signature.params[index])
+          })[0];
+
+          if (existing) {
+            existing.signatures.push(signature);
           }
           else {
             entries.push({
@@ -1109,7 +1125,7 @@
           return entries;
         }, [])
         .map(function (entry) {
-          return parseNode(entry.signatures, params.concat(entry.param))
+          return parseTree(entry.signatures, params.concat(entry.param))
         });
 
     return new Node(params, signature, childs);
@@ -1148,11 +1164,11 @@
     }
 
     // parse signatures into a node tree
-    var node = parseNode(_signatures, []);
+    var node = parseTree(_signatures, []);
 
     //var util = require('util');
-    //console.log('ROOT')
-    //console.log(util.inspect(root, { depth: null }));
+    //console.log('ROOT');
+    //console.log(util.inspect(node, { depth: null }));
 
     // generate code for the typed function
     var code = [];
@@ -1176,7 +1192,7 @@
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
 
-    console.log('FN\n' + fn.toString()); // TODO: cleanup
+    //console.log('FN\n' + fn.toString()); // TODO: cleanup
 
     // attach the signatures with sub-functions to the constructed function
     fn.signatures = normalizeSignatures(_signatures); // normalized signatures

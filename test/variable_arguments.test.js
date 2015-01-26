@@ -79,7 +79,6 @@ describe('variable arguments', function () {
   });
 
   it('should create a typed function with union type arguments', function() {
-    console.log('TEST'); // TODO: cleanup
     var fn = typed('...number|string', function (values) {
       assert(Array.isArray(values));
       return values;

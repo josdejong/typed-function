@@ -47,7 +47,16 @@ describe('errors', function () {
         'string | number': function () {},
         'string': function () {}
       });
-    }, /Error: Signature "string" defined twice/);
+    }, /Error: Signature "string" defined multiple times/);
+  });
+
+  it('should give correct error in case of conflicting union arguments (2)', function() {
+    assert.throws(function () {
+      var fn = typed({
+        '...string | number': function () {},
+        '...string': function () {}
+      });
+    }, /Error: Signature "string" defined multiple times/);
   });
 
   it('should give correct error in case of wrong type of argument (varArgs)', function() {
