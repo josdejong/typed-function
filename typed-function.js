@@ -259,26 +259,26 @@
   Signature.prototype.expand = function () {
     var signatures = [];
 
-    function _iterate(signature, types, index) {
-      if (index < signature.params.length) {
-        var param = signature.params[index];
-        if (index == signature.params.length - 1 && signature.varArgs) {
-          // last parameter of a varArgs signature. Do not split the varArgs parameter
-          _iterate(signature, types.concat(param), index + 1);
+    function recurse(signature, path) {
+      if (path.length < signature.params.length) {
+        var param = signature.params[path.length];
+        if (signature.varArgs) {
+          // a variable argument. do not split the types in the parameter
+          recurse(signature, path.concat(param));
         }
         else {
+          // split each type in the parameter
           param.types.forEach(function (type) {
-            _iterate(signature, types.concat(new Param(type, param.varArgs)), index + 1);
+            recurse(signature, path.concat(new Param(type, param.varArgs)));
           });
         }
       }
       else {
-        signatures.push(new Signature(types, signature.fn));
+        // TODO: expand conversions
+        signatures.push(new Signature(path, signature.fn));
       }
     }
-    _iterate(this, [], 0);
-
-    // TODO: expand conversions
+    recurse(this, []);
 
     return signatures;
   };
