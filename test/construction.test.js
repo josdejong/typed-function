@@ -105,7 +105,7 @@ describe('construction', function() {
     assert.throws(function () {fn(new Date())}, /TypeError: Unexpected type of argument \(expected: number, actual: Date, index: 0\)/);
   });
 
-  it('should throw an error when providing a  Wrong function signature', function() {
+  it('should throw an error when providing a wrong function signature', function() {
     var fn = typed({
       'number': function (value) {
         return 'number:' + value;

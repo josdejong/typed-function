@@ -82,6 +82,59 @@
   }
 
   /**
+   * Create an ArgumentsError. Creates messages like:
+   *
+   *   Unexpected type of argument (expected: ..., actual: ..., index: ...)
+   *   Too few arguments (expected: ..., index: ...)
+   *   Too many arguments (expected: ..., actual: ...)
+   *
+   * @param {String} fn         Function name
+   * @param {Object} args       The actual arguments
+   * @param {Number} index      Current argument index
+   * @param {string} [expected] An optional, comma separated string with
+   *                            expected types on given index
+   * @extends Error
+   */
+  function createError(fn, args, index, expected) {
+    var actual = args[index];
+    var actualType = getTypeOf(actual);
+    var _expected = expected ? expected.split(',') : null;
+    var anyType = _expected && _expected.indexOf('any') !== -1;
+    var message;
+    var data = {
+      fn: fn,
+      index: index,
+      actual: actual,
+      expected: _expected
+    };
+
+    //console.log('createError', fn, args, index, expected) // TODO: cleanup
+
+    // TODO: add function name to the message
+    if (_expected) {
+      if (args.length > index && !anyType) {
+        // unexpected type
+        message = 'Unexpected type of argument' +
+            ' (expected: ' + _expected.join(' or ') + ', actual: ' + actualType + ', index: ' + index + ')';
+      }
+      else {
+        // too few arguments
+        message = 'Too few arguments' +
+          ' (expected: ' + _expected.join(' or ') + ', index: ' + index + ')';
+      }
+    }
+    else {
+      // too many arguments
+      message = 'Too many arguments' +
+          ' (expected: ' + index + ', actual: ' + args.length + ')'
+    }
+
+    var err = new TypeError(message);
+    err.data = data;
+    return err;
+  }
+
+  /**
    * Collection with function references (local shortcuts to functions)
    * @constructor
    * @param {string} [name='refs']  Optional name for the refs, used to generate
@@ -250,9 +303,7 @@
   }
 
   /**
-   * Expand a signature:
-   * - split params with multiple types in separate signatures
-   * - expand signatures for every conversion
+   * Expand a signature: split params with union types in separate signatures
    * For example split a Signature "string | number" into two signatures.
    * @return {Signature[]} Returns an array with signatures (at least one)
    */
@@ -274,7 +325,6 @@
         }
       }
       else {
-        // TODO: expand conversions
         signatures.push(new Signature(path, signature.fn));
       }
     }
@@ -427,16 +477,15 @@
    * @private
    */
   Node.prototype._exceptions = function (refs, prefix) {
-    var code = [];
     var index = this.path.length;
 
+    // TODO: function name with exceptions
     if (this.childs.length === 0) {
-      // no childs
-      code.push(prefix + 'if (arguments.length > ' + index + ') {');
-      code.push(prefix + '  throw ' + refs.add(tooManyArguments, 'err') +
-          '(' + index + ', arguments.length); ' +
-          '// Too many arguments');
-      code.push(prefix + '}');
+      return [
+        prefix + 'if (arguments.length > ' + index + ') {',
+        prefix + '  throw createError(\'\', arguments, ' + index + ')',
+        prefix + '}'
+      ].join('\n');
     }
     else {
       var arg = 'arg' + index;
@@ -445,20 +494,8 @@
         return node.param ? types.concat(node.param.types) : types;
       }, []);
 
-      // TODO: add "Actual: ..." to the error message
-      code.push(prefix + 'if (arguments.length === ' + index + ') {');
-      code.push(prefix + '  throw ' + refs.add(tooFewArguments, 'err') +
-          '(\'' + types.join(',') + '\', arguments.length); ' +
-          '// Too few arguments');
-      code.push(prefix + '}');
-      code.push(prefix + 'else {');
-      code.push(prefix + '  throw ' + refs.add(unexpectedType, 'err') +
-          '(\'' + types.join(',') + '\', ' + arg + ', ' + index + '); ' +
-          '// Unexpected type');
-      code.push(prefix + '}');
+      return prefix + 'throw createError(\'\', arguments, ' + index + ', \'' + types.join(',') + '\');';
     }
-
-    return code.join('\n');
   };
 
   /**
@@ -716,6 +753,7 @@
    * @param {number} index       Index of the argument
    * @returns {TypeError} Returns a TypeError
    */
+  // TODO: cleanup
   function unexpectedType (expected, actual, index) {
     var arr = expected.split(',');
     var message = 'Unexpected type of argument';
@@ -736,6 +774,7 @@
    * @param {number} index       index of the argument
    * @returns {TypeError} Returns a TypeError
    */
+  // TODO: cleanup
   function tooFewArguments(expected, index) {
     var arr = expected.split(',');
     var message = 'Too few arguments';
@@ -754,6 +793,7 @@
    * @param {number} actual    The actual number of arguments
    * @returns {TypeError}Returns a TypeError
    */
+  // TODO: cleanup
   function tooManyArguments(expected, actual) {
     var message = 'Too many arguments';
     var err = new TypeError(message + ' (expected: ' + expected + ', actual: ' + actual + ')');
@@ -1057,12 +1097,23 @@
    * @return {Signature[]} Returns an array with split signatures
    */
   function parseSignatures(rawSignatures) {
-    return Object.keys(rawSignatures).reduce(function (signatures, params) {
-      var fn = rawSignatures[params];
-      var signature = new Signature(params, fn);
+    return Object.keys(rawSignatures).reduce(function (signatures, types) {
+      var fn = rawSignatures[types];
+      var signature = new Signature(types, fn);
 
       return signatures.concat(signature.expand());
     }, []);
+  }
+
+  /**
+   * Expand given signatures with possible conversions
+   * @param {Signature[]} signatures
+   * @return {Signature[]} Returns expanded signatures
+   */
+  function expandConversions(signatures) {
+    var expanded = [];
+
+    // TODO: implement expandConversions
   }
 
   /**
