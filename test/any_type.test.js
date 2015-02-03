@@ -38,9 +38,9 @@ describe('any type', function () {
     assert.strictEqual(Object.keys(fn.signatures).length, 2);
     assert.equal(fn([],true), 'any,boolean');
     assert.equal(fn(2,'foo'), 'any,string');
-    assert.throws(function () {fn([], new Date())}, /TypeError: Unexpected type of argument \(expected: string or boolean, actual: Date, index: 1\)/);
-    assert.throws(function () {fn(2, 2)},           /TypeError: Unexpected type of argument \(expected: string or boolean, actual: number, index: 1\)/);
-    assert.throws(function () {fn(2)},              /TypeError: Too few arguments \(expected: string or boolean, index: 1\)/);
+    assert.throws(function () {fn([], new Date())}, /TypeError: Unexpected type of argument \(expected: boolean or string, actual: Date, index: 1\)/);
+    assert.throws(function () {fn(2, 2)},           /TypeError: Unexpected type of argument \(expected: boolean or string, actual: number, index: 1\)/);
+    assert.throws(function () {fn(2)},              /TypeError: Too few arguments \(expected: boolean or string, index: 1\)/);
   });
 
   it('should compose a function with multiple any type arguments (2)', function() {
@@ -61,8 +61,8 @@ describe('any type', function () {
     assert.equal(fn([],true), 'any,boolean');
     assert.equal(fn([],2), 'any,number');
     assert.equal(fn('foo', 2), 'string,any');
-    assert.throws(function () {fn([], new Date())}, /TypeError: Unexpected type of argument \(expected: number or boolean, actual: Date, index: 1\)/);
-    assert.throws(function () {fn([], 'foo')},      /TypeError: Unexpected type of argument \(expected: number or boolean, actual: string, index: 1\)/)
+    assert.throws(function () {fn([], new Date())}, /TypeError: Unexpected type of argument \(expected: boolean or number, actual: Date, index: 1\)/);
+    assert.throws(function () {fn([], 'foo')},      /TypeError: Unexpected type of argument \(expected: boolean or number, actual: string, index: 1\)/)
   });
 
   it('should compose a function with multiple any type arguments (3)', function() {

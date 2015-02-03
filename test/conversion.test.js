@@ -209,7 +209,7 @@ describe('conversion', function () {
 
     // booleans should be converted to number
     assert.equal(fn(false, true, true), 'booleans');
-    assert.equal(fn(false, false, 5), 'numbers'); // FIXME
+    assert.equal(fn(false, false, 5), 'numbers');
     assert.equal(fn(false, 4, false), 'numbers');
     assert.equal(fn(2, false, false), 'numbers');
     assert.equal(fn(false, 4, 5), 'numbers');
