@@ -238,13 +238,22 @@
   };
 
   /**
-   * Test whether this parameters types conflict an other parameters types.
-   * Does not take into account varArgs.
+   * Test whether this parameters equal an other parameters types.
+   * Does take into account varArgs.
+   * @param {Param} other
+   * @return {boolean} Returns true when both params are equal.
+   */
+  Param.prototype.equals = function (other) {
+    return this.varArgs === other.varArgs &&
+        this.types.sort().join() == other.types.sort().join();
+  };
+
+  /**
+   * Test whether this parameters types overlap an other parameters types.
    * @param {Param} other
    * @return {boolean} Returns true when there are conflicting types
    */
-  // TODO: cleanup when unused
-  Param.prototype.conflictingTypes = function (other) {
+  Param.prototype.overlapping = function (other) {
     return this.types.some(function (type) {
       return contains(other.types, type);
     });
@@ -367,6 +376,8 @@
     }
     recurse(this, []);
 
+    // TODO: also expand conversions
+
     return signatures;
   };
 
@@ -462,10 +473,6 @@
           var exactTypes = allTypes.filter(function (type, i) {
             return this.param.conversions[i] === undefined;
           }.bind(this));
-          var conversionTypes = allTypes.filter(function (type, i) {
-            return this.param.conversions[i] !== undefined;
-          }.bind(this));
-          console.log('TYPES', allTypes, exactTypes, conversionTypes)
 
           code.push(prefix + 'if (' + getTests(allTypes, 'arg' + index) + ') { ' + comment);
           code.push(prefix + '  var varArgs = [arg' + index + '];');
@@ -702,7 +709,7 @@
    * @param {Param[]} path      Path with parameters to this node
    * @return {Node}             Returns a node tree
    */
-  function parseTree(signatures, params, path) {
+  function parseTree_(signatures, params, path) { // TOOD: cleanup
     var index = path.length;
 
     var params_i = params[index];
@@ -728,6 +735,65 @@
     else {
       return null;
     }
+  }
+
+  /**
+   * Parse signatures recursively in a node tree.
+   * @param {Signature[]} signatures  Array with expanded signatures
+   * @param {Param[]} path            Traversed path
+   * @return {Node}                   Returns a node tree
+   */
+  function parseTree(signatures, path) {
+    var index = path.length;
+
+    // filter the signatures with the correct number of params
+    var withFn = signatures.filter(function (signature) {
+      return signature.params.length === index;
+    });
+    var signature = withFn.shift();
+    // TODO: is this error reachable? If not, clean up
+    //if (withFn.length > 0) {
+    //  throw new Error('Signature "' + signature.params + '" defined multiple times');
+    //}
+
+    // recurse over the signatures
+    var childs = signatures
+        .filter(function (signature) {
+          return signature.params[index] != undefined;
+        })
+        .sort(function (a, b) {
+          return compareParams(a.params[index], b.params[index]);
+        })
+        .reduce(function (entries, signature) {
+          // group signatures with the same param at current index
+          var param = signature.params[index];
+          var existing = entries.filter(function (entry) {
+            return entry.param.overlapping(param);
+          })[0];
+
+          if (existing) {
+            if (param.varArgs) {
+              throw new Error('Conflicting types "' + param + '" and "' + existing.param + '"');
+            }
+            else {
+              existing.signatures.push(signature);
+            }
+          }
+          else {
+            entries.push({
+              param: signature.params[index],
+              signatures: [signature]
+            });
+          }
+
+          return entries;
+        }, [])
+        .map(function (entry) {
+          console.log('ENTRY', entry.param.toString(), entry.signatures.join(';'))
+          return parseTree(entry.signatures, path.concat(entry.param))
+        });
+
+    return new Node(path, signature, childs);
   }
 
   /**
@@ -769,20 +835,20 @@
 
     console.log('EXPANDED SIGNATURES', _signatures.map(function (s) {return s.toString()}))
 
-    var params = splitParams(_signatures);
-
-    console.log('PARAMS', params.map(function (params_i) {
-      return params_i.map(function (param) {
-        return param.toString() +
-          (param.hasConversions() ? (' (to ' + JSON.stringify(param.conversions) + ')') :'')
-      });
-    }));
+    //var params = splitParams(_signatures);
+    //
+    //console.log('PARAMS', params.map(function (params_i) {
+    //  return params_i.map(function (param) {
+    //    return param.toString() +
+    //      (param.hasConversions() ? (' (to ' + JSON.stringify(param.conversions) + ')') :'')
+    //  });
+    //}));
 
     // change from an array to a map
     var _signaturesMap = mapSignatures(_signatures);
 
     // parse signatures into a node tree
-    var node = parseTree(_signaturesMap, params, []);
+    var node = parseTree(_signatures, []);
 
     //var util = require('util');
     //console.log('ROOT');
