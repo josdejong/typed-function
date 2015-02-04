@@ -272,24 +272,31 @@
   /**
    * Return a string representation of this params types, like 'string' or
    * 'number | boolean' or '...number'
+   * @param {boolean} [toConversion]   If true, the returned types string
+   *                                   contains the types where the parameter
+   *                                   will convert to. If false (default)
+   *                                   the "from" types are returned
    * @returns {string}
    */
-  Param.prototype.toString = function () {
-    return (this.varArgs ? '...' : '') + this.types.map(function (type) {
-          return type;
-        }).join('|');
-    // TODO: cleanup
-    //return (this.varArgs ? '...' : '') + this.types.map(function (type, index) {
-    //      var conversion = this.conversions[index];
-    //      return conversion ? conversion.to : type;
-    //    }.bind(this)).join('|');
+  Param.prototype.toString = function (toConversion) {
+    var types = this.types
+        .map(function (type, i) {
+          var conversion = this.conversions[i];
+          return toConversion && conversion ? conversion.to : type;
+        }.bind(this))
+        .filter(function (type, i, types) {
+          return types.indexOf(type) === i;  // dedupe array
+        });
+
+    return (this.varArgs ? '...' : '') + types.join('|');
   };
 
   /**
    * A function signature
-   * @param {string | string[]} params  Array with the type(s) of each parameter,
-   *                                    or a comma separated string with types
-   * @param {function} fn               The actual function
+   * @param {string | string[] | Param[]} params
+   *                         Array with the type(s) of each parameter,
+   *                         or a comma separated string with types
+   * @param {function} fn    The actual function
    * @constructor
    */
   function Signature(params, fn) {
@@ -443,21 +450,40 @@
         }
         else {
           // variable arguments with a fixed type
-          var getTests = function (arg) {
-            return this.param.types
+          var getTests = function (types, arg) {
+            return types
                 .map(function (type) {
                   return refs.add(getTypeTest(type), 'test') + '(' + arg + ')';
                 })
                 .join(' || ');
           }.bind(this);
 
-          code.push(prefix + 'if (' + getTests('arg' + index) + ') { ' + comment);
+          var allTypes = this.param.types;
+          var exactTypes = allTypes.filter(function (type, i) {
+            return this.param.conversions[i] === undefined;
+          }.bind(this));
+          var conversionTypes = allTypes.filter(function (type, i) {
+            return this.param.conversions[i] !== undefined;
+          }.bind(this));
+          console.log('TYPES', allTypes, exactTypes, conversionTypes)
+
+          code.push(prefix + 'if (' + getTests(allTypes, 'arg' + index) + ') { ' + comment);
           code.push(prefix + '  var varArgs = [arg' + index + '];');
           code.push(prefix + '  for (var i = ' + (index + 1) + '; i < arguments.length; i++) {');
-          code.push(prefix + '    if (' + getTests('arguments[i]') + ') {');
+          code.push(prefix + '    if (' + getTests(exactTypes, 'arguments[i]') + ') {');
           code.push(prefix + '      varArgs.push(arguments[i]);');
+          allTypes.forEach(function (type, i) {
+            var conversion = this.param.conversions[i];
+            if (conversion) {
+              var test = refs.add(getTypeTest(type), 'test');
+              var convert = refs.add(conversion.convert, 'convert');
+              code.push(prefix + '    }');
+              code.push(prefix + '    else if (' + test + '(arguments[i])) {');
+              code.push(prefix + '      varArgs.push(' + convert + '(arguments[i]));');
+            }
+          }.bind(this));
           code.push(prefix + '    } else {');
-          code.push(prefix + '      throw createError(\'\', arguments, i, \'' + this.param.types.join(',') + '\');');
+          code.push(prefix + '      throw createError(\'\', arguments, i, \'' + allTypes.join(',') + '\');');
           code.push(prefix + '    }');
           code.push(prefix + '  }');
           code.push(this.signature.toCode(refs, prefix + '  '));
@@ -558,7 +584,7 @@
       var fn = rawSignatures[types];
       var signature = new Signature(types, fn);
 
-      return signatures.concat(signature.expand());
+      return signatures.concat(signature.expand()); // TODO: this should be redundant: can be done by splitParams?
     }, []);
   }
 
@@ -591,7 +617,6 @@
         var exists = params.some(function (param) {
           return contains(param.types, conversion.from);
         });
-        console.log('CONVERSION', conversion.from, 'to', conversion.to, exists)
 
         if (!exists) {
           addConversion(params, conversion);
@@ -654,73 +679,6 @@
   }
 
   /**
-   * Expand given signatures with possible conversions
-   * @param {Signature[]} signatures
-   * @return {Signature[]} Returns expanded signatures
-   */
-  function expandConversions(signatures) {
-    // TODO: simplify this function or split it in multiple functions
-    var expanded = [];
-
-    var conversions = filterConversions(signatures);
-
-    console.log('SIGNATURES', signatures.map(function (s) {return s.toString()}))
-
-    console.log('CONVERSIONS', conversions)
-
-    // TODO: deduplicate params on current argument index
-
-    var sig = {};
-
-    function recurse(signature, path) {
-      var index = path.length;
-
-      if (path.length < signature.params.length) {
-        var param = signature.params[path.length];
-
-        if (signature.varArgs) {
-          // a variable argument. do not split the types in the parameter
-          var newParam = param.clone();
-          newParam.conversions = new Array(newParam.types.length);
-          conversions[index].forEach(function (conversion) {
-            newParam.types.push(conversion.from);
-            newParam.conversions.push(conversion);
-          });
-
-          recurse(signature, path.concat(newParam));
-        }
-        else {
-          // recurse for every parameter type
-          param.types.forEach(function (type) {
-            recurse(signature, path.concat(new Param(type)));
-          });
-
-          // create a new path for every conversion
-          conversions[index].forEach(function (conversion) {
-            var newParam = new Param([conversion.from]);
-            newParam.conversions = [conversion];
-            recurse(signature, path.concat(newParam));
-          })
-        }
-      }
-      else {
-        expanded.push(new Signature(path, signature.fn));
-        //var s = new Signature(path, signature.fn);
-        //if (!sig[s]) { // FIXME: This checking should be redundant
-        //  sig[s] = s;
-        //  expanded.push(s);
-        //}
-      }
-    }
-
-    signatures.forEach(function (signature) {
-      recurse(signature, []);
-    });
-
-    return expanded;
-  }
-
-  /**
    * create a map with normalized signatures as key and the function as value
    * @param {Signature[]} signatures   An array with split signatures
    * @return {Object} Returns a map with normalized signatures
@@ -747,8 +705,6 @@
   function parseTree(signatures, params, path) {
     var index = path.length;
 
-    // TODO: create new signature in case of conversions
-    var signature = signatures[path.join(',')] || null;
     var params_i = params[index];
     var childs = (params_i || []).reduce(function (childs, param) {
       var child = parseTree(signatures, params, path.concat(param));
@@ -758,128 +714,21 @@
       return childs;
     }, []);
 
-    console.log('parseTree', path.join(', '), signature ? 'YES!' : 'no', signature instanceof Signature, childs.length);
+    //console.log('parseTree', path.join(', '), signature ? 'YES!' : 'no', signature instanceof Signature, childs.length);
+
+    var toPath = path.map(function (param) {
+      return param.toString(true);
+    });
+    console.log('TO PATH', toPath)
+    var signature = signatures[toPath.join(',')] || null;
 
     if (signature !== null || childs.length > 0) {
-      return new Node(path, signature, childs);
+      return new Node(path, signature && new Signature(path, signature.fn), childs);
     }
     else {
       return null;
     }
   }
-
-  //function parseTree__(signatures, path) {
-  //  var index = path.length;
-  //
-  //  console.log('index:', index);
-  //  console.log('  signatures:', signatures.join('; '));
-  //
-  //  // filter the signatures with the correct number of params
-  //  var withFn = signatures.filter(function (signature) {
-  //    return signature.params.length === index;
-  //  });
-  //  var signature = withFn.shift();
-  //  if (withFn.length > 0) {
-  //    throw new Error('Signature "' + signature.params + '" defined multiple times');
-  //  }
-  //
-  //  // recurse over the signatures, create entries for each parameter
-  //  var entries1 = signatures
-  //      // filter signatures having a parameter defined at current index
-  //      .filter(function (signature) {
-  //        return signature.params[index] != undefined;
-  //      })
-  //
-  //      // order the parameters (*, Object, any)
-  //      .sort(function (a, b) {
-  //        return compareParams(a.params[index], b.params[index]);
-  //      })
-  //
-  //      // group signatures with the same param at current index
-  //      .reduce(function (entries, signature) {
-  //        var existing = entries.filter(function (entry) {
-  //          return entry.param.equalTypes(signature.params[index])
-  //        })[0];
-  //
-  //        if (existing) {
-  //          existing.signatures.push(signature);
-  //        }
-  //        else {
-  //          entries.push({
-  //            param: signature.params[index],
-  //            signatures: [signature]
-  //          });
-  //        }
-  //
-  //        return entries;
-  //      }, []);
-  //
-  //  // get all defined types
-  //  var types = entries1.reduce(function (types, entry) {
-  //    return types.concat(entry.param.types);
-  //  }, []);
-  //
-  //  // filter the relevant conversions
-  //  var conversions = typed.conversions.reduce(function (all, conversion) {
-  //    if (contains(types, conversion.to) && !contains(types, conversion.from)) {
-  //      types.push(conversion.from);
-  //      all.push(conversion);
-  //    }
-  //    return all;
-  //  }, []);
-  //
-  //  // create entries for conversions at current index
-  //  var entries2 = conversions
-  //      .reduce(function (entries, conversion) {
-  //        var param = new Param([conversion.from]);
-  //        param.conversions = [conversion];
-  //
-  //        var match = signatures.filter(function (signature) {
-  //          return signature.params[index].types[0] === conversion.to;
-  //        })[0];
-  //
-  //        if (match) {
-  //          var signature = match.clone();
-  //          signature.params[index] = param; // replace with the convert parameter
-  //          var newEntry = {
-  //            param: param,
-  //            signatures: [signature]
-  //          };
-  //
-  //          var entry = entries.filter(function (entry) {
-  //            return contains(entry.param.types, conversion.from);
-  //          })[0];
-  //          if (entry) {
-  //            // already exists
-  //
-  //          }
-  //          else {
-  //
-  //          }
-  //
-  //        }
-  //
-  //        return entries;
-  //      }, entries1);
-  //
-  //  //console.log('ENTRIES', JSON.stringify(entries1.concat(entries2)))
-  //  console.log('  entries:', entries1.concat(entries2).map(function (entry) {
-  //    return '<' + entry.param.toString() + ' :: ' + entry.signatures.join('; ') + '>';
-  //  }));
-  //
-  //  // create a Node tree for every child
-  //  var childs = entries1
-  //      .concat(entries2)
-  //      .map(function (entry) {
-  //        return parseTree(entry.signatures, path.concat(entry.param));
-  //      });
-  //
-  //  console.log('index:', index, 'end');
-  //  console.log('  signature:', signature && signature.toString())
-  //  console.log('  childs:', childs.map(function (child) {return child.param.toString()}))
-  //
-  //  return new Node(path, signature, childs);
-  //}
 
   /**
    * Generate an array like ['arg0', 'arg1', 'arg2']
@@ -922,18 +771,17 @@
 
     var params = splitParams(_signatures);
 
-    //console.log('PARAMS', JSON.stringify(params))
     console.log('PARAMS', params.map(function (params_i) {
-      return params_i.map(function (param) {return param.toString() + (param.hasConversions() ? (' (to ' + param.conversions + ')') :'')});
-    }))
+      return params_i.map(function (param) {
+        return param.toString() +
+          (param.hasConversions() ? (' (to ' + JSON.stringify(param.conversions) + ')') :'')
+      });
+    }));
 
+    // change from an array to a map
     var _signaturesMap = mapSignatures(_signatures);
 
-
-    console.log('MAP', Object.keys(_signaturesMap))
-
     // parse signatures into a node tree
-    //var node = parseTree(_signatures, []);
     var node = parseTree(_signaturesMap, params, []);
 
     //var util = require('util');

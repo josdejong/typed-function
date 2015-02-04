@@ -142,7 +142,7 @@ describe('conversion', function () {
     strictEqualArray(fn('str', true, false), ['str', 1, 0]);
     strictEqualArray(fn('str', 2, false), ['str', 2, 0]);
 
-    assert.throws(function () {fn(new Date(), '2')}, /TypeError: Unexpected type of argument \(expected: string or number, actual: Date, index: 0\)/)
+    assert.throws(function () {fn(new Date(), '2')}, /TypeError: Unexpected type of argument \(expected: string or number or boolean, actual: Date, index: 0\)/)
   });
 
   it('should add non-conflicting conversions to a function with one argument', function() {
