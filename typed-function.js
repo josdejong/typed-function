@@ -193,8 +193,11 @@
     // parse the types, can be a string with types separated by pipe characters |
     if (typeof types === 'string') {
       // parse variable arguments operator (ellipses '...number')
-      var _varArgs = (types.substring(0, 3) === '...');
-      var _types = _varArgs ? types.substr(3) : types;
+      var _types = types.trim();
+      var _varArgs = _types.substr(0, 3) === '...';
+      if (_varArgs) {
+        _types = _types.substr(3);
+      }
       if (_types === '') {
         this.types = ['any'];
       }
@@ -356,17 +359,43 @@
   Signature.prototype.expand = function () {
     var signatures = [];
 
+    console.log('EXPAND', this.params.map(function(param) {
+      return param.types;
+    }));
+
     function recurse(signature, path) {
       if (path.length < signature.params.length) {
         var param = signature.params[path.length];
-        if (signature.varArgs) {
+        if (param.varArgs) {
           // a variable argument. do not split the types in the parameter
-          recurse(signature, path.concat(param));
+          var newParam = param.clone();
+
+          // add conversions to the parameter
+          // recurse for all conversions
+          typed.conversions.forEach(function (conversion) {
+            if (!contains(param.types, conversion.from) && contains(param.types, conversion.to)) {
+              var i = newParam.types.length;
+              newParam.types[i] = conversion.from;
+              newParam.conversions[i] = conversion;
+              recurse(signature, path.concat(newParam));
+            }
+          });
+
+          recurse(signature, path.concat(newParam));
         }
         else {
           // split each type in the parameter
           param.types.forEach(function (type) {
-            recurse(signature, path.concat(new Param(type, param.varArgs)));
+            recurse(signature, path.concat(new Param(type)));
+          });
+
+          // recurse for all conversions
+          typed.conversions.forEach(function (conversion) {
+            if (!contains(param.types, conversion.from) && contains(param.types, conversion.to)) {
+              var newParam = new Param(conversion.from);
+              newParam.conversions[0] = conversion;
+              recurse(signature, path.concat(newParam));
+            }
           });
         }
       }
@@ -376,9 +405,18 @@
     }
     recurse(this, []);
 
-    // TODO: also expand conversions
-
     return signatures;
+  };
+
+  /**
+   * Test whether any of the signatures parameters has conversions
+   * @return {boolean} Returns true when any of the parameters contains
+   *                   conversions.
+   */
+  Signature.prototype.hasConversions = function () {
+    return this.params.some(function (param) {
+      return param.hasConversions();
+    });
   };
 
   /**
@@ -582,121 +620,54 @@
   };
 
   /**
-   * Split all raw signatures into an array with (split) Signatures
+   * Split all raw signatures into an array with expanded Signatures
    * @param {Object.<string, function>} rawSignatures
-   * @return {Signature[]} Returns an array with split signatures
+   * @return {Signature[]} Returns an array with expanded signatures
    */
-  function parseSignatures(rawSignatures) {
-    return Object.keys(rawSignatures).reduce(function (signatures, types) {
-      var fn = rawSignatures[types];
-      var signature = new Signature(types, fn);
+  function parseSignatures(rawSignatures) { // TODO: cleanup
+    var map = Object.keys(rawSignatures)
+        .reduce(function (signatures, types, i) {
+          var fn = rawSignatures[types];
+          var signature = new Signature(types, fn);
 
-      return signatures.concat(signature.expand()); // TODO: this should be redundant: can be done by splitParams?
-    }, []);
-  }
-
-  /**
-   * Split parameters per argument index, and add conversions
-   * @param {Signature[]} signatures
-   * @returns {Array.<Array.<Param>>}
-   *            Returns an array with parameters grouped per argument index
-   */
-  function splitParams(signatures) {
-    var all = [];
-
-    signatures.forEach((function (signature) {
-      signature.params.forEach(function(param, index) {
-        var params = all[index] || (all[index] = []);
-        if (param.varArgs) {
-          addParam(params, param.clone());
-        }
-        else {
-          param.types.forEach(function (type) {
-            addParam(params, new Param(type));
+          signature.expand().forEach(function (signature) {
+            var key = signature.toString();
+            // TODO: create a function Signature.conversionIndex(), and choose the signature with the lowest index value
+            if (signatures[key] === undefined || (signatures[key].hasConversions() && !signature.hasConversions())) {
+              signatures[key] = signature;
+            }
+            else {
+              if (!signature.hasConversions()) {
+                throw new Error('Signature "' + key + '" is defined twice');
+              }
+            }
           });
-        }
-      });
-    }));
 
-    all.forEach(function (params) {
-      // filter the relevant conversions for argument i, and add new params for them
-      typed.conversions.forEach(function (conversion) {
-        var exists = params.some(function (param) {
-          return contains(param.types, conversion.from);
-        });
+          return signatures;
+        }, {});
 
-        if (!exists) {
-          addConversion(params, conversion);
-        }
-      });
-
-      // order the parameters (*, Object, any)
-      params.sort(compareParams);
-    });
-
-    return all;
-  }
-
-  /**
-   * Helper function to add a new entry to an array with parameters.
-   * Tests for conflicts. Used by function splitParams.
-   * @param {Array.<Param>} params
-   * @param {Param} param
-   */
-  function addParam (params, param) {
-    var existing = params.filter(function (p) {
-      return p.conflictingTypes(param);
-    })[0];
-
-    if (existing) {
-      if (existing.varArgs) {
-        throw new Error('Conflicting types "' + param + '" and "' + existing + '"');
-      }
-      // else: nothing to do
-    } else {
-      params.push(param);
-    }
-  }
-
-  /**
-   * Helper function to add a new entry to an array with parameters.
-   * Tests for conflicts. Used by function splitParams.
-   * @param {Array.<Param>} params
-   * @param {{from: string, to: string, convert: function}} conversion
-   */
-  function addConversion(params, conversion) {
-    var existing = params.filter(function (param) {
-      return contains(param.types, conversion.to) && !param.hasConversions();
-    })[0];
-    console.log('MATCH', existing && existing.toString())
-
-    if (existing) {
-      if (existing.varArgs) {
-        var index = existing.types.length;
-        existing.types[index] = conversion.from;
-        existing.conversions[index] = conversion;
-      }
-      else {
-        var newParam = new Param(conversion.from);
-        newParam.conversions[0] = conversion;
-        console.log('add new param', newParam.toString())
-        params.push(newParam);
-      }
-    }
+    return Object.keys(map).map(function (key) {
+      return map[key];
+    }, []);
   }
 
   /**
    * create a map with normalized signatures as key and the function as value
    * @param {Signature[]} signatures   An array with split signatures
-   * @return {Object} Returns a map with normalized signatures
+   * @return {Object.<string, function>} Returns a map with normalized
+   *                                     signatures as key, and the function
+   *                                     as value.
    */
   function mapSignatures(signatures) {
-    return signatures.reduce(function (normalized, entry) {
-      var signature = entry.params.join(',');
+    return signatures.reduce(function (normalized, signature) {
+      var params = signature.params.join(',');
+      // TODO: remove this error (is already dealt with by parseSignatures?)
       if (normalized[signature]) {
         throw new Error('Signature "' + signature + '" is defined twice');
       }
-      normalized[signature] = entry;
+      if (signature.fn) {
+        normalized[params] = signature.fn;
+      }
       return normalized;
     }, {});
   }
@@ -740,21 +711,16 @@
   /**
    * Parse signatures recursively in a node tree.
    * @param {Signature[]} signatures  Array with expanded signatures
-   * @param {Param[]} path            Traversed path
+   * @param {Param[]} path            Traversed path of parameter types
    * @return {Node}                   Returns a node tree
    */
   function parseTree(signatures, path) {
     var index = path.length;
 
     // filter the signatures with the correct number of params
-    var withFn = signatures.filter(function (signature) {
+    var signature = signatures.filter(function (signature) {
       return signature.params.length === index;
-    });
-    var signature = withFn.shift();
-    // TODO: is this error reachable? If not, clean up
-    //if (withFn.length > 0) {
-    //  throw new Error('Signature "' + signature.params + '" defined multiple times');
-    //}
+    })[0]; // there can be only one signature
 
     // recurse over the signatures
     var childs = signatures
@@ -772,12 +738,10 @@
           })[0];
 
           if (existing) {
-            if (param.varArgs) {
-              throw new Error('Conflicting types "' + param + '" and "' + existing.param + '"');
+            if (existing.param.varArgs) {
+              throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
             }
-            else {
-              existing.signatures.push(signature);
-            }
+            existing.signatures.push(signature);
           }
           else {
             entries.push({
@@ -789,7 +753,7 @@
           return entries;
         }, [])
         .map(function (entry) {
-          console.log('ENTRY', entry.param.toString(), entry.signatures.join(';'))
+          console.log('ENTRY', entry.param.toString(), entry.signatures.join(';'));
           return parseTree(entry.signatures, path.concat(entry.param))
         });
 
@@ -844,8 +808,6 @@
     //  });
     //}));
 
-    // change from an array to a map
-    var _signaturesMap = mapSignatures(_signatures);
 
     // parse signatures into a node tree
     var node = parseTree(_signatures, []);
@@ -876,13 +838,7 @@
     console.log('FN\n' + fn.toString()); // TODO: cleanup
 
     // attach the signatures with sub-functions to the constructed function
-    fn.signatures = {}; // hash map with signatures
-    for (var prop in _signaturesMap) {
-      if (_signaturesMap.hasOwnProperty(prop)) {
-        fn.signatures[prop] = _signaturesMap[prop].fn;
-      }
-    }
-    // TODO: also add converted signatures to the map?
+    fn.signatures = mapSignatures(_signatures);
 
     return fn;
   }
@@ -934,25 +890,6 @@
    */
   function contains(array, entry) {
     return array.indexOf(entry) !== -1;
-  }
-
-  /**
-   * Transpose a two dimensional matrix. Supports unbalanced matrices.
-   * For example [[1,2],[3,4,5]] returns [[1,3],[2,4],[5]]
-   * @param {Array}array
-   * @returns {Array} Returns the transposed array
-   */
-  // TODO: cleanup, not used
-  function transpose(array) {
-    var res = [];
-    for (var r = 0; r < array.length; r++) {
-      var row = array[r];
-      for (var c = 0; c < row.length; c++) {
-        var entry = row[c];
-        res[c] ? res[c].push(entry) : res[c] = [entry];
-      }
-    }
-    return res;
   }
 
   // configuration
@@ -1012,7 +949,7 @@
         for (var signature in fn.signatures) {
           if (fn.signatures.hasOwnProperty(signature)) {
             if (signatures.hasOwnProperty(signature)) {
-              err = new Error('Conflicting signatures: "' + signature + '" is defined twice.');
+              err = new Error('Signature "' + signature + '" is defined twice');
               err.data = {signature: signature};
               throw err;
             }

@@ -36,7 +36,7 @@ describe('merge', function () {
 
     assert.throws(function () {
       typed(typed1, typed2)
-    }, /Error: Conflicting signatures: "boolean" is defined twice/);
+    }, /Error: Signature "boolean" is defined twice/);
   });
 
   it('should throw an error in case of conflicting names when merging', function () {
