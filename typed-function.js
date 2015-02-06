@@ -22,25 +22,6 @@
   'use strict';
 
   /**
-   * Merge multiple objects.
-   * Expects one or more Objects as input arguments
-   */
-  function merge () {
-    var obj = {};
-
-    for (var i = 0; i < arguments.length; i++) {
-      var o = arguments[i];
-      for (var prop in o) {
-        if (o.hasOwnProperty(prop)) {
-          obj[prop] = o[prop];
-        }
-      }
-    }
-
-    return obj;
-  }
-
-  /**
    * Get a type test function for a specific data type
    * @param {string} type                   A data type like 'number' or 'string'
    * @returns {function(obj: *) : boolean}  Returns a type testing function.
@@ -213,27 +194,6 @@
   }
 
   /**
-   * Test whether this parameters types equal an other parameters types.
-   * Does not take into account varArgs.
-   * @param {Param} other
-   * @return {boolean} Returns true when the types are equal.
-   */
-  Param.prototype.equalTypes = function (other) {
-    return this.types.sort().join() == other.types.sort().join();
-  };
-
-  /**
-   * Test whether this parameters equal an other parameters types.
-   * Does take into account varArgs.
-   * @param {Param} other
-   * @return {boolean} Returns true when both params are equal.
-   */
-  Param.prototype.equals = function (other) {
-    return this.varArgs === other.varArgs &&
-        this.types.sort().join() == other.types.sort().join();
-  };
-
-  /**
    * Order Params
    * any type ('any') will be ordered last, and object as second last (as other
    * types may be an object as well, like Array).
@@ -248,9 +208,6 @@
 
     if (contains(a.types, 'Object')) return 1;
     if (contains(b.types, 'Object')) return -1;
-
-    //if (a.hasConversions()) return 1;
-    //if (b.hasConversions()) return -1;
 
     if (a.hasConversions()) {
       if (b.hasConversions()) {
@@ -272,11 +229,6 @@
       }
     }
 
-    // TODO: use or cleanup?
-    //var as = a.types.sort().join(',');
-    //var bs = b.types.sort().join(',');
-    //
-    //return as > bs ? 1 : as < bs ? -1 : 0;
     return 0;
   };
 
@@ -524,6 +476,7 @@
    * @returns {string} Returns the code as string
    */
   Node.prototype.toCode = function (refs, prefix) {
+    // TODO: split this function in multiple functions, it's too large
     var code = [];
 
     if (this.param) {
@@ -677,7 +630,7 @@
    * @param {Object.<string, function>} rawSignatures
    * @return {Signature[]} Returns an array with expanded signatures
    */
-  function parseSignatures(rawSignatures) { // TODO: cleanup
+  function parseSignatures(rawSignatures) {
     var map = Object.keys(rawSignatures)
         .reduce(function (signatures, types, i) {
           var fn = rawSignatures[types];
@@ -710,6 +663,7 @@
     });
 
     // filter redundant conversions from signatures with varArgs
+    // TODO: simplify this loop or move it to a separate function
     arr.forEach(function (signature) {
       if (signature.varArgs) {
         var index = signature.params.length - 1;
@@ -751,10 +705,6 @@
   function mapSignatures(signatures) {
     return signatures.reduce(function (normalized, signature) {
       var params = signature.params.join(',');
-      // TODO: remove this error (is already dealt with by parseSignatures?)
-      if (normalized[signature]) {
-        throw new Error('Signature "' + signature + '" is defined twice');
-      }
       if (signature.fn) {
         normalized[params] = signature.fn;
       }
@@ -1027,4 +977,3 @@
 
   return typed;
 }));
-
