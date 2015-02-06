@@ -22,24 +22,6 @@
   'use strict';
 
   /**
-   * Order Params
-   * any type ('any') will be ordered last, and object as second last (as other types
-   * may be an object as well, like Array)
-   * @param {Param} a
-   * @param {Param} b
-   * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
-   */
-  function compareParams(a, b) {
-    if (a.anyType) return 1;
-    if (a.anyType) return -1;
-
-    if (contains(a.types, 'Object')) return 1;
-    if (contains(b.types, 'Object')) return -1;
-
-    return 0;
-  }
-
-  /**
    * Merge multiple objects.
    * Expects one or more Objects as input arguments
    */
@@ -252,6 +234,53 @@
   };
 
   /**
+   * Order Params
+   * any type ('any') will be ordered last, and object as second last (as other
+   * types may be an object as well, like Array).
+   *
+   * @param {Param} a
+   * @param {Param} b
+   * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
+   */
+  Param.compare = function (a, b) {
+    if (a.anyType) return 1;
+    if (a.anyType) return -1;
+
+    if (contains(a.types, 'Object')) return 1;
+    if (contains(b.types, 'Object')) return -1;
+
+    //if (a.hasConversions()) return 1;
+    //if (b.hasConversions()) return -1;
+
+    if (a.hasConversions()) {
+      if (b.hasConversions()) {
+        var ac = a.conversions.filter(function (conversion) {
+          return conversion !== undefined;
+        })[0];
+        var bc = b.conversions.filter(function (conversion) {
+          return conversion !== undefined;
+        })[0];
+        return typed.conversions.indexOf(ac) - typed.conversions.indexOf(bc);
+      }
+      else {
+        return 1;
+      }
+    }
+    else {
+      if (b.hasConversions()) {
+        return -1;
+      }
+    }
+
+    // TODO: use or cleanup?
+    //var as = a.types.sort().join(',');
+    //var bs = b.types.sort().join(',');
+    //
+    //return as > bs ? 1 : as < bs ? -1 : 0;
+    return 0;
+  };
+
+  /**
    * Test whether this parameters types overlap an other parameters types.
    * @param {Param} other
    * @return {boolean} Returns true when there are conflicting types
@@ -359,10 +388,6 @@
   Signature.prototype.expand = function () {
     var signatures = [];
 
-    console.log('EXPAND', this.params.map(function(param) {
-      return param.types;
-    }));
-
     function recurse(signature, path) {
       if (path.length < signature.params.length) {
         var param = signature.params[path.length];
@@ -377,7 +402,6 @@
               var i = newParam.types.length;
               newParam.types[i] = conversion.from;
               newParam.conversions[i] = conversion;
-              recurse(signature, path.concat(newParam));
             }
           });
 
@@ -406,6 +430,30 @@
     recurse(this, []);
 
     return signatures;
+  };
+
+  /**
+   * Compare two signatures.
+   *
+   * When two params are equal and contain conversions, they will be sorted
+   * by lowest index of the first conversions.
+   *
+   * @param {Signature} a
+   * @param {Signature} b
+   * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
+   */
+  Signature.compare = function (a, b) {
+    if (a.params.length > b.params.length) return 1;
+    if (a.params.length < b.params.length) return -1;
+
+    for (var i = 0; i < a.params.length; i++) {
+      var cmp = Param.compare(a.params[i], b.params[i]);
+      if (cmp !== 0) {
+        return cmp;
+      }
+    }
+
+    return 0;
   };
 
   /**
@@ -611,8 +659,13 @@
     else {
       var arg = 'arg' + index;
       var types = this.childs.reduce(function (types, node) {
-        // TODO: filter non-converted types
-        return node.param ? types.concat(node.param.types) : types;
+        node.param && node.param.types.forEach(function (type) {
+          if (types.indexOf(type) === -1) {
+            types.push(type);
+          }
+        });
+
+        return types;
       }, []);
 
       return prefix + 'throw createError(\'\', arguments, ' + index + ', \'' + types.join(',') + '\');';
@@ -632,23 +685,60 @@
 
           signature.expand().forEach(function (signature) {
             var key = signature.toString();
-            // TODO: create a function Signature.conversionIndex(), and choose the signature with the lowest index value
-            if (signatures[key] === undefined || (signatures[key].hasConversions() && !signature.hasConversions())) {
+            if (signatures[key] === undefined) {
               signatures[key] = signature;
             }
             else {
-              if (!signature.hasConversions()) {
+              var cmp = Signature.compare(signature, signatures[key]);
+              if (cmp < 0) {
+                // override if sorted first
+                signatures[key] = signature;
+              }
+              else if (cmp === 0) {
                 throw new Error('Signature "' + key + '" is defined twice');
               }
+              // else: just ignore
             }
           });
 
           return signatures;
         }, {});
 
-    return Object.keys(map).map(function (key) {
-      return map[key];
-    }, []);
+    // convert from map to array
+    var arr = Object.keys(map).map(function (types) {
+      return map[types];
+    });
+
+    // filter redundant conversions from signatures with varArgs
+    arr.forEach(function (signature) {
+      if (signature.varArgs) {
+        var index = signature.params.length - 1;
+        var param = signature.params[index];
+
+        var t = 0;
+        while (t < param.types.length) {
+          if (param.conversions[t]) {
+            var type = param.types[t];
+            var exists = arr.some(function (other) {
+              var p = other.params[index];
+
+              return other !== signature && p &&
+                  contains(p.types, type) &&   // FIXME: mutable variable warning
+                  !p.conversions[index];
+            });
+
+            if (exists) {
+              param.types.splice(t, 1);
+              param.conversions.splice(t, 1);
+              t--;
+            }
+          }
+          t++;
+        }
+      }
+    });
+
+    return arr;
   }
 
   /**
@@ -674,42 +764,6 @@
 
   /**
    * Parse signatures recursively in a node tree.
-   * @param {Object.<string,Signature>} signatures  Hash map with signatures
-   * @param {Array.<Array.<Param>>} params
-   *                            Expanded parameters per argument
-   * @param {Param[]} path      Path with parameters to this node
-   * @return {Node}             Returns a node tree
-   */
-  function parseTree_(signatures, params, path) { // TOOD: cleanup
-    var index = path.length;
-
-    var params_i = params[index];
-    var childs = (params_i || []).reduce(function (childs, param) {
-      var child = parseTree(signatures, params, path.concat(param));
-      if (child !== null) {
-        childs.push(child);
-      }
-      return childs;
-    }, []);
-
-    //console.log('parseTree', path.join(', '), signature ? 'YES!' : 'no', signature instanceof Signature, childs.length);
-
-    var toPath = path.map(function (param) {
-      return param.toString(true);
-    });
-    console.log('TO PATH', toPath)
-    var signature = signatures[toPath.join(',')] || null;
-
-    if (signature !== null || childs.length > 0) {
-      return new Node(path, signature && new Signature(path, signature.fn), childs);
-    }
-    else {
-      return null;
-    }
-  }
-
-  /**
-   * Parse signatures recursively in a node tree.
    * @param {Signature[]} signatures  Array with expanded signatures
    * @param {Param[]} path            Traversed path of parameter types
    * @return {Node}                   Returns a node tree
@@ -728,7 +782,7 @@
           return signature.params[index] != undefined;
         })
         .sort(function (a, b) {
-          return compareParams(a.params[index], b.params[index]);
+          return Param.compare(a.params[index], b.params[index]);
         })
         .reduce(function (entries, signature) {
           // group signatures with the same param at current index
@@ -753,7 +807,6 @@
           return entries;
         }, [])
         .map(function (entry) {
-          console.log('ENTRY', entry.param.toString(), entry.signatures.join(';'));
           return parseTree(entry.signatures, path.concat(entry.param))
         });
 
@@ -797,18 +850,6 @@
       throw new Error('No signatures provided'); // TODO: is this error needed?
     }
 
-    console.log('EXPANDED SIGNATURES', _signatures.map(function (s) {return s.toString()}))
-
-    //var params = splitParams(_signatures);
-    //
-    //console.log('PARAMS', params.map(function (params_i) {
-    //  return params_i.map(function (param) {
-    //    return param.toString() +
-    //      (param.hasConversions() ? (' (to ' + JSON.stringify(param.conversions) + ')') :'')
-    //  });
-    //}));
-
-
     // parse signatures into a node tree
     var node = parseTree(_signatures, []);
 
@@ -835,7 +876,7 @@
     // evaluate the JavaScript code and attach function references
     var fn = eval(factory)(refs);
 
-    console.log('FN\n' + fn.toString()); // TODO: cleanup
+    //console.log('FN\n' + fn.toString()); // TODO: cleanup
 
     // attach the signatures with sub-functions to the constructed function
     fn.signatures = mapSignatures(_signatures);

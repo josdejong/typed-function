@@ -156,12 +156,12 @@ describe('conversion', function () {
     });
 
     // booleans should be converted to number
-    assert.equal(fn(false), 0);
-    assert.equal(fn(true), 1);
+    assert.strictEqual(fn(false), 0);
+    assert.strictEqual(fn(true), 1);
 
     // numbers and strings should be left as is
-    assert.equal(fn(2), 2);
-    assert.equal(fn('foo'), 'foo');
+    assert.strictEqual(fn(2), 2);
+    assert.strictEqual(fn('foo'), 'foo');
   });
 
   it('should add non-conflicting conversions to a function with one argument', function() {
