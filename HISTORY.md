@@ -1,5 +1,11 @@
 # History
 
+## not yet released, version 0.7.0
+
+- Large code refactoring.
+- Fixed bugs related to any type parameters.
+
+
 ## 2015-01-16, version 0.6.0
 
 - Removed the configuration option `minify`

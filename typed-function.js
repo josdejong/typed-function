@@ -473,9 +473,10 @@
    * Generate code for this group of signatures
    * @param {Refs} refs
    * @param {string} prefix
+   * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
    * @returns {string} Returns the code as string
    */
-  Node.prototype.toCode = function (refs, prefix) {
+  Node.prototype.toCode = function (refs, prefix, anyType) {
     // TODO: split this function in multiple functions, it's too large
     var code = [];
 
@@ -540,7 +541,7 @@
         if (this.param.anyType) {
           // any type
           code.push(prefix + '// type: any');
-          code.push(this._innerCode(refs, prefix));
+          code.push(this._innerCode(refs, prefix, anyType));
         }
         else {
           // regular type
@@ -548,14 +549,14 @@
           var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
 
           code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
-          code.push(this._innerCode(refs, prefix + '  '));
+          code.push(this._innerCode(refs, prefix + '  ', anyType));
           code.push(prefix + '}');
         }
       }
     }
     else {
       // root node (path is empty)
-      code.push(this._innerCode(refs, prefix));
+      code.push(this._innerCode(refs, prefix, anyType));
     }
 
     return code.join('\n');
@@ -566,10 +567,11 @@
    * This is a helper function of Node.prototype.toCode
    * @param {Refs} refs
    * @param {string} prefix
+   * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
    * @returns {string} Returns the inner code as string
    * @private
    */
-  Node.prototype._innerCode = function(refs, prefix) {
+  Node.prototype._innerCode = function(refs, prefix, anyType) {
     var code = [];
 
     if (this.signature) {
@@ -578,9 +580,17 @@
       code.push(prefix + '}');
     }
 
+    var nextAnyType = this.childs.filter(function (child) {
+      return child.param.anyType;
+    })[0];
+
     this.childs.forEach(function (child) {
-      code.push(child.toCode(refs, prefix));
+      code.push(child.toCode(refs, prefix, nextAnyType));
     });
+
+    if (anyType && !this.param.anyType) {
+      code.push(anyType.toCode(refs, prefix, nextAnyType));
+    }
 
     var exceptions = this._exceptions(refs, prefix);
     if (exceptions) {
@@ -610,7 +620,6 @@
       ].join('\n');
     }
     else {
-      var arg = 'arg' + index;
       var types = this.childs.reduce(function (types, node) {
         node.param && node.param.types.forEach(function (type) {
           if (types.indexOf(type) === -1) {
@@ -632,7 +641,7 @@
    */
   function parseSignatures(rawSignatures) {
     var map = Object.keys(rawSignatures)
-        .reduce(function (signatures, types, i) {
+        .reduce(function (signatures, types) {
           var fn = rawSignatures[types];
           var signature = new Signature(types, fn);
 
@@ -749,7 +758,7 @@
           }
           else {
             entries.push({
-              param: signature.params[index],
+              param: param,
               signatures: [signature]
             });
           }
@@ -797,7 +806,7 @@
     // parse signatures, expand them
     var _signatures = parseSignatures(signatures);
     if (_signatures.length == 0) {
-      throw new Error('No signatures provided'); // TODO: is this error needed?
+      throw new Error('No signatures provided');
     }
 
     // parse signatures into a node tree
@@ -866,10 +875,12 @@
    */
   function getTypeOf(x) {
     for (var type in types) {
-      if (types.hasOwnProperty(type)) {
+      if (types.hasOwnProperty(type) && type !== 'Object') {
+        // Array and Date are also Object, so test for Object afterwards
         if (types[type](x)) return type;
       }
     }
+    if (types['Object'](x)) return type;
     return 'unknown';
   }
 
