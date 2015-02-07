@@ -1,6 +1,6 @@
 # History
 
-## not yet released, version 0.7.0
+## 2015-02-07, version 0.6.1
 
 - Large code refactoring.
 - Fixed bugs related to any type parameters.
