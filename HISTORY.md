@@ -1,6 +1,6 @@
 # History
 
-## not yet released, version 0.6.2
+## 2015-02-26, version 0.6.2
 
 - Fixed a bug sometimes not ordering the handling of any type arguments last.
 - Fixed a bug sometimes not choosing the signature with the lowest number of
