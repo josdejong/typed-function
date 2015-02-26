@@ -235,4 +235,45 @@ describe('conversion', function () {
     assert.equal(fn('{}'), 'any');
   });
 
+  describe ('ordering', function () {
+
+    it('should correctly select the signatures with the least amount of conversions', function () {
+      typed.conversions = [
+        {from: 'number',  to: 'string', convert: function (x) {return x + '';}},
+        {from: 'boolean', to: 'string', convert: function (x) {return x + '';}},
+        {from: 'boolean', to: 'number', convert: function (x) {return +x;}}
+      ];
+
+      var fn = typed({
+        'boolean, boolean': function (a, b) {
+          assert.equal(typeof a, 'boolean');
+          assert.equal(typeof b, 'boolean');
+          return 'booleans';
+        },
+        'number, number': function (a, b) {
+          assert.equal(typeof a, 'number');
+          assert.equal(typeof b, 'number');
+          return 'numbers';
+        },
+        'string, string': function (a, b) {
+          assert.equal(typeof a, 'string');
+          assert.equal(typeof b, 'string');
+          return 'strings';
+        }
+      });
+
+      assert.equal(fn(true, true), 'booleans');
+      assert.equal(fn(2, true), 'numbers');
+      assert.equal(fn(true, 2), 'numbers');
+      assert.equal(fn(2, 2), 'numbers');
+      assert.equal(fn('foo', 'bar'), 'strings');
+      assert.equal(fn('foo', 2), 'strings');
+      assert.equal(fn(2, 'foo'), 'strings');
+      assert.equal(fn(true, 'foo'), 'strings');
+      assert.equal(fn('foo', true), 'strings');
+
+    });
+
+  })
+
 });

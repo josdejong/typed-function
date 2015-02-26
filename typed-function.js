@@ -398,6 +398,18 @@
     if (a.params.length > b.params.length) return 1;
     if (a.params.length < b.params.length) return -1;
 
+    // count the number of conversions
+    var ac = a.params.filter(function (param) {
+      return param.hasConversions();
+    });
+    var bc = b.params.filter(function (param) {
+      return param.hasConversions();
+    });
+
+    if (ac.length > bc.length) return 1;
+    if (ac.length < bc.length) return -1;
+
+    // compare the conversion index per parameter
     for (var i = 0; i < a.params.length; i++) {
       var cmp = Param.compare(a.params[i], b.params[i]);
       if (cmp !== 0) {
