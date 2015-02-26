@@ -204,7 +204,7 @@
    */
   Param.compare = function (a, b) {
     if (a.anyType) return 1;
-    if (a.anyType) return -1;
+    if (b.anyType) return -1;
 
     if (contains(a.types, 'Object')) return 1;
     if (contains(b.types, 'Object')) return -1;

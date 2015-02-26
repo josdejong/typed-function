@@ -218,4 +218,21 @@ describe('conversion', function () {
     assert.equal(fn(2, 4, 5), 'numbers');
   });
 
+  it('should insert conversions when having an any type argument', function() {
+    var fn = typed({
+      'number': function (a) {
+        return 'number';
+      },
+      'any': function (a) {
+        return 'any';
+      }
+    });
+
+    // booleans should be converted to number
+    assert.equal(fn(2), 'number');
+    assert.equal(fn(true), 'number');
+    assert.equal(fn('foo'), 'any');
+    assert.equal(fn('{}'), 'any');
+  });
+
 });
