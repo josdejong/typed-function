@@ -1,5 +1,11 @@
 # History
 
+## 2015-03-08, version 0.6.3
+
+- Fixed generated internal Signature and Param objects not being cleaned up
+  after the typed function has been generated.
+
+
 ## 2015-02-26, version 0.6.2
 
 - Fixed a bug sometimes not ordering the handling of any type arguments last.

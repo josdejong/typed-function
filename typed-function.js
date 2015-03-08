@@ -845,7 +845,7 @@
     ].join('\n');
 
     // evaluate the JavaScript code and attach function references
-    var fn = eval(factory)(refs);
+    var fn = _eval(factory, refs);
 
     //console.log('FN\n' + fn.toString()); // TODO: cleanup
 
@@ -853,6 +853,12 @@
     fn.signatures = mapSignatures(_signatures);
 
     return fn;
+  }
+
+  // call eval in a separate function to prevent the created code being
+  // attached to the functions scope where it was created
+  function _eval(factory, refs) {
+    return eval(factory)(refs);
   }
 
   // data type tests
