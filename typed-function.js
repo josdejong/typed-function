@@ -30,16 +30,18 @@
   function getTypeTest(type) {
     var test = typed.types[type];
     if (!test) {
-      var matches = Object.keys(typed.types)
-          .filter(function (t) {
-            return t.toLowerCase() == type.toLowerCase();
-          })
-          .map(function (t) {
-            return '"' + t + '"';
-          });
+      var hint;
+      for (var name in typed.types) {
+        if (typed.types.hasOwnProperty(name)) {
+          if (name.toLowerCase() == type.toLowerCase()) {
+            hint = name;
+            break;
+          }
+        }
+      }
 
       throw new Error('Unknown type "' + type + '"' +
-          (matches.length ? ('. Did you mean ' + matches.join(', or ') + '?') : ''));
+          (hint ? ('. Did you mean "' + hint + '"?') : ''));
     }
     return test;
   }
@@ -136,12 +138,16 @@
     var path = this.name + '.categories';
     var categories = this.categories;
 
-    Object.keys(categories).forEach(function (cat) {
-      categories[cat].forEach(function (ref, index) {
-        code.push('var ' + cat + index + ' = ' + path + '[\'' + cat + '\'][' + index + '];');
-      });
-    });
-    
+    for (var cat in categories) {
+      if (categories.hasOwnProperty(cat)) {
+        var category = categories[cat];
+
+        for (var i = 0; i < category.length; i++) {
+          code.push('var ' + cat + i + ' = ' + path + '[\'' + cat + '\'][' + i + '];');
+        }
+      }
+    }
+
     return code.join('\n');
   };
 
@@ -165,9 +171,10 @@
         this.types = ['any'];
       }
       else {
-        this.types = _types.split('|').map(function (type) {
-          return type.trim();
-        });
+        this.types = _types.split('|');
+        for (var i = 0; i < this.types.length; i++) {
+          this.types[i] = this.types[i].trim();
+        }
       }
     }
     else if (Array.isArray(types)) {
@@ -188,9 +195,7 @@
     this.varArgs = _varArgs || varArgs || false;
 
     // check for any type arguments
-    this.anyType = this.types.some(function (type) {
-      return type == 'any';
-    });
+    this.anyType = this.types.indexOf('any') !== -1;
   }
 
   /**
@@ -211,12 +216,22 @@
 
     if (a.hasConversions()) {
       if (b.hasConversions()) {
-        var ac = a.conversions.filter(function (conversion) {
-          return conversion !== undefined;
-        })[0];
-        var bc = b.conversions.filter(function (conversion) {
-          return conversion !== undefined;
-        })[0];
+        var i, ac, bc;
+
+        for (i = 0; i < a.conversions.length; i++) {
+          if (a.conversions[i] !== undefined) {
+            ac = a.conversions[i];
+            break;
+          }
+        }
+
+        for (i = 0; i < b.conversions.length; i++) {
+          if (b.conversions[i] !== undefined) {
+            bc = b.conversions[i];
+            break;
+          }
+        }
+
         return typed.conversions.indexOf(ac) - typed.conversions.indexOf(bc);
       }
       else {
@@ -238,9 +253,12 @@
    * @return {boolean} Returns true when there are conflicting types
    */
   Param.prototype.overlapping = function (other) {
-    return this.types.some(function (type) {
-      return contains(other.types, type);
-    });
+    for (var i = 0; i < this.types.length; i++) {
+      if (contains(other.types, this.types[i])) {
+        return true;
+      }
+    }
+    return false;
   };
 
   /**
@@ -272,14 +290,17 @@
    * @returns {string}
    */
   Param.prototype.toString = function (toConversion) {
-    var types = this.types
-        .map(function (type, i) {
-          var conversion = this.conversions[i];
-          return toConversion && conversion ? conversion.to : type;
-        }.bind(this))
-        .filter(function (type, i, types) {
-          return types.indexOf(type) === i;  // dedupe array
-        });
+    var types = [];
+    var keys = {};
+
+    for (var i = 0; i < this.types.length; i++) {
+      var conversion = this.conversions[i];
+      var type = toConversion && conversion ? conversion.to : this.types[i];
+      if (!(type in keys)) {
+        keys[type] = true;
+        types.push(type);
+      }
+    }
 
     return (this.varArgs ? '...' : '') + types.join('|');
   };
@@ -293,32 +314,31 @@
    * @constructor
    */
   function Signature(params, fn) {
+    var _params;
     if (typeof params === 'string') {
-      this.params = (params !== '') ? params.split(',').map(function (types) {
-        return new Param(types);
-      }) : [];
+      _params = (params !== '') ? params.split(',') : [];
     }
     else if (Array.isArray(params)) {
-      this.params = params.map(function (types) {
-        return new Param(types);
-      });
+      _params = params;
     }
     else {
       throw new Error('string or Array expected');
     }
 
-    // check variable arguments operator '...'
-    var withVarArgs = this.params.filter(function (param) {
-      return param.varArgs;
-    });
-    if (withVarArgs.length === 0) {
-      this.varArgs = false;
-    }
-    else if (withVarArgs[0] === this.params[this.params.length - 1]) {
-      this.varArgs = true;
-    }
-    else {
-      throw new SyntaxError('Unexpected variable arguments operator "..."');
+    this.params = new Array(_params.length);
+    for (var i = 0; i < _params.length; i++) {
+      var param = new Param(_params[i]);
+      this.params[i] = param;
+      if (i === _params.length - 1) {
+        // the last argument
+        this.varArgs = param.varArgs;
+      }
+      else {
+        // non-last argument
+        if (param.varArgs) {
+          throw new SyntaxError('Unexpected variable arguments operator "..."');
+        }
+      }
     }
 
     this.fn = fn;
@@ -342,37 +362,41 @@
 
     function recurse(signature, path) {
       if (path.length < signature.params.length) {
+        var i, newParam, conversion;
+
         var param = signature.params[path.length];
         if (param.varArgs) {
           // a variable argument. do not split the types in the parameter
-          var newParam = param.clone();
+          newParam = param.clone();
 
           // add conversions to the parameter
           // recurse for all conversions
-          typed.conversions.forEach(function (conversion) {
+          for (i = 0; i < typed.conversions.length; i++) {
+            conversion = typed.conversions[i];
             if (!contains(param.types, conversion.from) && contains(param.types, conversion.to)) {
-              var i = newParam.types.length;
-              newParam.types[i] = conversion.from;
-              newParam.conversions[i] = conversion;
+              var j = newParam.types.length;
+              newParam.types[j] = conversion.from;
+              newParam.conversions[j] = conversion;
             }
-          });
+          }
 
           recurse(signature, path.concat(newParam));
         }
         else {
           // split each type in the parameter
-          param.types.forEach(function (type) {
-            recurse(signature, path.concat(new Param(type)));
-          });
+          for (i = 0; i < param.types.length; i++) {
+            recurse(signature, path.concat(new Param(param.types[i])));
+          }
 
           // recurse for all conversions
-          typed.conversions.forEach(function (conversion) {
+          for (i = 0; i < typed.conversions.length; i++) {
+            conversion = typed.conversions[i];
             if (!contains(param.types, conversion.from) && contains(param.types, conversion.to)) {
-              var newParam = new Param(conversion.from);
+              newParam = new Param(conversion.from);
               newParam.conversions[0] = conversion;
               recurse(signature, path.concat(newParam));
             }
-          });
+          }
         }
       }
       else {
@@ -399,18 +423,20 @@
     if (a.params.length < b.params.length) return -1;
 
     // count the number of conversions
-    var ac = a.params.filter(function (param) {
-      return param.hasConversions();
-    });
-    var bc = b.params.filter(function (param) {
-      return param.hasConversions();
-    });
+    var i;
+    var len = a.params.length; // a and b have equal amount of params
+    var ac = 0;
+    var bc = 0;
+    for (i = 0; i < len; i++) {
+      if (a.params[i].hasConversions()) ac++;
+      if (b.params[i].hasConversions()) bc++;
+    }
 
-    if (ac.length > bc.length) return 1;
-    if (ac.length < bc.length) return -1;
+    if (ac > bc) return 1;
+    if (ac < bc) return -1;
 
     // compare the conversion index per parameter
-    for (var i = 0; i < a.params.length; i++) {
+    for (i = 0; i < a.params.length; i++) {
       var cmp = Param.compare(a.params[i], b.params[i]);
       if (cmp !== 0) {
         return cmp;
@@ -426,9 +452,12 @@
    *                   conversions.
    */
   Signature.prototype.hasConversions = function () {
-    return this.params.some(function (param) {
-      return param.hasConversions();
-    });
+    for (var i = 0; i < this.params.length; i++) {
+      if (this.params[i].hasConversions()) {
+        return true;
+      }
+    }
+    return false;
   };
 
   /**
@@ -439,21 +468,25 @@
    */
   Signature.prototype.toCode = function (refs, prefix) {
     var code = [];
-    var args = this.params.map(function (param, index) {
+
+    var args = new Array(this.params.length);
+    for (var i = 0; i < this.params.length; i++) {
+      var param = this.params[i];
       var conversion = param.conversions[0];
       if (param.varArgs) {
-        return 'varArgs';
+        args[i] = 'varArgs';
       }
       else if (conversion) {
-        return refs.add(conversion.convert, 'convert') + '(arg' + index + ')';
+        args[i] = refs.add(conversion.convert, 'convert') + '(arg' + i + ')';
       }
       else {
-        return 'arg' + index;
+        args[i] = 'arg' + i;
       }
-    }).join(', ');
+    }
+
     var ref = this.fn ? refs.add(this.fn, 'signature') : undefined;
     if (ref) {
-      return prefix + 'return ' + ref + '(' + args  + '); // signature: ' + this.params.join(', ');
+      return prefix + 'return ' + ref + '(' + args.join(', ')  + '); // signature: ' + this.params.join(', ');
     }
 
     return code.join('\n');
@@ -514,33 +547,37 @@
         else {
           // variable arguments with a fixed type
           var getTests = function (types, arg) {
-            return types
-                .map(function (type) {
-                  return refs.add(getTypeTest(type), 'test') + '(' + arg + ')';
-                })
-                .join(' || ');
+            var tests = new Array(types.length);
+            for (var i = 0; i < types.length; i++) {
+              tests[i] = refs.add(getTypeTest(types[i]), 'test') + '(' + arg + ')';
+            }
+            return tests.join(' || ');
           }.bind(this);
 
           var allTypes = this.param.types;
-          var exactTypes = allTypes.filter(function (type, i) {
-            return this.param.conversions[i] === undefined;
-          }.bind(this));
+          var exactTypes = [];
+          for (var i = 0; i < allTypes.length; i++) {
+            if (this.param.conversions[i] === undefined) {
+              exactTypes.push(allTypes[i]);
+            }
+          }
 
           code.push(prefix + 'if (' + getTests(allTypes, 'arg' + index) + ') { ' + comment);
           code.push(prefix + '  var varArgs = [arg' + index + '];');
           code.push(prefix + '  for (var i = ' + (index + 1) + '; i < arguments.length; i++) {');
           code.push(prefix + '    if (' + getTests(exactTypes, 'arguments[i]') + ') {');
           code.push(prefix + '      varArgs.push(arguments[i]);');
-          allTypes.forEach(function (type, i) {
-            var conversion = this.param.conversions[i];
-            if (conversion) {
-              var test = refs.add(getTypeTest(type), 'test');
-              var convert = refs.add(conversion.convert, 'convert');
+
+          for (var i = 0; i < allTypes.length; i++) {
+            var conversion_i = this.param.conversions[i];
+            if (conversion_i) {
+              var test = refs.add(getTypeTest(allTypes[i]), 'test');
+              var convert = refs.add(conversion_i.convert, 'convert');
               code.push(prefix + '    }');
               code.push(prefix + '    else if (' + test + '(arguments[i])) {');
               code.push(prefix + '      varArgs.push(' + convert + '(arguments[i]));');
             }
-          }.bind(this));
+          }
           code.push(prefix + '    } else {');
           code.push(prefix + '      throw createError(\'\', arguments.length, i, arguments[i], \'' + allTypes.join(',') + '\');');
           code.push(prefix + '    }');
@@ -585,6 +622,7 @@
    */
   Node.prototype._innerCode = function(refs, prefix, anyType) {
     var code = [];
+    var i;
 
     if (this.signature) {
       code.push(prefix + 'if (arguments.length === ' + this.path.length + ') {');
@@ -592,13 +630,17 @@
       code.push(prefix + '}');
     }
 
-    var nextAnyType = this.childs.filter(function (child) {
-      return child.param.anyType;
-    })[0];
+    var nextAnyType;
+    for (i = 0; i < this.childs.length; i++) {
+      if (this.childs[i].param.anyType) {
+        nextAnyType = this.childs[i];
+        break;
+      }
+    }
 
-    this.childs.forEach(function (child) {
-      code.push(child.toCode(refs, prefix, nextAnyType));
-    });
+    for (i = 0; i < this.childs.length; i++) {
+      code.push(this.childs[i].toCode(refs, prefix, nextAnyType));
+    }
 
     if (anyType && !this.param.anyType) {
       code.push(anyType.toCode(refs, prefix, nextAnyType));
@@ -632,15 +674,21 @@
       ].join('\n');
     }
     else {
-      var types = this.childs.reduce(function (types, node) {
-        node.param && node.param.types.forEach(function (type) {
-          if (types.indexOf(type) === -1) {
-            types.push(type);
-          }
-        });
+      var keys = {};
+      var types = [];
 
-        return types;
-      }, []);
+      for (var i = 0; i < this.childs.length; i++) {
+        var node = this.childs[i];
+        if (node.param) {
+          for (var j = 0; j < node.param.types.length; j++) {
+            var type = node.param.types[j];
+            if (!(type in keys)) {
+              keys[type] = true;
+              types.push(type);
+            }
+          }
+        }
+      }
 
       return prefix + 'throw createError(\'\', arguments.length, ' + index + ', arguments[' + index + '], \'' + types.join(',') + '\');';
     }
@@ -652,40 +700,48 @@
    * @return {Signature[]} Returns an array with expanded signatures
    */
   function parseSignatures(rawSignatures) {
-    var map = Object.keys(rawSignatures)
-        .reduce(function (signatures, types) {
-          var fn = rawSignatures[types];
-          var signature = new Signature(types, fn);
+    var signature;
+    var keys = {};
+    var signatures = [];
+    var i;
 
-          signature.expand().forEach(function (signature) {
-            var key = signature.toString();
-            if (signatures[key] === undefined) {
-              signatures[key] = signature;
+    for (var types in rawSignatures) {
+      if (rawSignatures.hasOwnProperty(types)) {
+        var fn = rawSignatures[types];
+        signature = new Signature(types, fn);
+
+        var expanded = signature.expand();
+
+        for (i = 0; i < expanded.length; i++) {
+          var signature_i = expanded[i];
+          var key = signature_i.toString();
+          var existing = keys[key];
+          if (!existing) {
+            keys[key] = signature_i;
+            signatures.push(signature_i);
+          }
+          else {
+            var cmp = Signature.compare(signature_i, existing);
+            if (cmp < 0) {
+              // override if sorted first
+              keys[key] = signature_i;
+              signatures.push(signature_i);
             }
-            else {
-              var cmp = Signature.compare(signature, signatures[key]);
-              if (cmp < 0) {
-                // override if sorted first
-                signatures[key] = signature;
-              }
-              else if (cmp === 0) {
-                throw new Error('Signature "' + key + '" is defined twice');
-              }
-              // else: just ignore
+            else if (cmp === 0) {
+              throw new Error('Signature "' + key + '" is defined twice');
             }
-          });
+            // else: just ignore
+          }
 
-          return signatures;
-        }, {});
-
-    // convert from map to array
-    var arr = Object.keys(map).map(function (types) {
-      return map[types];
-    });
+        }
+      }
+    }
 
     // filter redundant conversions from signatures with varArgs
     // TODO: simplify this loop or move it to a separate function
-    arr.forEach(function (signature) {
+    for (i = 0; i < signatures.length; i++) {
+      signature = signatures[i];
+
       if (signature.varArgs) {
         var index = signature.params.length - 1;
         var param = signature.params[index];
@@ -694,26 +750,29 @@
         while (t < param.types.length) {
           if (param.conversions[t]) {
             var type = param.types[t];
-            var exists = arr.some(function (other) {
+
+            for (var j = 0; j < signatures.length; j++) {
+              var other = signatures[j];
               var p = other.params[index];
 
-              return other !== signature && p &&
-                  contains(p.types, type) &&   // FIXME: mutable variable warning
-                  !p.conversions[index];
-            });
-
-            if (exists) {
-              param.types.splice(t, 1);
-              param.conversions.splice(t, 1);
-              t--;
+              if (other !== signature &&
+                  p &&
+                  contains(p.types, type) &&
+                  !p.conversions[index]) {
+                // this (conversion) type already exists, remove it
+                param.types.splice(t, 1);
+                param.conversions.splice(t, 1);
+                t--;
+                break;
+              }
             }
           }
           t++;
         }
       }
-    });
+    }
 
-    return arr;
+    return signatures;
   }
 
   /**
@@ -724,13 +783,17 @@
    *                                     as value.
    */
   function mapSignatures(signatures) {
-    return signatures.reduce(function (normalized, signature) {
-      var params = signature.params.join(',');
+    var normalized = {};
+
+    for (var i = 0; i < signatures.length; i++) {
+      var signature = signatures[i];
       if (signature.fn) {
+        var params = signature.params.join(',');
         normalized[params] = signature.fn;
       }
-      return normalized;
-    }, {});
+    }
+
+    return normalized;
   }
 
   /**
@@ -740,48 +803,71 @@
    * @return {Node}                   Returns a node tree
    */
   function parseTree(signatures, path) {
+    var i, signature;
     var index = path.length;
+    var nodeSignature;
 
-    // filter the signatures with the correct number of params
-    var signature = signatures.filter(function (signature) {
-      return signature.params.length === index;
-    })[0]; // there can be only one signature
+    var filtered = [];
+    for (i = 0; i < signatures.length; i++) {
+      signature = signatures[i];
+
+      // filter the first signature with the correct number of params
+      if (signature.params.length === index && !nodeSignature) {
+        nodeSignature = signature;
+      }
+
+      if (signature.params[index] != undefined) {
+        filtered.push(signature);
+      }
+    }
+
+    // sort the filtered signatures by param
+    filtered.sort(function (a, b) {
+      return Param.compare(a.params[index], b.params[index]);
+    });
 
     // recurse over the signatures
-    var childs = signatures
-        .filter(function (signature) {
-          return signature.params[index] != undefined;
-        })
-        .sort(function (a, b) {
-          return Param.compare(a.params[index], b.params[index]);
-        })
-        .reduce(function (entries, signature) {
-          // group signatures with the same param at current index
-          var param = signature.params[index];
-          var existing = entries.filter(function (entry) {
-            return entry.param.overlapping(param);
-          })[0];
+    var entries = [];
+    for (i = 0; i < filtered.length; i++) {
+      signature = filtered[i];
+      // group signatures with the same param at current index
+      var param = signature.params[index];
 
-          if (existing) {
-            if (existing.param.varArgs) {
-              throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
-            }
-            existing.signatures.push(signature);
-          }
-          else {
-            entries.push({
-              param: param,
-              signatures: [signature]
-            });
-          }
+      // TODO: replace the next filter loop
+      var existing = entries.filter(function (entry) {
+        return entry.param.overlapping(param);
+      })[0];
 
-          return entries;
-        }, [])
-        .map(function (entry) {
-          return parseTree(entry.signatures, path.concat(entry.param))
+      //var existing;
+      //for (var j = 0; j < entries.length; j++) {
+      //  if (entries[j].param.overlapping(param)) {
+      //    existing = entries[j];
+      //    break;
+      //  }
+      //}
+
+      if (existing) {
+        if (existing.param.varArgs) {
+          throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
+        }
+        existing.signatures.push(signature);
+      }
+      else {
+        entries.push({
+          param: param,
+          signatures: [signature]
         });
+      }
+    }
 
-    return new Node(path, signature, childs);
+    // parse the childs
+    var childs = new Array(entries.length);
+    for (i = 0; i < entries.length; i++) {
+      var entry = entries[i];
+      childs[i] = parseTree(entry.signatures, path.concat(entry.param))
+    }
+
+    return new Node(path, nodeSignature, childs);
   }
 
   /**
@@ -875,9 +961,16 @@
    * @returns {number} The maximum number of parameters
    */
   function maxParams(signatures) {
-    return signatures.reduce(function (max, signature) {
-      return Math.max(max, signature.params.length);
-    }, 0);
+    var max = 0;
+
+    for (var i = 0; i < signatures.length; i++) {
+      var len = signatures[i].params.length;
+      if (len > max) {
+        max = len;
+      }
+    }
+
+    return max;
   }
 
   /**
@@ -947,15 +1040,17 @@
       return _typed(name, signatures);
     },
     '...function': function (fns) {
+      var err;
       var name = '';
       var signatures = {};
-      fns.forEach(function (fn, index) {
-        var err;
+
+      for (var i = 0; i < fns.length; i++) {
+        var fn = fns[i];
 
         // test whether this is a typed-function
         if (!(typeof fn.signatures === 'object')) {
-          err = new TypeError('Function is no typed-function (index: ' + index + ')');
-          err.data = {index: index};
+          err = new TypeError('Function is no typed-function (index: ' + i + ')');
+          err.data = {index: i};
           throw err;
         }
 
@@ -987,7 +1082,7 @@
             throw err;
           }
         }
-      });
+      }
 
       return _typed(name, signatures);
     }
