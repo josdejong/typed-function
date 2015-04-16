@@ -5,6 +5,8 @@
  *
  * https://github.com/josdejong/typed-function
  */
+'use strict';
+
 (function (factory) {
   if (typeof define === 'function' && define.amd) {
     // AMD. Register as an anonymous module.
@@ -19,8 +21,6 @@
     window.typed = factory();
   }
 }(function () {
-  'use strict';
-
   /**
    * Get a type test function for a specific data type
    * @param {string} type                   A data type like 'number' or 'string'
@@ -52,14 +52,14 @@
    *   Too many arguments (expected: ..., actual: ...)
    *
    * @param {String} fn         Function name
-   * @param {Object} args       The actual arguments
+   * @param {number} argCount   Number of arguments
    * @param {Number} index      Current argument index
+   * @param {*} actual          Current argument
    * @param {string} [expected] An optional, comma separated string with
    *                            expected types on given index
    * @extends Error
    */
-  function createError(fn, args, index, expected) {
-    var actual = args[index];
+  function createError(fn, argCount, index, actual, expected) {
     var actualType = getTypeOf(actual);
     var _expected = expected ? expected.split(',') : null;
     var anyType = _expected && contains(_expected, 'any');
@@ -75,7 +75,7 @@
 
     // TODO: add function name to the message
     if (_expected) {
-      if (args.length > index && !anyType) {
+      if (argCount > index && !anyType) {
         // unexpected type
         message = 'Unexpected type of argument' +
             ' (expected: ' + _expected.join(' or ') + ', actual: ' + actualType + ', index: ' + index + ')';
@@ -89,7 +89,7 @@
     else {
       // too many arguments
       message = 'Too many arguments' +
-          ' (expected: ' + index + ', actual: ' + args.length + ')'
+          ' (expected: ' + index + ', actual: ' + argCount + ')'
     }
 
     var err = new TypeError(message);
@@ -542,7 +542,7 @@
             }
           }.bind(this));
           code.push(prefix + '    } else {');
-          code.push(prefix + '      throw createError(\'\', arguments, i, \'' + allTypes.join(',') + '\');');
+          code.push(prefix + '      throw createError(\'\', arguments.length, i, arguments[i], \'' + allTypes.join(',') + '\');');
           code.push(prefix + '    }');
           code.push(prefix + '  }');
           code.push(this.signature.toCode(refs, prefix + '  '));
@@ -627,7 +627,7 @@
       // TODO: can this condition be simplified? (we have a fall-through here)
       return [
         prefix + 'if (arguments.length > ' + index + ') {',
-        prefix + '  throw createError(\'\', arguments, ' + index + ')',
+        prefix + '  throw createError(\'\', arguments.length, ' + index + ', arg' + index+ ');',
         prefix + '}'
       ].join('\n');
     }
@@ -642,7 +642,7 @@
         return types;
       }, []);
 
-      return prefix + 'throw createError(\'\', arguments, ' + index + ', \'' + types.join(',') + '\');';
+      return prefix + 'throw createError(\'\', arguments.length, ' + index + ', arg' + index+ ', \'' + types.join(',') + '\');';
     }
   };
 
@@ -833,12 +833,14 @@
     var _name = name || '';
     var _args = getArgs(maxParams(_signatures));
     code.push('function ' + _name + '(' + _args.join(', ') + ') {');
+    code.push('  "use strict";');
     code.push(node.toCode(refs, '  '));
     code.push('}');
 
     // generate code for the factory function
     var factory = [
       '(function (' + refs.name + ') {',
+      '"use strict";',
       refs.toCode(),
       'return ' + code.join('\n'),
       '})'
