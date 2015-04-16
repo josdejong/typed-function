@@ -627,7 +627,7 @@
       // TODO: can this condition be simplified? (we have a fall-through here)
       return [
         prefix + 'if (arguments.length > ' + index + ') {',
-        prefix + '  throw createError(\'\', arguments.length, ' + index + ', arg' + index+ ');',
+        prefix + '  throw createError(\'\', arguments.length, ' + index + ', arguments[' + index + ']);',
         prefix + '}'
       ].join('\n');
     }
@@ -642,7 +642,7 @@
         return types;
       }, []);
 
-      return prefix + 'throw createError(\'\', arguments.length, ' + index + ', arg' + index+ ', \'' + types.join(',') + '\');';
+      return prefix + 'throw createError(\'\', arguments.length, ' + index + ', arguments[' + index + '], \'' + types.join(',') + '\');';
     }
   };
 
@@ -844,8 +844,8 @@
     ].join('\n');
 
     // evaluate the JavaScript code and attach function references
-    var factory = (new Function(refs.name, body));
-    var fn = factory(refs);
+    var factory = (new Function(refs.name, 'createError', body));
+    var fn = factory(refs, createError);
 
     //console.log('FN\n' + fn.toString()); // TODO: cleanup
 
