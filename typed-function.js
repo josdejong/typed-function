@@ -837,17 +837,15 @@
     code.push(node.toCode(refs, '  '));
     code.push('}');
 
-    // generate code for the factory function
-    var factory = [
-      '(function (' + refs.name + ') {',
-      '"use strict";',
+    // generate body for the factory function
+    var body = [
       refs.toCode(),
-      'return ' + code.join('\n'),
-      '})'
+      'return ' + code.join('\n')
     ].join('\n');
 
     // evaluate the JavaScript code and attach function references
-    var fn = _eval(factory, refs);
+    var factory = (new Function(refs.name, body));
+    var fn = factory(refs);
 
     //console.log('FN\n' + fn.toString()); // TODO: cleanup
 
@@ -855,12 +853,6 @@
     fn.signatures = mapSignatures(_signatures);
 
     return fn;
-  }
-
-  // call eval in a separate function to prevent the created code being
-  // attached to the functions scope where it was created
-  function _eval(factory, refs) {
-    return eval(factory)(refs);
   }
 
   // data type tests
