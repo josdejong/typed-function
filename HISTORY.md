@@ -1,6 +1,6 @@
 # History
 
-## not yet released, version 0.7.0
+## 2015-04-17, version 0.7.0
 
 - Performance improvements.
 
