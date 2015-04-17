@@ -2,7 +2,7 @@
 
 ## not yet released, version 0.7.0
 
-- Large performance improvements.
+- Performance improvements.
 
 
 ## 2015-03-08, version 0.6.3

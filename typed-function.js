@@ -125,7 +125,7 @@
       index = this.categories[cat].length;
       this.categories[cat].push(fn);
     }
-    
+
     return cat + index;
   };
 
@@ -700,6 +700,7 @@
    * @return {Signature[]} Returns an array with expanded signatures
    */
   function parseSignatures(rawSignatures) {
+    // FIXME: need to have deterministic ordering of signatures, do not create via object
     var signature;
     var keys = {};
     var signatures = [];
@@ -718,22 +719,26 @@
           var existing = keys[key];
           if (!existing) {
             keys[key] = signature_i;
-            signatures.push(signature_i);
           }
           else {
             var cmp = Signature.compare(signature_i, existing);
             if (cmp < 0) {
               // override if sorted first
               keys[key] = signature_i;
-              signatures.push(signature_i);
             }
             else if (cmp === 0) {
               throw new Error('Signature "' + key + '" is defined twice');
             }
             // else: just ignore
           }
-
         }
+      }
+    }
+
+    // convert from map to array
+    for (key in keys) {
+      if (keys.hasOwnProperty(key)) {
+        signatures.push(keys[key]);
       }
     }
 
