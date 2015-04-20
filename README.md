@@ -168,6 +168,13 @@ A typed function can be constructed in three ways:
     ```
 
 
+### Methods
+
+-   `typed.create() : function`
+
+    Create a new, isolated instance of typed-function.
+
+
 ### Properties
 
 -   `typed.types: Object`
