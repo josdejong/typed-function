@@ -174,6 +174,16 @@ A typed function can be constructed in three ways:
 
     Create a new, isolated instance of typed-function.
 
+-   `typed.find(fn: function, signature: string | Array) : function | null`
+
+    Find a specific signature from a typed function, for example:
+    
+    ```js
+    var fn = typed(...);
+    var f = typed.find(fn, ['number', 'string']);
+    var f = typed.find(fn, 'number, string');
+    ```
+
 
 ### Properties
 
