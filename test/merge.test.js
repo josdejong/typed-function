@@ -12,7 +12,7 @@ describe('merge', function () {
 
     assert.strictEqual(typed3(true), 'boolean:true');
     assert.strictEqual(typed3(2), 'number:2');
-    assert.throws(function () {typed3('foo')}, /TypeError: Unexpected type of argument \(expected: boolean or number, actual: string, index: 0\)/);
+    assert.throws(function () {typed3('foo')}, /TypeError: Unexpected type of argument in function unnamed \(expected: boolean or number, actual: string, index: 0\)/);
   });
 
   it('should merge three typed-functions', function () {
@@ -27,7 +27,7 @@ describe('merge', function () {
     assert.strictEqual(typed4(true), 'boolean:true');
     assert.strictEqual(typed4(2), 'number:2');
     assert.strictEqual(typed4('foo'), 'string:foo');
-    assert.throws(function () {typed4(new Date())}, /TypeError: Unexpected type of argument \(expected: boolean or number or string, actual: Date, index: 0\)/);
+    assert.throws(function () {typed4(new Date())}, /TypeError: Unexpected type of argument in function unnamed \(expected: boolean or number or string, actual: Date, index: 0\)/);
   });
 
   it('should throw an error in case of conflicting signatures when merging', function () {

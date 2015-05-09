@@ -151,26 +151,71 @@ The following type expressions are supported:
 A typed function can be constructed in three ways:
 
 -   With a single signature:
+
     ```
     typed(signature: string, fn: function) : function
     typed(name: string, signature: string, fn: function) : function
     ```
 
 -   With multiple signatures:
+
     ```
     typed(signatures: Object.<string, function>) : function
     typed(name: string, signatures: Object.<string, function>) : function
     ```
 
 -   Merge multiple typed functions into a new typed function
+
     ```
     typed(functions: ...function) : function
     ```
 
 
+### Methods
+
+-   `typed.convert(value: *, type: string) : *`
+
+    Convert an value to another type. Only applicable when conversions have
+    been defined in `typed.conversions` (see section [Properties](#properties)). 
+    Example:
+    
+    ```js
+    typed.conversions.push({
+      from: 'number',
+      to: 'string',
+      convert: function (x) {
+        return +x;
+    });
+    
+    var str = typed.convert(2.3, 'string'); // '2.3' 
+    ```
+
+-   `typed.create() : function`
+
+    Create a new, isolated instance of typed-function. Example:
+    
+    ```js
+    var typed = require('typed-function');  // default instance
+    var typed2 = typed.create();            // a second instance
+    ```
+
+-   `typed.find(fn: function, signature: string | Array) : function | null`
+
+    Find a specific signature from a typed function. The function currently
+    only finds exact matching signatures.
+    
+    For example:
+    
+    ```js
+    var fn = typed(...);
+    var f = typed.find(fn, ['number', 'string']);
+    var f = typed.find(fn, 'number, string');
+    ```
+
+
 ### Properties
 
--   `typed.types: Object`
+-   `typed.types: Object.<string, function>`
 
     A map with the object types as key and a type checking test as value.
     Custom types can be added like:
@@ -183,9 +228,9 @@ A typed function can be constructed in three ways:
     typed.types['Person'] = function (x) {
       return x instanceof Person;
     };
-  ```
+    ```
 
--   `typed.conversions: Array`
+-   `typed.conversions: Array.<{from: string, to: string, convert: function}>`
 
     An Array with built-in conversions. Empty by default. Can be used for example
     to defined conversions from `boolean` to `number`. For example:
@@ -198,6 +243,26 @@ A typed function can be constructed in three ways:
         return +x;
     });
     ```
+    
+-   `typed.ignore: Array.<string>`
+
+    An Array with names of types to be ignored when creating a typed function.
+    This can be useful filter signatures when creating a typed function. Example:
+
+    ```js
+    // a set with signatures maybe loaded from somewhere
+    var signatures = {
+      'number': function () {...},
+      'string': function () {...}
+    }
+
+    // we want to ignore a specific type
+    typed.ignore = ['string'];        
+
+    // the created function fn will only contain the 'number' signature 
+    var fn = typed('fn', signatures);
+    ```
+
 
 ### Output
 

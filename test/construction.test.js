@@ -95,24 +95,43 @@ describe('construction', function() {
     assert.equal(fn(new Date()), 'Date');
   });
 
+  it('should create a new, isolated instance of typed-function', function() {
+    var typed2 = typed.create();
+    function Person() {}
+
+    typed.types['Person'] = function (x) {
+      return x instanceof Person;
+    };
+
+    assert.strictEqual(typed.create, typed2.create);
+    assert.notStrictEqual(typed.types, typed2.types);
+    assert.notStrictEqual(typed.conversions, typed2.conversions);
+
+    typed('Person', function (p) {return 'Person'});
+
+    assert.throws(function () {
+      typed2('Person', function (p) {return 'Person'});
+    }, /Error: Unknown type "Person"/)
+  });
+
   it('should throw an error when providing an unsupported type of argument', function() {
-    var fn = typed({
+    var fn = typed('fn1', {
       'number': function (value) {
         return 'number:' + value;
       }
     });
 
-    assert.throws(function () {fn(new Date())}, /TypeError: Unexpected type of argument \(expected: number, actual: Date, index: 0\)/);
+    assert.throws(function () {fn(new Date())}, /TypeError: Unexpected type of argument in function fn1 \(expected: number, actual: Date, index: 0\)/);
   });
 
   it('should throw an error when providing a wrong function signature', function() {
-    var fn = typed({
+    var fn = typed('fn1', {
       'number': function (value) {
         return 'number:' + value;
       }
     });
 
-    assert.throws(function () {fn(1, 2)}, /TypeError: Too many arguments \(expected: 1, actual: 2\)/);
+    assert.throws(function () {fn(1, 2)}, /TypeError: Too many arguments in function fn1 \(expected: 1, actual: 2\)/);
   });
 
   it('should throw an error when composing with an unknown type', function() {
@@ -123,6 +142,24 @@ describe('construction', function() {
         }
       });
     }, /Error: Unknown type "foo"/);
+  });
+
+  it('should ignore types from typed.ignore', function() {
+    var typed2 = typed.create();
+    typed2.ignore = ['string'];
+
+    var fn = typed2({
+      'number': function () {},
+      'number, number': function () {},
+
+      'string, number': function () {},
+      'number, string': function () {},
+      'boolean | string, boolean': function () {},
+      'any, ...string': function () {},
+      'string': function () {}
+    });
+
+    assert.deepEqual(Object.keys(fn.signatures).sort(), ['number', 'number,number']);
   });
 
   it('should give a hint when composing with a wrongly cased type', function() {
