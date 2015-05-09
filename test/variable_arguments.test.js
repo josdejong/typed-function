@@ -16,11 +16,11 @@ describe('variable arguments', function () {
 
     assert.equal(sum(2), 2);
     assert.equal(sum(2,3,4), 9);
-    assert.throws(function () {sum()},                /TypeError: Too few arguments \(expected: number, index: 0\)/);
-    assert.throws(function () {sum(true)},            /TypeError: Unexpected type of argument \(expected: number, actual: boolean, index: 0\)/);
-    assert.throws(function () {sum('string')},        /TypeError: Unexpected type of argument \(expected: number, actual: string, index: 0\)/);
-    assert.throws(function () {sum(2, 'string')},     /TypeError: Unexpected type of argument \(expected: number, actual: string, index: 1\)/);
-    assert.throws(function () {sum(2, 3, 'string')},  /TypeError: Unexpected type of argument \(expected: number, actual: string, index: 2\)/);
+    assert.throws(function () {sum()},                /TypeError: Too few arguments in function unnamed \(expected: number, index: 0\)/);
+    assert.throws(function () {sum(true)},            /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: boolean, index: 0\)/);
+    assert.throws(function () {sum('string')},        /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: string, index: 0\)/);
+    assert.throws(function () {sum(2, 'string')},     /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: string, index: 1\)/);
+    assert.throws(function () {sum(2, 3, 'string')},  /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: string, index: 2\)/);
   });
 
   it('should create a typed function with variable arguments (2)', function() {
@@ -32,9 +32,9 @@ describe('variable arguments', function () {
 
     assert.equal(fn('foo', 2), 'foo: 2');
     assert.equal(fn('foo', 2, 4), 'foo: 2, 4');
-    assert.throws(function () {fn(2, 4)}, /TypeError: Unexpected type of argument \(expected: string, actual: number, index: 0\)/);
-    assert.throws(function () {fn('string')}, /TypeError: Too few arguments \(expected: number, index: 1\)/);
-    assert.throws(function () {fn('string', 'string')}, /TypeError: Unexpected type of argument \(expected: number, actual: string, index: 1\)/);
+    assert.throws(function () {fn(2, 4)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: number, index: 0\)/);
+    assert.throws(function () {fn('string')}, /TypeError: Too few arguments in function unnamed \(expected: number, index: 1\)/);
+    assert.throws(function () {fn('string', 'string')}, /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: string, index: 1\)/);
   });
 
   it('should create a typed function with any type arguments (1)', function() {
@@ -47,8 +47,8 @@ describe('variable arguments', function () {
     assert.equal(fn('foo', 2), 'foo: 2');
     assert.equal(fn('foo', 2, true, 'bar'), 'foo: 2, true, bar');
     assert.equal(fn('foo', 'bar'), 'foo: bar');
-    assert.throws(function () {fn(2, 4)}, /TypeError: Unexpected type of argument \(expected: string, actual: number, index: 0\)/);
-    assert.throws(function () {fn('string')}, /TypeError: Too few arguments \(expected: any, index: 1\)/);
+    assert.throws(function () {fn(2, 4)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: number, index: 0\)/);
+    assert.throws(function () {fn('string')}, /TypeError: Too few arguments in function unnamed \(expected: any, index: 1\)/);
   });
 
   it('should create a typed function with implicit any type arguments', function() {
@@ -61,8 +61,8 @@ describe('variable arguments', function () {
     assert.equal(fn('foo', 2), 'foo: 2');
     assert.equal(fn('foo', 2, true, 'bar'), 'foo: 2, true, bar');
     assert.equal(fn('foo', 'bar'), 'foo: bar');
-    assert.throws(function () {fn(2, 4)}, /TypeError: Unexpected type of argument \(expected: string, actual: number, index: 0\)/);
-    assert.throws(function () {fn('string')}, /TypeError: Too few arguments \(expected: any, index: 1\)/);
+    assert.throws(function () {fn(2, 4)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: number, index: 0\)/);
+    assert.throws(function () {fn('string')}, /TypeError: Too few arguments in function unnamed \(expected: any, index: 1\)/);
   });
 
   it('should create a typed function with any type arguments (2)', function() {
@@ -74,8 +74,8 @@ describe('variable arguments', function () {
     assert.equal(fn('foo', 2), 'foo: 2');
     assert.equal(fn(1, 2, 4), '1: 2, 4');
     assert.equal(fn(null, 2, 4), 'null: 2, 4');
-    assert.throws(function () {fn('string')},           /TypeError: Too few arguments \(expected: number, index: 1\)/);
-    assert.throws(function () {fn('string', 'string')}, /TypeError: Unexpected type of argument \(expected: number, actual: string, index: 1\)/);
+    assert.throws(function () {fn('string')},           /TypeError: Too few arguments in function unnamed \(expected: number, index: 1\)/);
+    assert.throws(function () {fn('string', 'string')}, /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: string, index: 1\)/);
   });
 
   it('should create a typed function with union type arguments', function() {
@@ -87,10 +87,10 @@ describe('variable arguments', function () {
     strictEqualArray(fn(2,3,4), [2,3,4]);
     strictEqualArray(fn('a','b','c'), ['a','b','c']);
     strictEqualArray(fn('a',2,'c',3), ['a',2,'c',3]);
-    assert.throws(function () {fn()},               /TypeError: Too few arguments \(expected: number or string, index: 0\)/);
-    assert.throws(function () {fn('string', true)}, /TypeError: Unexpected type of argument. Index: 1 \(expected: string | number/);
-    assert.throws(function () {fn(2, false)},       /TypeError: Unexpected type of argument. Index: 1 \(expected: string | number/);
-    assert.throws(function () {fn(2, 3, false)},    /TypeError: Unexpected type of argument. Index: 2 \(expected: string | number/);
+    assert.throws(function () {fn()},               /TypeError: Too few arguments in function unnamed \(expected: number or string, index: 0\)/);
+    assert.throws(function () {fn('string', true)}, /TypeError: Unexpected type of argument. Index: 1 in function unnamed \(expected: string | number/);
+    assert.throws(function () {fn(2, false)},       /TypeError: Unexpected type of argument. Index: 1 in function unnamed \(expected: string | number/);
+    assert.throws(function () {fn(2, 3, false)},    /TypeError: Unexpected type of argument. Index: 2 in function unnamed \(expected: string | number/);
   });
 
   it('should create a composed function with variable arguments', function() {
@@ -110,9 +110,9 @@ describe('variable arguments', function () {
     assert.equal(fn('foo', 2), 'foo: 2');
     assert.equal(fn('foo', 2, 4), 'foo: 2, 4');
     assert.equal(fn(true, false, false), 'booleans');
-    assert.throws(function () {fn(2, 4)},           /TypeError: Unexpected type of argument \(expected: string or boolean, actual: number, index: 0\)/);
-    assert.throws(function () {fn('string')},       /TypeError: Too few arguments \(expected: number, index: 1\)/);
-    assert.throws(function () {fn('string', true)}, /TypeError: Unexpected type of argument \(expected: number, actual: boolean, index: 1\)/);
+    assert.throws(function () {fn(2, 4)},           /TypeError: Unexpected type of argument in function unnamed \(expected: string or boolean, actual: number, index: 0\)/);
+    assert.throws(function () {fn('string')},       /TypeError: Too few arguments in function unnamed \(expected: number, index: 1\)/);
+    assert.throws(function () {fn('string', true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: boolean, index: 1\)/);
   });
 
   it('should continue with other options if varArgs do not match', function() {

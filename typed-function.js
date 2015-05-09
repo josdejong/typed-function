@@ -67,6 +67,7 @@
     function createError(fn, argCount, index, actual, expected) {
       var actualType = getTypeOf(actual);
       var _expected = expected ? expected.split(',') : null;
+      var _fn = (fn || 'unnamed');
       var anyType = _expected && contains(_expected, 'any');
       var message;
       var data = {
@@ -82,18 +83,18 @@
       if (_expected) {
         if (argCount > index && !anyType) {
           // unexpected type
-          message = 'Unexpected type of argument' +
+          message = 'Unexpected type of argument in function ' + _fn +
               ' (expected: ' + _expected.join(' or ') + ', actual: ' + actualType + ', index: ' + index + ')';
         }
         else {
           // too few arguments
-          message = 'Too few arguments' +
+          message = 'Too few arguments in function ' + _fn +
               ' (expected: ' + _expected.join(' or ') + ', index: ' + index + ')';
         }
       }
       else {
         // too many arguments
-        message = 'Too many arguments' +
+        message = 'Too many arguments in function ' + _fn +
             ' (expected: ' + index + ', actual: ' + argCount + ')'
       }
 
@@ -583,7 +584,7 @@
               }
             }
             code.push(prefix + '    } else {');
-            code.push(prefix + '      throw createError(\'\', arguments.length, i, arguments[i], \'' + allTypes.join(',') + '\');');
+            code.push(prefix + '      throw createError(name, arguments.length, i, arguments[i], \'' + allTypes.join(',') + '\');');
             code.push(prefix + '    }');
             code.push(prefix + '  }');
             code.push(this.signature.toCode(refs, prefix + '  '));
@@ -673,7 +674,7 @@
         // TODO: can this condition be simplified? (we have a fall-through here)
         return [
           prefix + 'if (arguments.length > ' + index + ') {',
-          prefix + '  throw createError(\'\', arguments.length, ' + index + ', arguments[' + index + ']);',
+          prefix + '  throw createError(name, arguments.length, ' + index + ', arguments[' + index + ']);',
           prefix + '}'
         ].join('\n');
       }
@@ -694,7 +695,7 @@
           }
         }
 
-        return prefix + 'throw createError(\'\', arguments.length, ' + index + ', arguments[' + index + '], \'' + types.join(',') + '\');';
+        return prefix + 'throw createError(name, arguments.length, ' + index + ', arguments[' + index + '], \'' + types.join(',') + '\');';
       }
     };
 
@@ -928,6 +929,7 @@
       var _args = getArgs(maxParams(_signatures));
       code.push('function ' + _name + '(' + _args.join(', ') + ') {');
       code.push('  "use strict";');
+      code.push('  var name = \'' + _name + '\';');
       code.push(node.toCode(refs, '  '));
       code.push('}');
 

@@ -115,23 +115,23 @@ describe('construction', function() {
   });
 
   it('should throw an error when providing an unsupported type of argument', function() {
-    var fn = typed({
+    var fn = typed('fn1', {
       'number': function (value) {
         return 'number:' + value;
       }
     });
 
-    assert.throws(function () {fn(new Date())}, /TypeError: Unexpected type of argument \(expected: number, actual: Date, index: 0\)/);
+    assert.throws(function () {fn(new Date())}, /TypeError: Unexpected type of argument in function fn1 \(expected: number, actual: Date, index: 0\)/);
   });
 
   it('should throw an error when providing a wrong function signature', function() {
-    var fn = typed({
+    var fn = typed('fn1', {
       'number': function (value) {
         return 'number:' + value;
       }
     });
 
-    assert.throws(function () {fn(1, 2)}, /TypeError: Too many arguments \(expected: 1, actual: 2\)/);
+    assert.throws(function () {fn(1, 2)}, /TypeError: Too many arguments in function fn1 \(expected: 1, actual: 2\)/);
   });
 
   it('should throw an error when composing with an unknown type', function() {

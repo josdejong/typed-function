@@ -10,7 +10,7 @@ describe('union types', function () {
 
     assert.equal(fn(true), 'boolean');
     assert.equal(fn(2), 'number');
-    assert.throws(function () {fn('string')}, /TypeError: Unexpected type of argument \(expected: number or boolean, actual: string, index: 0\)/);
+    assert.throws(function () {fn('string')}, /TypeError: Unexpected type of argument in function unnamed \(expected: number or boolean, actual: string, index: 0\)/);
   });
 
 });

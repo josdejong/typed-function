@@ -3,6 +3,8 @@
 ## not yet released, version 0.8.0
 
 - Implemented function `create` to create a new instance of typed-function.
+- Extended the error messages to denote the function name, like `"Too many 
+  arguments in function foo (...)"`.
 
 
 ## 2015-04-17, version 0.7.0
