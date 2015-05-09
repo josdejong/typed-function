@@ -1214,6 +1214,10 @@
      */
     function convert (value, type) {
       var from = getTypeOf(value);
+      
+      // check conversion is needed
+      if (type === from)
+        return value;
 
       for (var i = 0; i < typed.conversions.length; i++) {
         var conversion = typed.conversions[i];
