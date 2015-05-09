@@ -1165,12 +1165,31 @@
       return null;
     }
 
+    /**
+     * Convert a given value to another data type.
+     * @param {*} value
+     * @param {string} type
+     */
+    function convert (value, type) {
+      var from = getTypeOf(value);
+
+      for (var i = 0; i < typed.conversions.length; i++) {
+        var conversion = typed.conversions[i];
+        if (conversion.from === from && conversion.to === type) {
+          return conversion.convert(value);
+        }
+      }
+
+      throw new Error('Cannot convert from ' + from + ' to ' + type);
+    }
+
     // attach types and conversions to the final `typed` function
     typed.config = config;
     typed.types = types;
     typed.conversions = conversions;
     typed.create = create;
     typed.find = find;
+    typed.convert = convert;
 
     return typed;
   }

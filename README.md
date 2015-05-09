@@ -151,18 +151,21 @@ The following type expressions are supported:
 A typed function can be constructed in three ways:
 
 -   With a single signature:
+
     ```
     typed(signature: string, fn: function) : function
     typed(name: string, signature: string, fn: function) : function
     ```
 
 -   With multiple signatures:
+
     ```
     typed(signatures: Object.<string, function>) : function
     typed(name: string, signatures: Object.<string, function>) : function
     ```
 
 -   Merge multiple typed functions into a new typed function
+
     ```
     typed(functions: ...function) : function
     ```
@@ -170,13 +173,38 @@ A typed function can be constructed in three ways:
 
 ### Methods
 
+-   `typed.convert(value: *, type: string) : *`
+
+    Convert an value to another type. Only applicable when conversions have
+    been defined in `typed.conversions` (see section [Properties](#properties)). 
+    Example:
+    
+    ```js
+    typed.conversions.push({
+      from: 'number',
+      to: 'string',
+      convert: function (x) {
+        return +x;
+    });
+    
+    var str = typed.convert(2.3, 'string'); // '2.3' 
+    ```
+
 -   `typed.create() : function`
 
-    Create a new, isolated instance of typed-function.
+    Create a new, isolated instance of typed-function. Example:
+    
+    ```js
+    var typed = require('typed-function');  // default instance
+    var typed2 = typed.create();            // a second instance
+    ```
 
 -   `typed.find(fn: function, signature: string | Array) : function | null`
 
-    Find a specific signature from a typed function, for example:
+    Find a specific signature from a typed function. The function currently
+    only finds exact matching signatures.
+    
+    For example:
     
     ```js
     var fn = typed(...);
@@ -200,7 +228,7 @@ A typed function can be constructed in three ways:
     typed.types['Person'] = function (x) {
       return x instanceof Person;
     };
-  ```
+    ```
 
 -   `typed.conversions: Array`
 
