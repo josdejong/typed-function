@@ -1,6 +1,12 @@
 # History
 
 
+## 2015-05-09, version 0.8.2
+
+- Fixed function `typed.convert` not handling the case where the value already
+  has the requested type. Thanks @rjbaucells.
+
+
 ## 2015-05-09, version 0.8.1
 
 - Implemented option `typed.ignore` to ignore/filter signatures of a typed
