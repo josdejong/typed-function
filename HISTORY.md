@@ -1,5 +1,12 @@
 # History
 
+
+## 2015-05-09, version 0.8.1
+
+- Implemented option `typed.ignore` to ignore/filter signatures of a typed
+  function.
+
+
 ## 2015-05-09, version 0.8.0
 
 - Implemented function `create` to create a new instance of typed-function.
