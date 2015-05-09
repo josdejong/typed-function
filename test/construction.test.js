@@ -144,6 +144,24 @@ describe('construction', function() {
     }, /Error: Unknown type "foo"/);
   });
 
+  it('should ignore types from typed.ignore', function() {
+    var typed2 = typed.create();
+    typed2.ignore = ['string'];
+
+    var fn = typed2({
+      'number': function () {},
+      'number, number': function () {},
+
+      'string, number': function () {},
+      'number, string': function () {},
+      'boolean | string, boolean': function () {},
+      'any, ...string': function () {},
+      'string': function () {}
+    });
+
+    assert.deepEqual(Object.keys(fn.signatures).sort(), ['number', 'number,number']);
+  });
+
   it('should give a hint when composing with a wrongly cased type', function() {
     assert.throws(function () {
       var fn = typed({

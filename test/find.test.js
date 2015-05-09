@@ -3,16 +3,18 @@ var typed = require('../typed-function');
 
 describe('find', function () {
 
-  var a =  function a () {};
-  var b =  function b () {};
-  var c =  function c () {};
-  var d =  function d () {};
+  function a () {}
+  function b () {}
+  function c () {}
+  function d () {}
+  function e () {}
 
   var fn = typed({
     'number': a,
     'string, ...number': b,
     'number, boolean': c,
-    'any': d
+    'any': d,
+    '': e
   });
 
 
@@ -20,6 +22,7 @@ describe('find', function () {
     assert.strictEqual(typed.find(fn, ['number']), a);
     assert.strictEqual(typed.find(fn, ['number', 'boolean']), c);
     assert.strictEqual(typed.find(fn, ['any']), d);
+    assert.strictEqual(typed.find(fn, []), e);
 
   });
 
@@ -28,6 +31,11 @@ describe('find', function () {
     assert.strictEqual(typed.find(fn, 'number,boolean'), c);
     assert.strictEqual(typed.find(fn, ' number, boolean '), c); // with spaces
     assert.strictEqual(typed.find(fn, 'any'), d);
+    assert.strictEqual(typed.find(fn, ''), e);
+  });
+
+  it('should return null if not found', function() {
+    assert.strictEqual(typed.find(fn, 'number, number'), null);
   });
 
 

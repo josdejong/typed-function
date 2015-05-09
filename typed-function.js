@@ -77,9 +77,6 @@
         expected: _expected
       };
 
-      //console.log('createError', fn, args, index, expected) // TODO: cleanup
-
-      // TODO: add function name to the message
       if (_expected) {
         if (argCount > index && !anyType) {
           // unexpected type
@@ -193,7 +190,7 @@
 
       // can hold a type to which to convert when handling this parameter
       this.conversions = [];
-      // TODO: better implement support for conversions, be able to add conversions via constructor (support a new type Object?)
+      // TODO: implement better API for conversions, be able to add conversions via constructor (support a new type Object?)
 
       // variable arguments
       this.varArgs = _varArgs || varArgs || false;
@@ -282,6 +279,21 @@
      */
     Param.prototype.hasConversions = function () {
       return this.conversions.length > 0;
+    };
+
+    /**
+     * Tests whether this parameters contains any of the provided types
+     * @param {Object} types  A Map with types, like {'number': true}
+     * @returns {boolean}     Returns true when the parameter contains any
+     *                        of the provided types
+     */
+    Param.prototype.contains = function (types) {
+      for (var i = 0; i < this.types.length; i++) {
+        if (types[this.types[i]]) {
+          return true;
+        }
+      }
+      return false;
     };
 
     /**
@@ -462,6 +474,29 @@
           return true;
         }
       }
+      return false;
+    };
+
+    /**
+     * Test whether this signature should be ignored.
+     * Checks whether any of the parameters contains a type listed in
+     * typed.ignore
+     * @return {boolean} Returns true when the signature should be ignored
+     */
+    Signature.prototype.ignore = function () {
+      // create a map with ignored types
+      var types = {};
+      for (var i = 0; i < typed.ignore.length; i++) {
+        types[typed.ignore[i]] = true;
+      }
+
+      // test whether any of the parameters contains this type
+      for (i = 0; i < this.params.length; i++) {
+        if (this.params[i].contains(types)) {
+          return true;
+        }
+      }
+
       return false;
     };
 
@@ -669,7 +704,6 @@
     Node.prototype._exceptions = function (refs, prefix) {
       var index = this.path.length;
 
-      // TODO: add function name to exceptions
       if (this.childs.length === 0) {
         // TODO: can this condition be simplified? (we have a fall-through here)
         return [
@@ -715,6 +749,10 @@
         if (rawSignatures.hasOwnProperty(types)) {
           var fn = rawSignatures[types];
           signature = new Signature(types, fn);
+
+          if (signature.ignore()) {
+            continue;
+          }
 
           var expanded = signature.expand();
 
@@ -1035,13 +1073,17 @@
     // type conversions. Order is important
     var conversions = [];
 
+    // types to be ignored
+    var ignore = [];
+
     // temporary object for holding types and conversions, for constructing
     // the `typed` function itself
     // TODO: find a more elegant solution for this
     var typed = {
       config: config,
       types: types,
-      conversions: conversions
+      conversions: conversions,
+      ignore: ignore
     };
 
     /**
@@ -1187,6 +1229,7 @@
     typed.config = config;
     typed.types = types;
     typed.conversions = conversions;
+    typed.ignore = ignore;
     typed.create = create;
     typed.find = find;
     typed.convert = convert;

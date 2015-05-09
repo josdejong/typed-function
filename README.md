@@ -215,7 +215,7 @@ A typed function can be constructed in three ways:
 
 ### Properties
 
--   `typed.types: Object`
+-   `typed.types: Object.<string, function>`
 
     A map with the object types as key and a type checking test as value.
     Custom types can be added like:
@@ -230,7 +230,7 @@ A typed function can be constructed in three ways:
     };
     ```
 
--   `typed.conversions: Array`
+-   `typed.conversions: Array.<{from: string, to: string, convert: function}>`
 
     An Array with built-in conversions. Empty by default. Can be used for example
     to defined conversions from `boolean` to `number`. For example:
@@ -243,6 +243,26 @@ A typed function can be constructed in three ways:
         return +x;
     });
     ```
+    
+-   `typed.ignore: Array.<string>`
+
+    An Array with names of types to be ignored when creating a typed function.
+    This can be useful filter signatures when creating a typed function. Example:
+
+    ```js
+    // a set with signatures maybe loaded from somewhere
+    var signatures = {
+      'number': function () {...},
+      'string': function () {...}
+    }
+
+    // we want to ignore a specific type
+    typed.ignore = ['string'];        
+
+    // the created function fn will only contain the 'number' signature 
+    var fn = typed('fn', signatures);
+    ```
+
 
 ### Output
 
