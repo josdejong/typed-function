@@ -1,6 +1,6 @@
 # History
 
-## not yet released, version 0.8.0
+## 2015-05-09, version 0.8.0
 
 - Implemented function `create` to create a new instance of typed-function.
 - Implemented a utility function `convert(value, type)` (#1).
