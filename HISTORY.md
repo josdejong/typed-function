@@ -1,6 +1,12 @@
 # History
 
 
+## 2015-05-09, version 0.9.0
+
+- Function `typed.find` now throws an error instead of returning `null` when a 
+  signature is not found.
+
+
 ## 2015-05-09, version 0.8.2
 
 - Fixed function `typed.convert` not handling the case where the value already

@@ -9,7 +9,7 @@ describe('find', function () {
   function d () {}
   function e () {}
 
-  var fn = typed({
+  var fn = typed('fn', {
     'number': a,
     'string, ...number': b,
     'number, boolean': c,
@@ -34,8 +34,10 @@ describe('find', function () {
     assert.strictEqual(typed.find(fn, ''), e);
   });
 
-  it('should return null if not found', function() {
-    assert.strictEqual(typed.find(fn, 'number, number'), null);
+  it('should throw an error when not found', function() {
+    assert.throws(function () {
+      typed.find(fn, 'number, number');
+    }, /TypeError: Signature not found \(signature: fn\(number, number\)\)/);
   });
 
 

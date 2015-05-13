@@ -1168,11 +1168,13 @@
      *   typed.find(fn, 'number, string')
      *
      * Function find only only works for exact matches.
+     *
      * @param {function} fn                   A typed-function
      * @param {string | string[]} signature   Signature to be found, can be
      *                                        an array or a comma separated string.
-     * @return {function | null}              Returns the matching signature, or
-     *                                        null if no signature is found.
+     * @return {function}                     Returns the matching signature, or
+     *                                        throws an errror when no signature
+     *                                        is found.
      */
     function find (fn, signature) {
       if (!fn.signatures) {
@@ -1204,7 +1206,7 @@
 
       // TODO: extend find to match non-exact signatures
 
-      return null;
+      throw new TypeError('Signature not found (signature: ' + (fn.name || 'unnamed') + '(' + arr.join(', ') + '))');
     }
 
     /**
