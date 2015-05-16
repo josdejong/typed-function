@@ -5,6 +5,7 @@
 
 - Function `typed.find` now throws an error instead of returning `null` when a 
   signature is not found.
+- Fixed: the attached signatures no longer contains signatures with conversions.
 
 
 ## 2015-05-09, version 0.8.2

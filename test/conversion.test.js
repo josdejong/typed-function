@@ -63,6 +63,7 @@ describe('conversion', function () {
     assert.equal(fn('foo', true), 'string, number');
     assert.equal(fn('foo', 2), 'string, number');
     assert.equal(fn('foo', 'foo'), 'string, string');
+    assert.deepEqual(Object.keys(fn.signatures).sort(), ['string,number', 'string,string']);
   });
 
   it('should add conversions to a function with variable arguments (1)', function() {

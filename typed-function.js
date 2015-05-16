@@ -834,7 +834,7 @@
 
       for (var i = 0; i < signatures.length; i++) {
         var signature = signatures[i];
-        if (signature.fn) {
+        if (signature.fn && !signature.hasConversions()) {
           var params = signature.params.join(',');
           normalized[params] = signature.fn;
         }
