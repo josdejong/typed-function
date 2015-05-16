@@ -1,7 +1,7 @@
 # History
 
 
-## 2015-05-09, version 0.9.0
+## 2015-05-16, version 0.8.3
 
 - Function `typed.find` now throws an error instead of returning `null` when a 
   signature is not found.
