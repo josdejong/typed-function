@@ -30,6 +30,14 @@ describe('merge', function () {
     assert.throws(function () {typed4(new Date())}, /TypeError: Unexpected type of argument in function unnamed \(expected: boolean or number or string, actual: Date, index: 0\)/);
   });
 
+  it('should allow merging duplicate signatures when pointing to the same function', function () {
+    var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
+
+    var merged = typed(typed1, typed1);
+
+    assert.deepEqual(Object.keys(merged.signatures).sort(), ['boolean']);
+  });
+
   it('should throw an error in case of conflicting signatures when merging', function () {
     var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
     var typed2 = typed('boolean', function (value) { return 'boolean:' + value; });

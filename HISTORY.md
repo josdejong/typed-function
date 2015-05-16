@@ -1,6 +1,12 @@
 # History
 
 
+## not yet released, version 0.8.4
+
+- `typed-function` now allows merging typed functions with duplicate signatures
+  when they point to the same function.
+
+
 ## 2015-05-16, version 0.8.3
 
 - Function `typed.find` now throws an error instead of returning `null` when a 

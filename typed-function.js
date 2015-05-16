@@ -1130,9 +1130,12 @@
           for (var signature in fn.signatures) {
             if (fn.signatures.hasOwnProperty(signature)) {
               if (signatures.hasOwnProperty(signature)) {
-                err = new Error('Signature "' + signature + '" is defined twice');
-                err.data = {signature: signature};
-                throw err;
+                if (fn.signatures[signature] !== signatures[signature]) {
+                  err = new Error('Signature "' + signature + '" is defined twice');
+                  err.data = {signature: signature};
+                  throw err;
+                }
+                // else: both signatures point to the same function, that's fine
               }
               else {
                 signatures[signature] = fn.signatures[signature];

@@ -257,7 +257,7 @@ A typed function can be constructed in three ways:
     }
 
     // we want to ignore a specific type
-    typed.ignore = ['string'];        
+    typed.ignore = ['string'];
 
     // the created function fn will only contain the 'number' signature 
     var fn = typed('fn', signatures);
