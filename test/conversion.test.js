@@ -77,11 +77,10 @@ describe('conversion', function () {
     });
 
     assert.equal(sum(2,3,4), 9);
-    // TODO
-    //assert.equal(sum(2,true,4), 7);
-    //assert.equal(sum(1,2,false), 3);
-    //assert.equal(sum(1,2,true), 4);
-    //assert.equal(sum(true,1,2), 4);
+    assert.equal(sum(2,true,4), 7);
+    assert.equal(sum(1,2,false), 3);
+    assert.equal(sum(1,2,true), 4);
+    assert.equal(sum(true,1,2), 4);
     assert.equal(sum(true,false, true), 2);
   });
 

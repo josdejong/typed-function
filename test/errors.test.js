@@ -58,7 +58,7 @@ describe('errors', function () {
   it('should give correct error in case of wrong type of argument (union args)', function() {
     var fn = typed('boolean | string | Date', function () {});
 
-    assert.throws(function () {fn(2)}, /TypeError: Unexpected type of argument in function unnamed \(expected: boolean or string or Date, actual: number, index: 0\)/);
+    assert.throws(function () {fn(2)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string or boolean or Date, actual: number, index: 0\)/);
   });
 
   it('should give correct error in case of conflicting union arguments', function() {

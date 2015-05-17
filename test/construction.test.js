@@ -183,4 +183,29 @@ describe('construction', function() {
     }, /Error: Unknown type "Function". Did you mean "function"?/);
   });
 
+
+  it('should correctly order type checks based on their index in typed.types', function () {
+    var fn = typed({
+      'boolean': function (a) {
+        return 'boolean';
+      },
+      'string': function (a) {
+        return 'string';
+      },
+      'number': function (a) {
+        return 'number';
+      }
+    });
+
+    var str = fn.toString();
+    console.log('fn', str); // TODO: cleanup
+    var booleanIndex = str.indexOf('// signature: boolean');
+    var stringIndex  = str.indexOf('// signature: string');
+    var numberIndex  = str.indexOf('// signature: number');
+
+    assert(stringIndex > numberIndex, 'string must come after number');
+    assert(booleanIndex > numberIndex, 'boolean must come after number');
+    assert(booleanIndex > stringIndex, 'boolean must come after string');
+  });
+
 });

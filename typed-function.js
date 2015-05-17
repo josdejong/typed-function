@@ -216,6 +216,7 @@
      * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
      */
     Param.compare = function (a, b) {
+      // TODO: simplify parameter comparison, it's a mess
       if (a.anyType) return 1;
       if (b.anyType) return -1;
 
@@ -250,9 +251,27 @@
         if (b.hasConversions()) {
           return -1;
         }
-      }
+        else {
+          // both params have no conversions
+          var ai, bi;
 
-      return 0;
+          for (i = 0; i < typed.types.length; i++) {
+            if (typed.types[i].type === a.types[0]) {
+              ai = i;
+              break;
+            }
+          }
+
+          for (i = 0; i < typed.types.length; i++) {
+            if (typed.types[i].type === b.types[0]) {
+              bi = i;
+              break;
+            }
+          }
+
+          return ai - bi;
+        }
+      }
     };
 
     /**
@@ -459,7 +478,7 @@
       if (ac > bc) return 1;
       if (ac < bc) return -1;
 
-      // compare the conversion index per parameter
+      // compare the order per parameter
       for (i = 0; i < a.params.length; i++) {
         var cmp = Param.compare(a.params[i], b.params[i]);
         if (cmp !== 0) {
@@ -792,6 +811,11 @@
         }
       }
 
+      // order the signatures
+      signatures.sort(function (a, b) {
+        return Signature.compare(a, b);
+      });
+
       // filter redundant conversions from signatures with varArgs
       // TODO: simplify this loop or move it to a separate function
       for (i = 0; i < signatures.length; i++) {
@@ -1108,6 +1132,7 @@
         signatures[signature] = fn;
         return _typed(name, signatures);
       },
+      // TODO: add a signature 'Array.<function>'
       '...function': function (fns) {
         var err;
         var name = '';
