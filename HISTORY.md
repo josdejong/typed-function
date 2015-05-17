@@ -1,8 +1,10 @@
 # History
 
 
-## not yet released, version 0.8.4
+## not yet released, version 0.9.0
 
+- `typed.types` is now an ordered Array containing objects 
+  `{type: string, test: function}` instead of an object.
 - `typed-function` now allows merging typed functions with duplicate signatures
   when they point to the same function.
 

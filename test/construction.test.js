@@ -99,9 +99,12 @@ describe('construction', function() {
     var typed2 = typed.create();
     function Person() {}
 
-    typed.types['Person'] = function (x) {
-      return x instanceof Person;
-    };
+    typed.types.push({
+      type: 'Person',
+      test: function (x) {
+        return x instanceof Person;
+      }
+    });
 
     assert.strictEqual(typed.create, typed2.create);
     assert.notStrictEqual(typed.types, typed2.types);

@@ -31,15 +31,22 @@
      *                                        Throws an error for an unknown type.
      */
     function getTypeTest(type) {
-      var test = typed.types[type];
+      var test;
+      for (var i = 0; i < typed.types.length; i++) {
+        var entry = typed.types[i];
+        if (entry.type === type) {
+          test = entry.test;
+          break;
+        }
+      }
+
       if (!test) {
         var hint;
-        for (var name in typed.types) {
-          if (typed.types.hasOwnProperty(name)) {
-            if (name.toLowerCase() == type.toLowerCase()) {
-              hint = name;
-              break;
-            }
+        for (i = 0; i < typed.types.length; i++) {
+          entry = typed.types[i];
+          if (entry.type.toLowerCase() == type.toLowerCase()) {
+            hint = entry.type;
+            break;
           }
         }
 
@@ -587,7 +594,7 @@
           else {
             // variable arguments with a fixed type
             var getTests = function (types, arg) {
-              var tests = new Array(types.length);
+              var tests = [];
               for (var i = 0; i < types.length; i++) {
                 tests[i] = refs.add(getTypeTest(types[i]), 'test') + '(' + arg + ')';
               }
@@ -1013,13 +1020,23 @@
      * @returns {string} Returns a string with the type of value
      */
     function getTypeOf(x) {
-      for (var type in types) {
-        if (types.hasOwnProperty(type) && type !== 'Object') {
+      var obj;
+
+      for (var i = 0; i < typed.types.length; i++) {
+        var entry = typed.types[i];
+
+        if (entry.type === 'Object') {
           // Array and Date are also Object, so test for Object afterwards
-          if (types[type](x)) return type;
+          obj = entry;
+        }
+        else {
+          if (entry.test(x)) return entry.type;
         }
       }
-      if (types['Object'](x)) return type;
+
+      // at last, test whether an object
+      if (obj && obj.test(x)) return obj.type;
+
       return 'unknown';
     }
 
@@ -1034,38 +1051,18 @@
     }
 
     // data type tests
-    var types = {
-      'null': function (x) {
-        return x === null
-      },
-      'undefined': function (x) {
-        return x === undefined
-      },
-      'boolean': function (x) {
-        return typeof x === 'boolean'
-      },
-      'number': function (x) {
-        return typeof x === 'number'
-      },
-      'string': function (x) {
-        return typeof x === 'string'
-      },
-      'function': function (x) {
-        return typeof x === 'function'
-      },
-      'Array': function (x) {
-        return Array.isArray(x)
-      },
-      'Date': function (x) {
-        return x instanceof Date
-      },
-      'RegExp': function (x) {
-        return x instanceof RegExp
-      },
-      'Object': function (x) {
-        return typeof x === 'object'
-      }
-    };
+    var types = [
+      { type: 'number',    test: function (x) { return typeof x === 'number' } },
+      { type: 'string',    test: function (x) { return typeof x === 'string' } },
+      { type: 'boolean',   test: function (x) { return typeof x === 'boolean' } },
+      { type: 'function',  test: function (x) { return typeof x === 'function'} },
+      { type: 'Array',     test: Array.isArray },
+      { type: 'Date',      test: function (x) { return x instanceof Date } },
+      { type: 'RegExp',    test: function (x) { return x instanceof RegExp } },
+      { type: 'Object',    test: function (x) { return typeof x === 'object' } },
+      { type: 'null',      test: function (x) { return x === null } },
+      { type: 'undefined', test: function (x) { return x === undefined } }
+    ];
 
     // configuration
     var config = {};
