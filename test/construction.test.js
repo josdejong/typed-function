@@ -176,11 +176,11 @@ describe('construction', function() {
 
     assert.throws(function () {
       var fn = typed({
-        'Function': function (value) {
+        'function': function (value) {
           return 'Function:' + value;
         }
       });
-    }, /Error: Unknown type "Function". Did you mean "function"?/);
+    }, /Error: Unknown type "function". Did you mean "Function"?/);
   });
 
 

@@ -27,7 +27,7 @@
     /**
      * Get a type test function for a specific data type
      * @param {string} type                   A data type like 'number' or 'string'
-     * @returns {function(obj: *) : boolean}  Returns a type testing function.
+     * @returns {Function(obj: *) : boolean}  Returns a type testing function.
      *                                        Throws an error for an unknown type.
      */
     function getTypeTest(type) {
@@ -120,7 +120,7 @@
 
     /**
      * Add a function reference.
-     * @param {function} fn
+     * @param {Function} fn
      * @param {string} [category='fn']    A function category, like 'fn' or 'signature'
      * @returns {string} Returns the function name, for example 'fn0' or 'signature2'
      */
@@ -352,7 +352,7 @@
      * @param {string | string[] | Param[]} params
      *                         Array with the type(s) of each parameter,
      *                         or a comma separated string with types
-     * @param {function} fn    The actual function
+     * @param {Function} fn    The actual function
      * @constructor
      */
     function Signature(params, fn) {
@@ -761,7 +761,7 @@
 
     /**
      * Split all raw signatures into an array with expanded Signatures
-     * @param {Object.<string, function>} rawSignatures
+     * @param {Object.<string, Function>} rawSignatures
      * @return {Signature[]} Returns an array with expanded signatures
      */
     function parseSignatures(rawSignatures) {
@@ -856,7 +856,7 @@
     /**
      * create a map with normalized signatures as key and the function as value
      * @param {Signature[]} signatures   An array with split signatures
-     * @return {Object.<string, function>} Returns a map with normalized
+     * @return {Object.<string, Function>} Returns a map with normalized
      *                                     signatures as key, and the function
      *                                     as value.
      */
@@ -972,8 +972,8 @@
      *   typed(name: string, signatures: Object.<string, function>)
      *
      * @param {string | null} name
-     * @param {Object.<string, function>} signatures
-     * @return {function} Returns the typed function
+     * @param {Object.<string, Function>} signatures
+     * @return {Function} Returns the typed function
      * @private
      */
     function _typed(name, signatures) {
@@ -1079,7 +1079,7 @@
       { type: 'number',    test: function (x) { return typeof x === 'number' } },
       { type: 'string',    test: function (x) { return typeof x === 'string' } },
       { type: 'boolean',   test: function (x) { return typeof x === 'boolean' } },
-      { type: 'function',  test: function (x) { return typeof x === 'function'} },
+      { type: 'Function',  test: function (x) { return typeof x === 'function'} },
       { type: 'Array',     test: Array.isArray },
       { type: 'Date',      test: function (x) { return x instanceof Date } },
       { type: 'RegExp',    test: function (x) { return x instanceof RegExp } },
@@ -1122,18 +1122,18 @@
         return _typed(null, signatures);
       },
       'string, Object': _typed,
-      'string, function': function (signature, fn) {
+      'string, Function': function (signature, fn) {
         var signatures = {};
         signatures[signature] = fn;
         return _typed(fn.name || null, signatures);
       },
-      'string, string, function': function (name, signature, fn) {
+      'string, string, Function': function (name, signature, fn) {
         var signatures = {};
         signatures[signature] = fn;
         return _typed(name, signatures);
       },
       // TODO: add a signature 'Array.<function>'
-      '...function': function (fns) {
+      '...Function': function (fns) {
         var err;
         var name = '';
         var signatures = {};
@@ -1194,10 +1194,10 @@
      *
      * Function find only only works for exact matches.
      *
-     * @param {function} fn                   A typed-function
+     * @param {Function} fn                   A typed-function
      * @param {string | string[]} signature   Signature to be found, can be
      *                                        an array or a comma separated string.
-     * @return {function}                     Returns the matching signature, or
+     * @return {Function}                     Returns the matching signature, or
      *                                        throws an errror when no signature
      *                                        is found.
      */
