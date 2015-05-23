@@ -130,7 +130,7 @@ typed-function has the following built-in types:
 - `boolean`
 - `number`
 - `string`
-- `function`
+- `Function`
 - `Array`
 - `Date`
 - `RegExp`
@@ -138,7 +138,7 @@ typed-function has the following built-in types:
 
 The following type expressions are supported:
 
-- Multiple arguments: `string, number, function`
+- Multiple arguments: `string, number, Function`
 - Union types: `number | string`
 - Variable arguments: `...number`
 - Any type: `any`

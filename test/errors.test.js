@@ -112,4 +112,22 @@ describe('errors', function () {
     assert.throws(function () {fn(2, 'foo')}, /TypeError: Unexpected type of argument in function unnamed \(expected: number or boolean, actual: string, index: 1\)/);
     assert.throws(function () {fn(2, true, 'foo')}, /TypeError: Unexpected type of argument in function unnamed \(expected: number or boolean, actual: string, index: 2\)/);
   });
+
+  it('should only list exact matches in expected types (not conversions)', function() {
+    var typed2 = typed.create();
+    typed2.conversions.push({
+      from: 'number',
+      to: 'string',
+      convert: function (x) {
+        return +x;
+      }
+    });
+
+    var fn1 = typed2('string', function () {});
+    var fn2 = typed2('...string', function () {});
+
+    assert.throws(function () {fn1(true)},    /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: boolean, index: 0\)/);
+    assert.throws(function () {fn2(true)},    /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: boolean, index: 0\)/);
+    assert.throws(function () {fn2(2, true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: boolean, index: 1\)/);
+  });
 });

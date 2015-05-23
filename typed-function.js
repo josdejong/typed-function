@@ -645,7 +645,7 @@
               }
             }
             code.push(prefix + '    } else {');
-            code.push(prefix + '      throw createError(name, arguments.length, i, arguments[i], \'' + allTypes.join(',') + '\');');
+            code.push(prefix + '      throw createError(name, arguments.length, i, arguments[i], \'' + exactTypes.join(',') + '\');');
             code.push(prefix + '    }');
             code.push(prefix + '  }');
             code.push(this.signature.toCode(refs, prefix + '  '));
@@ -747,7 +747,7 @@
           if (node.param) {
             for (var j = 0; j < node.param.types.length; j++) {
               var type = node.param.types[j];
-              if (!(type in keys)) {
+              if (!(type in keys) && !node.param.conversions[j]) {
                 keys[type] = true;
                 types.push(type);
               }

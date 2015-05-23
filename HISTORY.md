@@ -4,6 +4,7 @@
 ## not yet released, version 0.10.0
 
 - Changed the casing of the type `'function'` to `'Function'`.
+- List with expected types in error messages no longer includes converted types.
 
 
 ## 2015-05-17, version 0.9.0

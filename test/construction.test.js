@@ -198,7 +198,6 @@ describe('construction', function() {
     });
 
     var str = fn.toString();
-    console.log('fn', str); // TODO: cleanup
     var booleanIndex = str.indexOf('// signature: boolean');
     var stringIndex  = str.indexOf('// signature: string');
     var numberIndex  = str.indexOf('// signature: number');
