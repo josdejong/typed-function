@@ -4,8 +4,10 @@ var typed = require('../typed-function');
 describe('union types', function () {
 
   it('should create a typed function with union types', function() {
-    var fn = typed('number | boolean', function (arg) {
-      return typeof arg;
+    var fn = typed({
+      'number | boolean': function (arg) {
+        return typeof arg;
+      }
     });
 
     assert.equal(fn(true), 'boolean');

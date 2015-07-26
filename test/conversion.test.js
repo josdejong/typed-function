@@ -67,13 +67,15 @@ describe('conversion', function () {
   });
 
   it('should add conversions to a function with variable arguments (1)', function() {
-    var sum = typed('...number', function (values) {
-      assert(Array.isArray(values));
-      var sum = 0;
-      for (var i = 0; i < values.length; i++) {
-        sum += values[i];
+    var sum = typed({
+      '...number': function (values) {
+        assert(Array.isArray(values));
+        var sum = 0;
+        for (var i = 0; i < values.length; i++) {
+          sum += values[i];
+        }
+        return sum;
       }
-      return sum;
     });
 
     assert.equal(sum(2,3,4), 9);
@@ -85,14 +87,16 @@ describe('conversion', function () {
   });
 
   it('should add conversions to a function with variable arguments (2)', function() {
-    var sum = typed('string, ...number', function (name, values) {
-      assert.equal(typeof name, 'string');
-      assert(Array.isArray(values));
-      var sum = 0;
-      for (var i = 0; i < values.length; i++) {
-        sum += values[i];
+    var sum = typed({
+      'string, ...number': function (name, values) {
+        assert.equal(typeof name, 'string');
+        assert(Array.isArray(values));
+        var sum = 0;
+        for (var i = 0; i < values.length; i++) {
+          sum += values[i];
+        }
+        return sum;
       }
-      return sum;
     });
 
     assert.equal(sum('foo', 2,3,4), 9);

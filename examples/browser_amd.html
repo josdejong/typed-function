@@ -10,8 +10,10 @@
   // load math.js using require.js
   require(['../typed-function.js'], function (typed) {
     // create a typed function
-    var fn1 = typed('number, string', function (a, b) {
-      return 'a is a number, b is a string';
+    var fn1 = typed({
+      'number, string': function (a, b) {
+        return 'a is a number, b is a string';
+      }
     });
 
     // use the function

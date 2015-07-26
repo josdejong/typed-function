@@ -5,13 +5,15 @@ var strictEqualArray = require('./strictEqualArray');
 describe('variable arguments', function () {
 
   it('should create a typed function with variable arguments', function() {
-    var sum = typed('...number', function (values) {
-      assert(Array.isArray(values));
-      var sum = 0;
-      for (var i = 0; i < values.length; i++) {
-        sum += values[i];
+    var sum = typed({
+      '...number': function (values) {
+        assert(Array.isArray(values));
+        var sum = 0;
+        for (var i = 0; i < values.length; i++) {
+          sum += values[i];
+        }
+        return sum;
       }
-      return sum;
     });
 
     assert.equal(sum(2), 2);
@@ -24,10 +26,12 @@ describe('variable arguments', function () {
   });
 
   it('should create a typed function with variable arguments (2)', function() {
-    var fn = typed('string, ...number', function (str, values) {
-      assert.equal(typeof str, 'string');
-      assert(Array.isArray(values));
-      return str + ': ' + values.join(', ');
+    var fn = typed({
+      'string, ...number': function (str, values) {
+        assert.equal(typeof str, 'string');
+        assert(Array.isArray(values));
+        return str + ': ' + values.join(', ');
+      }
     });
 
     assert.equal(fn('foo', 2), 'foo: 2');
@@ -38,10 +42,12 @@ describe('variable arguments', function () {
   });
 
   it('should create a typed function with any type arguments (1)', function() {
-    var fn = typed('string, ...any', function (str, values) {
-      assert.equal(typeof str, 'string');
-      assert(Array.isArray(values));
-      return str + ': ' + values.join(', ');
+    var fn = typed({
+      'string, ...any': function (str, values) {
+        assert.equal(typeof str, 'string');
+        assert(Array.isArray(values));
+        return str + ': ' + values.join(', ');
+      }
     });
 
     assert.equal(fn('foo', 2), 'foo: 2');
@@ -52,10 +58,12 @@ describe('variable arguments', function () {
   });
 
   it('should create a typed function with implicit any type arguments', function() {
-    var fn = typed('string, ...', function (str, values) {
-      assert.equal(typeof str, 'string');
-      assert(Array.isArray(values));
-      return str + ': ' + values.join(', ');
+    var fn = typed({
+      'string, ...': function (str, values) {
+        assert.equal(typeof str, 'string');
+        assert(Array.isArray(values));
+        return str + ': ' + values.join(', ');
+      }
     });
 
     assert.equal(fn('foo', 2), 'foo: 2');
@@ -66,9 +74,11 @@ describe('variable arguments', function () {
   });
 
   it('should create a typed function with any type arguments (2)', function() {
-    var fn = typed('any, ...number', function (any, values) {
-      assert(Array.isArray(values));
-      return any + ': ' + values.join(', ');
+    var fn = typed({
+      'any, ...number': function (any, values) {
+        assert(Array.isArray(values));
+        return any + ': ' + values.join(', ');
+      }
     });
 
     assert.equal(fn('foo', 2), 'foo: 2');
@@ -79,9 +89,11 @@ describe('variable arguments', function () {
   });
 
   it('should create a typed function with union type arguments', function() {
-    var fn = typed('...number|string', function (values) {
-      assert(Array.isArray(values));
-      return values;
+    var fn = typed({
+      '...number|string': function (values) {
+        assert(Array.isArray(values));
+        return values;
+      }
     });
 
     strictEqualArray(fn(2,3,4), [2,3,4]);
@@ -133,7 +145,7 @@ describe('variable arguments', function () {
 
   it('should throw an error in case of unexpected variable arguments', function() {
     assert.throws(function () {
-      typed('...number, string', function () {});
+      typed({'...number, string': function () {}});
     }, /SyntaxError: Unexpected variable arguments operator "..."/);
   });
 

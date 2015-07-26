@@ -22,8 +22,10 @@ describe('construction', function() {
   });
 
   it('should create an unnamed function', function() {
-    var fn = typed('string', function (str) {
-      return 'foo';
+    var fn = typed({
+      'string': function (str) {
+        return 'foo';
+      }
     });
 
     assert.equal(fn('bar'), 'foo');
@@ -31,8 +33,10 @@ describe('construction', function() {
   });
 
   it('should inherit the name of the function implementation', function() {
-    var fn = typed('string', function fn1 (str) {
-      return 'foo';
+    var fn = typed({
+      'string': function fn1 (str) {
+        return 'foo';
+      }
     });
 
     assert.equal(fn('bar'), 'foo');
@@ -54,24 +58,30 @@ describe('construction', function() {
   });
 
   it('should create a typed function with one argument', function() {
-    var fn = typed('string', function () {
-      return 'string';
+    var fn = typed({
+      'string': function () {
+        return 'string';
+      }
     });
 
     assert.equal(fn('hi'), 'string');
   });
 
   it('should create a typed function with two arguments', function() {
-    var fn = typed('string, boolean', function () {
-      return 'foo';
+    var fn = typed({
+      'string, boolean': function () {
+        return 'foo';
+      }
     });
 
     assert.equal(fn('hi', true), 'foo');
   });
 
   it('should create a named, typed function', function() {
-    var fn = typed('myFunction', 'string, boolean', function () {
-      return 'noargs';
+    var fn = typed('myFunction', {
+      'string, boolean': function () {
+        return 'noargs';
+      }
     });
 
     assert.equal(fn('hi', true), 'noargs');
@@ -110,10 +120,14 @@ describe('construction', function() {
     assert.notStrictEqual(typed.types, typed2.types);
     assert.notStrictEqual(typed.conversions, typed2.conversions);
 
-    typed('Person', function (p) {return 'Person'});
+    typed({
+      'Person': function (p) {return 'Person'}
+    });
 
     assert.throws(function () {
-      typed2('Person', function (p) {return 'Person'});
+      typed2({
+        'Person': function (p) {return 'Person'}
+      });
     }, /Error: Unknown type "Person"/)
   });
 

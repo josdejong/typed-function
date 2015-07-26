@@ -79,18 +79,24 @@ Here some usage examples. More examples are available in the
 var typed = require('typed-function');
 
 // create a typed function
-var fn1 = typed('number, string', function (a, b) {
-  return 'a is a number, b is a string';
+var fn1 = typed({
+  'number, string': function (a, b) {
+    return 'a is a number, b is a string';
+  }
 });
 
 // create a typed function with multiple types per argument (type union)
-var fn2 = typed('string, number | boolean', function (a, b) {
-  return 'a is a string, b is a number or a boolean';
+var fn2 = typed({
+  'string, number | boolean': function (a, b) {
+    return 'a is a string, b is a number or a boolean';
+  }
 });
 
 // create a typed function with any type argument
-var fn3 = typed('string, any', function (a, b) {
-  return 'a is a string, b can be anything';
+var fn3 = typed({
+  'string, any': function (a, b) {
+    return 'a is a string, b can be anything';
+  }
 });
 
 // create a typed function with multiple signatures
@@ -148,23 +154,16 @@ The following type expressions are supported:
 
 ### Construction
 
-A typed function can be constructed in three ways:
+A typed function can be constructed in two ways:
 
--   With a single signature:
-
-    ```
-    typed(signature: string, fn: function) : function
-    typed(name: string, signature: string, fn: function) : function
-    ```
-
--   With multiple signatures:
+-   Create from an object with one or multiple signatures:
 
     ```
     typed(signatures: Object.<string, function>) : function
     typed(name: string, signatures: Object.<string, function>) : function
     ```
 
--   Merge multiple typed functions into a new typed function
+-   Merge multiple typed functions into a new typed function:
 
     ```
     typed(functions: ...function) : function

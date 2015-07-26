@@ -8,15 +8,17 @@ function Person(params) {
 
 // register a test for this new type
 typed.types.push({
-  type: 'Person',
+  name: 'Person',
   test: function (x) {
     return x instanceof Person;
   }
 });
 
 // create a typed function
-var stringify = typed('Person', function (person) {
-  return JSON.stringify(person);
+var stringify = typed({
+  'Person': function (person) {
+    return JSON.stringify(person);
+  }
 });
 
 // use the function

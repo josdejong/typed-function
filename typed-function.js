@@ -57,6 +57,36 @@
     }
 
     /**
+     * Retrieve the function name from a set of functions, and check
+     * whether the name of all functions match (if given)
+     * @param {Array.<function>} fns
+     */
+    function getName (fns) {
+      var name = '';
+
+      for (var i = 0; i < fns.length; i++) {
+        var fn = fns[i];
+
+        // merge function name
+        if (fn.name != '') {
+          if (name == '') {
+            name = fn.name;
+          }
+          else if (name != fn.name) {
+            var err = new Error('Function names do not match (expected: ' + name + ', actual: ' + fn.name + ')');
+            err.data = {
+              actual: fn.name,
+              expected: name
+            };
+            throw err;
+          }
+        }
+      }
+
+      return name;
+    }
+
+    /**
      * Create an ArgumentsError. Creates messages like:
      *
      *   Unexpected type of argument (expected: ..., actual: ..., index: ...)
@@ -1112,30 +1142,26 @@
      *
      * Signatures:
      *
-     *   typed(signature: string, fn: function)
-     *   typed(name: string, signature: string, fn: function)
      *   typed(signatures: Object.<string, function>)
      *   typed(name: string, signatures: Object.<string, function>)
      */
     typed = _typed('typed', {
       'Object': function (signatures) {
-        return _typed(null, signatures);
-      },
-      'string, Object': _typed,
-      'string, Function': function (signature, fn) {
-        var signatures = {};
-        signatures[signature] = fn;
-        return _typed(fn.name || null, signatures);
-      },
-      'string, string, Function': function (name, signature, fn) {
-        var signatures = {};
-        signatures[signature] = fn;
+        var fns = [];
+        for (var signature in signatures) {
+          if (signatures.hasOwnProperty(signature)) {
+            fns.push(signatures[signature]);
+          }
+        }
+        var name = getName(fns);
+
         return _typed(name, signatures);
       },
+      'string, Object': _typed,
       // TODO: add a signature 'Array.<function>'
       '...Function': function (fns) {
         var err;
-        var name = '';
+        var name = getName(fns);
         var signatures = {};
 
         for (var i = 0; i < fns.length; i++) {
@@ -1162,21 +1188,6 @@
               else {
                 signatures[signature] = fn.signatures[signature];
               }
-            }
-          }
-
-          // merge function name
-          if (fn.name != '') {
-            if (name == '') {
-              name = fn.name;
-            }
-            else if (name != fn.name) {
-              err = new Error('Function names do not match (expected: ' + name + ', actual: ' + fn.name + ')');
-              err.data = {
-                actual: fn.name,
-                expected: name
-              };
-              throw err;
             }
           }
         }

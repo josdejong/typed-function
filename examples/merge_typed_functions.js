@@ -1,12 +1,16 @@
 var typed = require('../typed-function');
 
 // create a couple of typed functions
-var fn1 = typed('number', function (a) {
-  return a + a;
+var fn1 = typed({
+  'number': function (a) {
+    return a + a;
+  }
 });
-var fn2 = typed('string', function (a) {
-  var value = +a;
-  return value + value;
+var fn2 = typed({
+  'string': function (a) {
+    var value = +a;
+    return value + value;
+  }
 });
 
 // merge multiple typed functions

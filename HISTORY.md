@@ -3,6 +3,10 @@
 
 ## not yet released, version 0.10.0
 
+- Dropped support for the following construction signatures in order to simplify
+  the API:
+  - `typed(signature: string, fn: function)`
+  - `typed(name: string, signature: string, fn: function)`
 - Changed the casing of the type `'function'` to `'Function'`. Breaking change.
 - `typed.types` is now an ordered Array containing objects 
   `{name: string, test: function}`. Breaking change.

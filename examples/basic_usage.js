@@ -1,18 +1,24 @@
 var typed = require('../typed-function');
 
 // create a typed function
-var fn1 = typed('number, string', function (a, b) {
-  return 'a is a number, b is a string';
+var fn1 = typed({
+  'number, string': function (a, b) {
+    return 'a is a number, b is a string';
+  }
 });
 
 // create a typed function with multiple types per argument (type union)
-var fn2 = typed('string, number | boolean', function (a, b) {
-  return 'a is a string, b is a number or boolean';
+var fn2 = typed({
+  'string, number | boolean': function (a, b) {
+    return 'a is a string, b is a number or boolean';
+  }
 });
 
 // create a typed function with any type argument
-var fn3 = typed('string, any', function (a, b) {
-  return 'a is a string, b can be anything';
+var fn3 = typed({
+  'string, any': function (a, b) {
+    return 'a is a string, b can be anything';
+  }
 });
 
 

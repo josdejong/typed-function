@@ -3,8 +3,8 @@ var typed = require('../typed-function');
 
 describe('merge', function () {
   it('should merge two typed-functions', function () {
-    var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
-    var typed2 = typed('number', function (value) { return 'number:' + value; });
+    var typed1 = typed({'boolean': function (value) { return 'boolean:' + value; }});
+    var typed2 = typed({'number':  function (value) { return 'number:' + value;  }});
 
     var typed3 = typed(typed1, typed2);
 
@@ -16,9 +16,9 @@ describe('merge', function () {
   });
 
   it('should merge three typed-functions', function () {
-    var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
-    var typed2 = typed('number', function (value) { return 'number:' + value; });
-    var typed3 = typed('string', function (value) { return 'string:' + value; });
+    var typed1 = typed({'boolean': function (value) { return 'boolean:' + value; }});
+    var typed2 = typed({'number':  function (value) { return 'number:' + value;  }});
+    var typed3 = typed({'string':  function (value) { return 'string:' + value;  }});
 
     var typed4 = typed(typed1, typed2, typed3);
 
@@ -31,7 +31,7 @@ describe('merge', function () {
   });
 
   it('should allow merging duplicate signatures when pointing to the same function', function () {
-    var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
+    var typed1 = typed({'boolean': function (value) { return 'boolean:' + value; }});
 
     var merged = typed(typed1, typed1);
 
@@ -39,8 +39,8 @@ describe('merge', function () {
   });
 
   it('should throw an error in case of conflicting signatures when merging', function () {
-    var typed1 = typed('boolean', function (value) { return 'boolean:' + value; });
-    var typed2 = typed('boolean', function (value) { return 'boolean:' + value; });
+    var typed1 = typed({'boolean': function (value) { return 'boolean:' + value; }});
+    var typed2 = typed({'boolean': function (value) { return 'boolean:' + value; }});
 
     assert.throws(function () {
       typed(typed1, typed2)
@@ -48,9 +48,9 @@ describe('merge', function () {
   });
 
   it('should throw an error in case of conflicting names when merging', function () {
-    var typed1 = typed('fn1', 'boolean', function () {});
-    var typed2 = typed('fn2', 'string', function () {});
-    var typed3 = typed('number', function () {});
+    var typed1 = typed('fn1', {'boolean': function () {}});
+    var typed2 = typed('fn2', {'string': function () {}});
+    var typed3 = typed({'number': function () {}});
 
     assert.throws(function () {
       typed(typed1, typed2)
