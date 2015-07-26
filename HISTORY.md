@@ -3,7 +3,9 @@
 
 ## not yet released, version 0.10.0
 
-- Changed the casing of the type `'function'` to `'Function'`.
+- Changed the casing of the type `'function'` to `'Function'`. Breaking change.
+- `typed.types` is now an ordered Array containing objects 
+  `{name: string, test: function}`. Breaking change.
 - List with expected types in error messages no longer includes converted types.
 
 

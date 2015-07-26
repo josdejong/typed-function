@@ -26,15 +26,15 @@
   function create() {
     /**
      * Get a type test function for a specific data type
-     * @param {string} type                   A data type like 'number' or 'string'
+     * @param {string} name                   Name of a data type like 'number' or 'string'
      * @returns {Function(obj: *) : boolean}  Returns a type testing function.
      *                                        Throws an error for an unknown type.
      */
-    function getTypeTest(type) {
+    function getTypeTest(name) {
       var test;
       for (var i = 0; i < typed.types.length; i++) {
         var entry = typed.types[i];
-        if (entry.type === type) {
+        if (entry.name === name) {
           test = entry.test;
           break;
         }
@@ -44,13 +44,13 @@
         var hint;
         for (i = 0; i < typed.types.length; i++) {
           entry = typed.types[i];
-          if (entry.type.toLowerCase() == type.toLowerCase()) {
-            hint = entry.type;
+          if (entry.name.toLowerCase() == name.toLowerCase()) {
+            hint = entry.name;
             break;
           }
         }
 
-        throw new Error('Unknown type "' + type + '"' +
+        throw new Error('Unknown type "' + name + '"' +
             (hint ? ('. Did you mean "' + hint + '"?') : ''));
       }
       return test;
@@ -256,14 +256,14 @@
           var ai, bi;
 
           for (i = 0; i < typed.types.length; i++) {
-            if (typed.types[i].type === a.types[0]) {
+            if (typed.types[i].name === a.types[0]) {
               ai = i;
               break;
             }
           }
 
           for (i = 0; i < typed.types.length; i++) {
-            if (typed.types[i].type === b.types[0]) {
+            if (typed.types[i].name === b.types[0]) {
               bi = i;
               break;
             }
@@ -1049,17 +1049,17 @@
       for (var i = 0; i < typed.types.length; i++) {
         var entry = typed.types[i];
 
-        if (entry.type === 'Object') {
+        if (entry.name === 'Object') {
           // Array and Date are also Object, so test for Object afterwards
           obj = entry;
         }
         else {
-          if (entry.test(x)) return entry.type;
+          if (entry.test(x)) return entry.name;
         }
       }
 
       // at last, test whether an object
-      if (obj && obj.test(x)) return obj.type;
+      if (obj && obj.test(x)) return obj.name;
 
       return 'unknown';
     }
@@ -1076,16 +1076,16 @@
 
     // data type tests
     var types = [
-      { type: 'number',    test: function (x) { return typeof x === 'number' } },
-      { type: 'string',    test: function (x) { return typeof x === 'string' } },
-      { type: 'boolean',   test: function (x) { return typeof x === 'boolean' } },
-      { type: 'Function',  test: function (x) { return typeof x === 'function'} },
-      { type: 'Array',     test: Array.isArray },
-      { type: 'Date',      test: function (x) { return x instanceof Date } },
-      { type: 'RegExp',    test: function (x) { return x instanceof RegExp } },
-      { type: 'Object',    test: function (x) { return typeof x === 'object' } },
-      { type: 'null',      test: function (x) { return x === null } },
-      { type: 'undefined', test: function (x) { return x === undefined } }
+      { name: 'number',    test: function (x) { return typeof x === 'number' } },
+      { name: 'string',    test: function (x) { return typeof x === 'string' } },
+      { name: 'boolean',   test: function (x) { return typeof x === 'boolean' } },
+      { name: 'Function',  test: function (x) { return typeof x === 'function'} },
+      { name: 'Array',     test: Array.isArray },
+      { name: 'Date',      test: function (x) { return x instanceof Date } },
+      { name: 'RegExp',    test: function (x) { return x instanceof RegExp } },
+      { name: 'Object',    test: function (x) { return typeof x === 'object' } },
+      { name: 'null',      test: function (x) { return x === null } },
+      { name: 'undefined', test: function (x) { return x === undefined } }
     ];
 
     // configuration

@@ -100,7 +100,7 @@ describe('construction', function() {
     function Person() {}
 
     typed.types.push({
-      type: 'Person',
+      name: 'Person',
       test: function (x) {
         return x instanceof Person;
       }

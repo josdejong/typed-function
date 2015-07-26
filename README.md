@@ -215,9 +215,9 @@ A typed function can be constructed in three ways:
 
 ### Properties
 
--   `typed.types: Array.<{type: string, test: function}>`
+-   `typed.types: Array.<{name: string, test: function}>`
 
-    Array with types. Each object contains a type name and a test.
+    Array with types. Each object contains a type name and a test function.
     The order of the types determines in which order function arguments are 
     type-checked, so for performance it's important to put the most used types 
     first. Custom types can be added like:
@@ -230,7 +230,7 @@ A typed function can be constructed in three ways:
     Person.prototype.isPerson = true;
 
     typed.types.push({
-      type: 'Person',
+      name: 'Person',
       test: function (x) {
         return x && x.isPerson === true;
       }
