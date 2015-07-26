@@ -7,7 +7,7 @@ function Person(params) {
 }
 
 // register a test for this new type
-typed.types.push({
+typed.addType({
   name: 'Person',
   test: function (x) {
     return x instanceof Person;
