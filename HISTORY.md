@@ -7,6 +7,7 @@
   the API:
   - `typed(signature: string, fn: function)`
   - `typed(name: string, signature: string, fn: function)`
+- Implemented convenience methods `typed.addType` and `typed.addConversion`.
 - Changed the casing of the type `'function'` to `'Function'`. Breaking change.
 - `typed.types` is now an ordered Array containing objects 
   `{name: string, test: function}`. Breaking change.

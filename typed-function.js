@@ -1277,6 +1277,27 @@
     typed.find = find;
     typed.convert = convert;
 
+    // add a type
+    typed.addType = function (type) {
+      if (!type || typeof type.name !== 'string' || typeof type.test !== 'function') {
+        throw new TypeError('Object with properties {name: string, test: function} expected');
+      }
+
+      types.push(type);
+    };
+
+    // add a conversion
+    typed.addConversion = function (conversion) {
+      if (!conversion
+          || typeof conversion.from !== 'string'
+          || typeof conversion.to !== 'string'
+          || typeof conversion.convert !== 'function') {
+        throw new TypeError('Object with properties {from: string, to: string, convert: function} expected');
+      }
+
+      conversions.push(conversion);
+    };
+
     return typed;
   }
 

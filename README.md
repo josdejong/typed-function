@@ -211,6 +211,43 @@ A typed function can be constructed in two ways:
     var f = typed.find(fn, 'number, string');
     ```
 
+-   `typed.addType(type: {name: string, test: function})`
+
+    Add a new type. A type object contains a name and a test function.
+    The order of the types determines in which order function arguments are 
+    type-checked, so for performance it's important to put the most used types 
+    first. All types are added to the Array `typed.types`. 
+    
+    Example:
+    
+    ```js
+    function Person(...) {
+      ...
+    }
+    
+    Person.prototype.isPerson = true;
+
+    typed.addType({
+      name: 'Person',
+      test: function (x) {
+        return x && x.isPerson === true;
+      }
+    });
+    ```
+    
+-   `typed.addConversion(conversion: {from: string, to: string, convert: function}`
+
+    Add a new conversion. Conversions are added to the Array `typed.conversions`.
+    
+    ```js
+    typed.addConversion({
+      from: 'boolean',
+      to: 'number',
+      convert: function (x) {
+        return +x;
+    });
+    ```
+    
 
 ### Properties
 

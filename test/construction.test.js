@@ -131,6 +131,31 @@ describe('construction', function() {
     }, /Error: Unknown type "Person"/)
   });
 
+  it('should add a type using addType', function() {
+    var typed2 = typed.create();
+    function Person() {}
+
+    var newType = {
+      name: 'Person',
+      test: function (x) {
+        return x instanceof Person;
+      }
+    };
+
+    typed.addType(newType);
+
+    assert.strictEqual(typed.types[typed.types.length - 1], newType);
+  });
+
+  it('should throw an error when passing an invalid type to addType', function() {
+    var typed2 = typed.create();
+    var errMsg = /TypeError: Object with properties \{name: string, test: function} expected/;
+
+    assert.throws(function () {typed2.addType({})}, errMsg);
+    assert.throws(function () {typed2.addType({name: 2, test: function () {}})}, errMsg);
+    assert.throws(function () {typed2.addType({name: 'foo', test: 'bar'})}, errMsg);
+  });
+
   it('should throw an error when providing an unsupported type of argument', function() {
     var fn = typed('fn1', {
       'number': function (value) {

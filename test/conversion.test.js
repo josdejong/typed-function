@@ -38,6 +38,38 @@ describe('conversion', function () {
     assert.equal(fn('foo'), 'foo');
   });
 
+  it('should add a conversion using addConversion', function() {
+    var typed2 = typed.create();
+
+    var conversion = {
+      from: 'number',
+      to: 'string',
+      convert: function (x) {
+        return x + '';
+      }
+    };
+
+    assert.equal(typed2.conversions.length, 0);
+
+    typed2.addConversion(conversion);
+
+    assert.equal(typed2.conversions.length, 1);
+    assert.strictEqual(typed2.conversions[0], conversion);
+  });
+
+  it('should throw an error when passing an invalid conversion object to addConversion', function() {
+    var typed2 = typed.create();
+    var errMsg = /TypeError: Object with properties \{from: string, to: string, convert: function} expected/;
+
+    assert.throws(function () {typed2.addConversion({})}, errMsg);
+    assert.throws(function () {typed2.addConversion({from: 'number', to: 'string'})}, errMsg);
+    assert.throws(function () {typed2.addConversion({from: 'number', convert: function () {}})}, errMsg);
+    assert.throws(function () {typed2.addConversion({to: 'string', convert: function () {}})}, errMsg);
+    assert.throws(function () {typed2.addConversion({from: 2, to: 'string', convert: function () {}})}, errMsg);
+    assert.throws(function () {typed2.addConversion({from: 'number', to: 2, convert: function () {}})}, errMsg);
+    assert.throws(function () {typed2.addConversion({from: 'number', to: 'string', convert: 'foo'})}, errMsg);
+  });
+
   it('should add conversions to a function with multiple arguments', function() {
     // note: we add 'string, string' first, and `string, number` afterwards,
     //       to test whether the conversions are correctly ordered.
