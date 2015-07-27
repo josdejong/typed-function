@@ -1,7 +1,13 @@
 # History
 
 
-## not yet released, version 0.10.0
+## 2015-07-27, version 0.10.1
+
+- Fixed functions `addType` and `addConversion` not being robust against
+  replaced arrays `typed.types` and `typed.conversions`.
+
+
+## 2015-07-26, version 0.10.0
 
 - Dropped support for the following construction signatures in order to simplify
   the API:

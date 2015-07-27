@@ -1283,7 +1283,7 @@
         throw new TypeError('Object with properties {name: string, test: function} expected');
       }
 
-      types.push(type);
+      typed.types.push(type);
     };
 
     // add a conversion
@@ -1295,7 +1295,7 @@
         throw new TypeError('Object with properties {from: string, to: string, convert: function} expected');
       }
 
-      conversions.push(conversion);
+      typed.conversions.push(conversion);
     };
 
     return typed;
