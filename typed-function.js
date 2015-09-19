@@ -433,6 +433,28 @@
     }
 
     /**
+     * Retrieve the parameter of this signature for a given index
+     * @param {number} [index] index of the parameter to retrieve
+     * @return {Param} Returns the parameter at that index, or the last parameter if varArgs is true
+     */
+    Signature.prototype.getParam = function(index) {
+      return index < this.params.length
+        ? this.params[index]
+        : this.varArgs
+          ? this.params[this.params.length - 1]
+          : undefined;
+    };
+
+    /**
+     * Test if this signature is compatible with a certain number of arguments
+     * @param {number} [length] length to test against this signature
+     * @return {boolean} Returns true if the signature may be called with the provided number of arguments.
+     */
+    Signature.prototype.compatibleLength = function(length) {
+      return length === this.params.length || this.varArgs && length > this.params.length;
+    };
+
+    /**
      * Create a clone of this signature
      * @returns {Signature} Returns a cloned version of this signature
      */
@@ -508,8 +530,10 @@
      * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
      */
     Signature.compare = function (a, b) {
-      if (a.params.length > b.params.length) return 1;
-      if (a.params.length < b.params.length) return -1;
+      var varArgs = a.varArgs ? 1 : -1;
+      if (a.varArgs ^ b.varArgs) return varArgs;
+      if (a.params.length > b.params.length) return -varArgs;
+      if (a.params.length < b.params.length) return varArgs;
 
       // count the number of conversions
       var i;
@@ -931,21 +955,26 @@
         signature = signatures[i];
 
         // filter the first signature with the correct number of params
-        if (signature.params.length === index && !nodeSignature) {
+        if (signature.compatibleLength(index) && !nodeSignature) {
           nodeSignature = signature;
         }
 
-        if (signature.params[index] != undefined) {
+        if (signature.getParam(index) != undefined) {
           filtered.push(signature);
         }
       }
+
+      var extrapolated = filtered.every(function(signature) { return signature.params.length < index; });
+      // stop if every remaining signature has varArgs and is beyond its minimum length
+      if(extrapolated && filtered.length === signatures.length)
+        filtered = [];
 
       // recurse over the signatures
       var entries = [];
       for (i = 0; i < filtered.length; i++) {
         signature = filtered[i];
         // group signatures with compatible params at current index
-        var param = signature.params[index];
+        var param = signature.getParam(index);
 
         var remainder = param;
 

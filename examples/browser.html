@@ -28,7 +28,7 @@
   };
 
   function printNode(node, path) {
-    path = (path || '').concat((node.param && node.param.types.toString()) || '');
+    path = (path || '').concat((node.param && node.param.toString()) || '');
     return node.childs.length
       ? node.childs.reduce(function(paths, child) { return paths.concat(printNode(child, path)); }, [])
       : [path];
