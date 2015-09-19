@@ -305,18 +305,34 @@
     };
 
     /**
-     * Test whether this parameters types overlap an other parameters types.
+     * Return a new param based on this param excluding another
      * @param {Param} other
-     * @return {boolean} Returns true when there are conflicting types
+     * @return {Param} Returns a param representing the types in this param that are not in the other
      */
-    Param.prototype.overlapping = function (other) {
-      for (var i = 0; i < this.types.length; i++) {
-        if (contains(other.types, this.types[i])) {
-          return true;
-        }
-      }
-      return false;
-    };
+	Param.prototype.except = function (other) {
+		var types = contains(this.types, 'any') ^ contains(other.types, 'any')
+			? contains(this.types, 'any') ? this.types : []
+			: this.types.filter(function(type) { return !contains(other.types, type); });
+
+		return this.varArgs ^ other.varArgs
+			// varArgs trumps non-varArgs, filter only one-way
+			? new Param(this.varArgs ? this.types : types, this.varArgs)
+			// where both are equivalent, filter as normal
+			: new Param(types, this.varArgs);
+	};
+
+    /**
+     * Return a new param based on the intersection of this param and another
+     * @param {Param} other
+     * @return {Param} Returns a param representing the common types to both
+     */
+ 	Param.prototype.intersect = function (other) {
+ 	    // the intersection of 'any' is always the other param, or 'any' if both are wildcards.
+ 	    var types = contains(this.types, 'any')
+ 	        ? other.types
+ 	        : this.types.filter(function(type) { return contains(other.types, 'any') || contains(other.types, type); })
+		return new Param(types, this.varArgs && other.varArgs);
+	};
 
     /**
      * Create a clone of this param
@@ -738,10 +754,6 @@
         code.push(this.childs[i].toCode(refs, prefix, nextAnyType));
       }
 
-      if (anyType && !this.param.anyType) {
-        code.push(anyType.toCode(refs, prefix, nextAnyType));
-      }
-
       var exceptions = this._exceptions(refs, prefix);
       if (exceptions) {
         code.push(exceptions);
@@ -929,43 +941,27 @@
         }
       }
 
-      // sort the filtered signatures by param
-      filtered.sort(function (a, b) {
-        return Param.compare(a.params[index], b.params[index]);
-      });
-
       // recurse over the signatures
       var entries = [];
       for (i = 0; i < filtered.length; i++) {
         signature = filtered[i];
-        // group signatures with the same param at current index
+        // group signatures with compatible params at current index
         var param = signature.params[index];
 
-        // TODO: replace the next filter loop
-        var existing = entries.filter(function (entry) {
-          return entry.param.overlapping(param);
-        })[0];
+		var remainder = param;
 
-        //var existing;
-        //for (var j = 0; j < entries.length; j++) {
-        //  if (entries[j].param.overlapping(param)) {
-        //    existing = entries[j];
-        //    break;
-        //  }
-        //}
-
-        if (existing) {
-          if (existing.param.varArgs) {
-            throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
-          }
-          existing.signatures.push(signature);
-        }
-        else {
-          entries.push({
-            param: param,
-            signatures: [signature]
-          });
-        }
+		entries = entries.map(function(entry) {
+			remainder = remainder.except(entry.param);
+			return [{
+				param: entry.param.except(param),
+				signatures: entry.signatures
+			}, {
+				param: entry.param.intersect(param),
+				signatures: entry.signatures.concat(signature)
+			}];
+		}).reduce(function(a, b) { return a.concat(b); }, [])
+			.concat({ param: remainder, signatures: [signature] })
+			.filter(function(entry) { return entry.param.types.length; });
       }
 
       // parse the childs
