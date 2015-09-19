@@ -309,30 +309,30 @@
      * @param {Param} other
      * @return {Param} Returns a param representing the types in this param that are not in the other
      */
-	Param.prototype.except = function (other) {
-		var types = contains(this.types, 'any') ^ contains(other.types, 'any')
-			? contains(this.types, 'any') ? this.types : []
-			: this.types.filter(function(type) { return !contains(other.types, type); });
+    Param.prototype.except = function (other) {
+      var types = contains(this.types, 'any') ^ contains(other.types, 'any')
+        ? contains(this.types, 'any') ? this.types : []
+        : this.types.filter(function(type) { return !contains(other.types, type); });
 
-		return this.varArgs ^ other.varArgs
-			// varArgs trumps non-varArgs, filter only one-way
-			? new Param(this.varArgs ? this.types : types, this.varArgs)
-			// where both are equivalent, filter as normal
-			: new Param(types, this.varArgs);
-	};
+      return this.varArgs ^ other.varArgs
+        // varArgs trumps non-varArgs, filter only one-way
+        ? new Param(this.varArgs ? this.types : types, this.varArgs)
+        // where both are equivalent, filter as normal
+        : new Param(types, this.varArgs);
+    };
 
     /**
      * Return a new param based on the intersection of this param and another
      * @param {Param} other
      * @return {Param} Returns a param representing the common types to both
      */
- 	Param.prototype.intersect = function (other) {
- 	    // the intersection of 'any' is always the other param, or 'any' if both are wildcards.
- 	    var types = contains(this.types, 'any')
- 	        ? other.types
- 	        : this.types.filter(function(type) { return contains(other.types, 'any') || contains(other.types, type); })
-		return new Param(types, this.varArgs && other.varArgs);
-	};
+    Param.prototype.intersect = function (other) {
+      // the intersection of 'any' is always the other param, or 'any' if both are wildcards.
+      var types = contains(this.types, 'any')
+        ? other.types
+        : this.types.filter(function(type) { return contains(other.types, 'any') || contains(other.types, type); })
+      return new Param(types, this.varArgs && other.varArgs);
+    };
 
     /**
      * Create a clone of this param
@@ -947,20 +947,20 @@
         // group signatures with compatible params at current index
         var param = signature.params[index];
 
-		var remainder = param;
+        var remainder = param;
 
-		entries = entries.map(function(entry) {
-			remainder = remainder.except(entry.param);
-			return [{
-				param: entry.param.except(param),
-				signatures: entry.signatures
-			}, {
-				param: entry.param.intersect(param),
-				signatures: entry.signatures.concat(signature)
-			}];
-		}).reduce(function(a, b) { return a.concat(b); }, [])
-			.concat({ param: remainder, signatures: [signature] })
-			.filter(function(entry) { return entry.param.types.length; });
+        entries = entries.map(function(entry) {
+          remainder = remainder.except(entry.param);
+          return [{
+            param: entry.param.except(param),
+            signatures: entry.signatures
+          }, {
+            param: entry.param.intersect(param),
+            signatures: entry.signatures.concat(signature)
+          }];
+        }).reduce(function(a, b) { return a.concat(b); }, [])
+          .concat({ param: remainder, signatures: [signature] })
+          .filter(function(entry) { return entry.param.types.length; });
       }
 
       // parse the childs
