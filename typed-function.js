@@ -630,10 +630,10 @@
      * Generate code for this group of signatures
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
+     * @param {boolean | undefined} [fallThrough]  True to suppress exceptions.
      * @returns {string} Returns the code as string
      */
-    Node.prototype.toCode = function (refs, prefix, anyType) {
+    Node.prototype.toCode = function (refs, prefix, fallThrough) {
       // TODO: split this function in multiple functions, it's too large
       var code = [];
 
@@ -702,7 +702,7 @@
           if (this.param.anyType) {
             // any type
             code.push(prefix + '// type: any');
-            code.push(this._innerCode(refs, prefix, anyType));
+            code.push(this._innerCode(refs, prefix, fallThrough));
           }
           else {
             // regular type
@@ -710,14 +710,14 @@
             var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
 
             code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
-            code.push(this._innerCode(refs, prefix + '  ', anyType));
+            code.push(this._innerCode(refs, prefix + '  ', fallThrough));
             code.push(prefix + '}');
           }
         }
       }
       else {
         // root node (path is empty)
-        code.push(this._innerCode(refs, prefix, anyType));
+        code.push(this._innerCode(refs, prefix, fallThrough));
       }
 
       return code.join('\n');
@@ -728,11 +728,11 @@
      * This is a helper function of Node.prototype.toCode
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
+     * @param {boolean | undefined} [fallThrough]  True to suppress exceptions.
      * @returns {string} Returns the inner code as string
      * @private
      */
-    Node.prototype._innerCode = function (refs, prefix, anyType) {
+    Node.prototype._innerCode = function (refs, prefix, fallThrough) {
       var code = [];
       var i;
 
@@ -742,21 +742,20 @@
         code.push(prefix + '}');
       }
 
-      var nextAnyType;
-      for (i = 0; i < this.childs.length; i++) {
-        if (this.childs[i].param.anyType) {
-          nextAnyType = this.childs[i];
-          break;
-        }
-      }
+      var exceptions = [];
 
-      for (i = 0; i < this.childs.length; i++) {
-        code.push(this.childs[i].toCode(refs, prefix, nextAnyType));
-      }
+      var last = this.childs.length - 1;
 
-      var exceptions = this._exceptions(refs, prefix);
-      if (exceptions) {
-        code.push(exceptions);
+      this.childs.forEach(function(child, index) {
+        // don't throw exceptions in an 'any' child node unless it's the last node
+        var skip = child.param.anyType && index < last;
+        code.push(child.toCode(refs, prefix, fallThrough || skip));
+        // if a child is skipped, its exceptions precede those of this node
+        if(skip) exceptions.push(child._exceptions(refs, prefix));
+      });
+
+      if (!fallThrough) {
+        code = code.concat(exceptions, this._exceptions(refs, prefix));
       }
 
       return code.join('\n');
