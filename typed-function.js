@@ -915,12 +915,8 @@
         }
       }
 
-      // sort the filtered signatures by param
-      filtered.sort(function (a, b) {
-        return Param.compare(a.params[index], b.params[index]);
-      });
-
       // recurse over the signatures
+      var anySigs = [];
       var entries = [];
       for (i = 0; i < filtered.length; i++) {
         signature = filtered[i];
@@ -931,7 +927,7 @@
         var found = false;
 
         entries
-          .filter(function (entry) { return param.anyType || entry.param.anyType || entry.param.overlapping(param); })
+          .filter(function (entry) { return param.anyType || entry.param.overlapping(param); })
           .forEach(function(existing) {
             found = found || (param.anyType === existing.param.anyType);
             if (existing.param.varArgs) {
@@ -951,10 +947,17 @@
         if(!found) {
           entries.push({
             param: param,
-            signatures: [signature]
+            signatures: anySigs.concat(signature)
           });
         }
+
+        if(param.anyType) anySigs.push(signature);
       }
+
+      // sort the entries by param
+      entries.sort(function (a, b) {
+        return Param.compare(a.param, b.param);
+      });
 
       // parse the childs
       var childs = new Array(entries.length);
