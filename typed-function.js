@@ -310,7 +310,6 @@
      * @return {boolean} Returns true when there are conflicting types
      */
     Param.prototype.overlapping = function (other) {
-      if(contains(other.types.concat(this.types), 'any')) return true;
       for (var i = 0; i < this.types.length; i++) {
         if (contains(other.types, this.types[i])) {
           return true;
@@ -615,10 +614,9 @@
      * Generate code for this group of signatures
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
      * @returns {string} Returns the code as string
      */
-    Node.prototype.toCode = function (refs, prefix, anyType) {
+    Node.prototype.toCode = function (refs, prefix) {
       // TODO: split this function in multiple functions, it's too large
       var code = [];
 
@@ -687,7 +685,7 @@
           if (this.param.anyType) {
             // any type
             code.push(prefix + '// type: any');
-            code.push(this._innerCode(refs, prefix, anyType));
+            code.push(this._innerCode(refs, prefix));
           }
           else {
             // regular type
@@ -695,14 +693,14 @@
             var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
 
             code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
-            code.push(this._innerCode(refs, prefix + '  ', anyType));
+            code.push(this._innerCode(refs, prefix + '  '));
             code.push(prefix + '}');
           }
         }
       }
       else {
         // root node (path is empty)
-        code.push(this._innerCode(refs, prefix, anyType));
+        code.push(this._innerCode(refs, prefix));
       }
 
       return code.join('\n');
@@ -713,11 +711,10 @@
      * This is a helper function of Node.prototype.toCode
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
      * @returns {string} Returns the inner code as string
      * @private
      */
-    Node.prototype._innerCode = function (refs, prefix, anyType) {
+    Node.prototype._innerCode = function (refs, prefix) {
       var code = [];
       var i;
 
@@ -727,20 +724,8 @@
         code.push(prefix + '}');
       }
 
-      var nextAnyType;
       for (i = 0; i < this.childs.length; i++) {
-        if (this.childs[i].param.anyType) {
-          nextAnyType = this.childs[i];
-          break;
-        }
-      }
-
-      for (i = 0; i < this.childs.length; i++) {
-        code.push(this.childs[i].toCode(refs, prefix, nextAnyType));
-      }
-
-      if (anyType && !this.param.anyType) {
-        code.push(anyType.toCode(refs, prefix, nextAnyType));
+        code.push(this.childs[i].toCode(refs, prefix));
       }
 
       var exceptions = this._exceptions(refs, prefix);
@@ -946,9 +931,9 @@
         var found = false;
 
         entries
-          .filter(function (entry) { return entry.param.overlapping(param); })
+          .filter(function (entry) { return param.anyType || entry.param.anyType || entry.param.overlapping(param); })
           .forEach(function(existing) {
-            found = true;
+            found = found || (param.anyType === existing.param.anyType);
             if (existing.param.varArgs) {
               throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
             }
