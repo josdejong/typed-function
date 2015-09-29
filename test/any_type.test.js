@@ -120,4 +120,22 @@ describe('any type', function () {
     assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: Array or any, index: 0\)/);
   });
 
+  it('should permit multi-layered use of any', function() {
+    var fn = typed({
+      'any,any': function () {
+        return 'two';
+      },
+      'number,number,string': function () {
+        return 'three';
+      },
+    });
+
+    assert(fn.signatures instanceof Object);
+    assert.strictEqual(Object.keys(fn.signatures).length, 2);
+    assert.equal(fn('a','b'), 'two');
+    assert.equal(fn(1,1), 'two');
+    assert.equal(fn(1,1,'a'), 'three');
+    assert.throws(function () {fn(1,1,1)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: number, index: 2\)/);
+  });
+
 });
