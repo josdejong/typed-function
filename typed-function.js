@@ -495,6 +495,12 @@
       if (a.params.length > b.params.length) return 1;
       if (a.params.length < b.params.length) return -1;
 
+      // count the number of 'any' params (less specific than conversions)
+      var aa = a.params.filter(function(param) { return param.anyType; }).length;
+      var ba = b.params.filter(function(param) { return param.anyType; }).length;
+      if (aa > ba) return 1;
+      if (aa < ba) return -1;
+
       // count the number of conversions
       var i;
       var len = a.params.length; // a and b have equal amount of params
