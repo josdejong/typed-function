@@ -310,6 +310,7 @@
      * @return {boolean} Returns true when there are conflicting types
      */
     Param.prototype.overlapping = function (other) {
+      if(contains(other.types.concat(this.types), 'any')) return true;
       for (var i = 0; i < this.types.length; i++) {
         if (contains(other.types, this.types[i])) {
           return true;
@@ -942,9 +943,17 @@
         var param = signature.params[index];
 
         // TODO: replace the next filter loop
-        var existing = entries.filter(function (entry) {
-          return entry.param.overlapping(param);
-        })[0];
+        var found = false;
+
+        entries
+          .filter(function (entry) { return entry.param.overlapping(param); })
+          .forEach(function(existing) {
+            found = true;
+            if (existing.param.varArgs) {
+              throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
+            }
+            existing.signatures.push(signature);
+          });
 
         //var existing;
         //for (var j = 0; j < entries.length; j++) {
@@ -954,13 +963,7 @@
         //  }
         //}
 
-        if (existing) {
-          if (existing.param.varArgs) {
-            throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
-          }
-          existing.signatures.push(signature);
-        }
-        else {
+        if(!found) {
           entries.push({
             param: param,
             signatures: [signature]
