@@ -1,6 +1,12 @@
 # History
 
 
+## Not yet released, version 0.10.2
+
+- Fixed support for using `any` multiple times in a single signture.
+  Thanks @luke-gumbley.
+
+
 ## 2015-07-27, version 0.10.1
 
 - Fixed functions `addType` and `addConversion` not being robust against
