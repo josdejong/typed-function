@@ -1,7 +1,7 @@
 # History
 
 
-## Not yet released, version 0.10.2
+## 2015-10-04, version 0.10.2
 
 - Fixed support for using `any` multiple times in a single signture.
   Thanks @luke-gumbley.
