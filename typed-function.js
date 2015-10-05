@@ -482,6 +482,33 @@
     };
 
     /**
+     * Retrieve the parameter of this signature for a given index
+     * @param {number} [index] index of the parameter to retrieve
+     * @return {Param} Returns the parameter at that index, or the last parameter if varArgs is true
+     */
+    Signature.prototype.getParam = function(index) {
+      // retrieve the specified parameter or the last parameter if varArgs has been specified
+      var param = this.params[index] || (this.varArgs && this.params[this.params.length - 1]) || undefined;
+
+      // for the special case of the first varArgs argument, duplicate but set varArgs to false
+      if(param && param.varArgs && index === this.params.length - 1) {
+        param = param.clone();
+        param.varArgs = false;
+      }
+
+      return param;
+    };
+
+    /**
+     * Test if this signature is compatible with a certain number of arguments
+     * @param {number} [length] length to test against this signature
+     * @return {boolean} Returns true if the signature may be called with the provided number of arguments.
+     */
+    Signature.prototype.compatibleLength = function(length) {
+      return length === this.params.length || this.varArgs && length > this.params.length;
+    };
+
+    /**
      * Compare two signatures.
      *
      * When two params are equal and contain conversions, they will be sorted
@@ -492,8 +519,12 @@
      * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
      */
     Signature.compare = function (a, b) {
-      if (a.params.length > b.params.length) return 1;
-      if (a.params.length < b.params.length) return -1;
+      var varArgs = a.varArgs ? 1 : -1;
+      // sigs with varArgs are sorted after sigs without
+      if (a.varArgs ^ b.varArgs) return varArgs;
+      // invert length sort by varArgs: (x) > (x,x) > (x,...) > (...)
+      if (a.params.length > b.params.length) return -varArgs;
+      if (a.params.length < b.params.length) return varArgs;
 
       // count the number of 'any' params (less specific than conversions)
       var aa = a.params.filter(function(param) { return param.anyType; }).length;
@@ -912,14 +943,18 @@
         signature = signatures[i];
 
         // filter the first signature with the correct number of params
-        if (signature.params.length === index && !nodeSignature) {
+        if (signature.compatibleLength(index) && !nodeSignature) {
           nodeSignature = signature;
         }
 
-        if (signature.params[index] != undefined) {
+        if (signature.getParam(index) != undefined) {
           filtered.push(signature);
         }
       }
+
+      // don't recurse into varArgs paths
+      if(path.length && path[index - 1].varArgs)
+        filtered = [];
 
       // recurse over the signatures
       var anySigs = [];
@@ -927,28 +962,17 @@
       for (i = 0; i < filtered.length; i++) {
         signature = filtered[i];
         // group signatures with the same param at current index
-        var param = signature.params[index];
+        var param = signature.getParam(index);
 
         // TODO: replace the next filter loop
         var found = false;
 
         entries
-          .filter(function (entry) { return param.anyType || entry.param.overlapping(param); })
+          .filter(function (entry) { return !entry.param.varArgs && (param.anyType || entry.param.overlapping(param)); })
           .forEach(function(existing) {
             found = found || (param.anyType === existing.param.anyType);
-            if (existing.param.varArgs) {
-              throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
-            }
             existing.signatures.push(signature);
           });
-
-        //var existing;
-        //for (var j = 0; j < entries.length; j++) {
-        //  if (entries[j].param.overlapping(param)) {
-        //    existing = entries[j];
-        //    break;
-        //  }
-        //}
 
         if(!found) {
           entries.push({
