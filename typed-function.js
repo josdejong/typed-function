@@ -433,11 +433,13 @@
       var signatures = [];
 
       function recurse(signature, path) {
-        if (path.length < signature.params.length) {
+        if (path.length < signature.params.length + (signature.varArgs ? 1 : 0)) {
           var i, newParam, conversion;
 
-          var param = signature.params[path.length];
-          if (param.varArgs) {
+          var param = signature.getParam(path.length);
+
+          // treat varArgs as two params; one obligatory, and the remainder optional
+          if (param.varArgs && path.length === signature.params.length) {
             // a variable argument. do not split the types in the parameter
             newParam = param.clone();
 
@@ -488,15 +490,7 @@
      */
     Signature.prototype.getParam = function(index) {
       // retrieve the specified parameter or the last parameter if varArgs has been specified
-      var param = this.params[index] || (this.varArgs && this.params[this.params.length - 1]) || undefined;
-
-      // for the special case of the first varArgs argument, duplicate but set varArgs to false
-      if(param && param.varArgs && index === this.params.length - 1) {
-        param = param.clone();
-        param.varArgs = false;
-      }
-
-      return param;
+      return this.params[index] || (this.varArgs && this.params[this.params.length - 1]) || undefined;
     };
 
     /**
