@@ -694,28 +694,26 @@
               }
             }
 
-            code.push(prefix + 'if (' + getTests(allTypes, 'arg' + index) + ') { ' + comment);
-            code.push(prefix + '  var varArgs = [arg' + index + '];');
-            code.push(prefix + '  for (var i = ' + (index + 1) + '; i < arguments.length; i++) {');
-            code.push(prefix + '    if (' + getTests(exactTypes, 'arguments[i]') + ') {');
-            code.push(prefix + '      varArgs.push(arguments[i]);');
+            code.push(prefix + 'var varArgs = [arg' + index + '];');
+            code.push(prefix + 'for (var i = ' + (index + 1) + '; i < arguments.length; i++) {');
+            code.push(prefix + '  if (' + getTests(exactTypes, 'arguments[i]') + ') {');
+            code.push(prefix + '    varArgs.push(arguments[i]);');
 
             for (var i = 0; i < allTypes.length; i++) {
               var conversion_i = this.param.conversions[i];
               if (conversion_i) {
                 var test = refs.add(getTypeTest(allTypes[i]), 'test');
                 var convert = refs.add(conversion_i.convert, 'convert');
-                code.push(prefix + '    }');
-                code.push(prefix + '    else if (' + test + '(arguments[i])) {');
-                code.push(prefix + '      varArgs.push(' + convert + '(arguments[i]));');
+                code.push(prefix + '  }');
+                code.push(prefix + '  else if (' + test + '(arguments[i])) {');
+                code.push(prefix + '    varArgs.push(' + convert + '(arguments[i]));');
               }
             }
-            code.push(prefix + '    } else {');
-            code.push(prefix + '      throw createError(name, arguments.length, i, arguments[i], \'' + exactTypes.join(',') + '\');');
-            code.push(prefix + '    }');
+            code.push(prefix + '  } else {');
+            code.push(prefix + '    throw createError(name, arguments.length, i, arguments[i], \'' + exactTypes.join(',') + '\');');
             code.push(prefix + '  }');
-            code.push(this.signature.toCode(refs, prefix + '  '));
             code.push(prefix + '}');
+            code.push(this.signature.toCode(refs, prefix));
           }
         }
         else {
