@@ -499,7 +499,7 @@
      * @return {boolean} Returns true if the signature may be called with the provided number of arguments.
      */
     Signature.prototype.compatibleLength = function(length) {
-      return length === this.params.length || this.varArgs && length > this.params.length;
+      return length === this.params.length || this.varArgs && length >= (this.params.length - 1);
     };
 
     /**
@@ -596,9 +596,13 @@
     Signature.prototype.toCode = function (refs, prefix) {
       var code = [];
 
-      var args = new Array(this.params.length);
-      for (var i = 0; i < this.params.length; i++) {
-        var param = this.params[i];
+      var params = this.varArgs
+        ? this.params.slice(0,-2).concat(this.params.slice(-1))
+        : this.params;
+
+      var args = new Array(params.length);
+      for (var i = 0; i < params.length; i++) {
+        var param = params[i];
         var conversion = param.conversions[0];
         if (param.varArgs) {
           args[i] = 'varArgs';
@@ -613,7 +617,7 @@
 
       var ref = this.fn ? refs.add(this.fn, 'signature') : undefined;
       if (ref) {
-        return prefix + 'return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.params.join(', ');
+        return prefix + 'return ' + ref + '(' + args.join(', ') + '); // Signature: ' + params.join(', ');
       }
 
       return code.join('\n');
@@ -660,11 +664,12 @@
 
         // non-root node (path is non-empty)
         if (this.param.varArgs) {
+          var varIndex = this.signature.params.length - 2;
           if (this.param.anyType) {
             // variable arguments with any type
             code.push(prefix + 'if (arguments.length > ' + index + ') {');
             code.push(prefix + '  var varArgs = [];');
-            code.push(prefix + '  for (var i = ' + index + '; i < arguments.length; i++) {');
+            code.push(prefix + '  for (var i = ' + varIndex + '; i < arguments.length; i++) {');
             code.push(prefix + '    varArgs.push(arguments[i]);');
             code.push(prefix + '  }');
             code.push(this.signature.toCode(refs, prefix + '  '));
@@ -688,8 +693,9 @@
               }
             }
 
-            code.push(prefix + 'var varArgs = [arg' + index + '];');
-            code.push(prefix + 'for (var i = ' + (index + 1) + '; i < arguments.length; i++) {');
+            var args = this.path.slice(varIndex).map(function(p, i) { return 'arg' + (i + varIndex); });
+            code.push(prefix + 'var varArgs = [' + args.join(',') + '];');
+            code.push(prefix + 'for (var i = ' + (varIndex + args.length) + '; i < arguments.length; i++) {');
             code.push(prefix + '  if (' + getTests(exactTypes, 'arguments[i]') + ') {');
             code.push(prefix + '    varArgs.push(arguments[i]);');
 
@@ -749,6 +755,11 @@
 
       if (this.signature) {
         code.push(prefix + 'if (arguments.length === ' + this.path.length + ') {');
+        if(this.signature.varArgs) {
+            var varIndex = this.signature.params.length - 2;
+            var args = this.path.slice(varIndex).map(function(p, i) { return 'arg' + (i + varIndex); });
+            code.push(prefix + '  var varArgs = [' + args.join(',') + '];');
+        }
         code.push(this.signature.toCode(refs, prefix + '  '));
         code.push(prefix + '}');
       }
