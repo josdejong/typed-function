@@ -719,8 +719,9 @@
         else {
           if (this.param.anyType) {
             // any type
-            code.push(prefix + '// type: any');
-            code.push(this._innerCode(refs, prefix));
+            code.push(prefix + 'if (arguments.length > ' + index + ') { // type: any');
+            code.push(this._innerCode(refs, prefix + '  '));
+            code.push(prefix + '}');
           }
           else {
             // regular type
