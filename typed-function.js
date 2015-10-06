@@ -617,7 +617,7 @@
 
       var ref = this.fn ? refs.add(this.fn, 'signature') : undefined;
       if (ref) {
-        return prefix + 'return ' + ref + '(' + args.join(', ') + '); // Signature: ' + params.join(', ');
+        return prefix + 'return ' + ref + '(' + args.join(', ') + '); // signature: ' + params.join(', ');
       }
 
       return code.join('\n');
