@@ -495,12 +495,6 @@
       if (a.params.length > b.params.length) return 1;
       if (a.params.length < b.params.length) return -1;
 
-      // count the number of 'any' params (less specific than conversions)
-      var aa = a.params.filter(function(param) { return param.anyType; }).length;
-      var ba = b.params.filter(function(param) { return param.anyType; }).length;
-      if (aa > ba) return 1;
-      if (aa < ba) return -1;
-
       // count the number of conversions
       var i;
       var len = a.params.length; // a and b have equal amount of params
@@ -620,9 +614,10 @@
      * Generate code for this group of signatures
      * @param {Refs} refs
      * @param {string} prefix
+     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
      * @returns {string} Returns the code as string
      */
-    Node.prototype.toCode = function (refs, prefix) {
+    Node.prototype.toCode = function (refs, prefix, anyType) {
       // TODO: split this function in multiple functions, it's too large
       var code = [];
 
@@ -691,7 +686,7 @@
           if (this.param.anyType) {
             // any type
             code.push(prefix + '// type: any');
-            code.push(this._innerCode(refs, prefix));
+            code.push(this._innerCode(refs, prefix, anyType));
           }
           else {
             // regular type
@@ -699,14 +694,14 @@
             var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
 
             code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
-            code.push(this._innerCode(refs, prefix + '  '));
+            code.push(this._innerCode(refs, prefix + '  ', anyType));
             code.push(prefix + '}');
           }
         }
       }
       else {
         // root node (path is empty)
-        code.push(this._innerCode(refs, prefix));
+        code.push(this._innerCode(refs, prefix, anyType));
       }
 
       return code.join('\n');
@@ -717,10 +712,11 @@
      * This is a helper function of Node.prototype.toCode
      * @param {Refs} refs
      * @param {string} prefix
+     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
      * @returns {string} Returns the inner code as string
      * @private
      */
-    Node.prototype._innerCode = function (refs, prefix) {
+    Node.prototype._innerCode = function (refs, prefix, anyType) {
       var code = [];
       var i;
 
@@ -730,8 +726,20 @@
         code.push(prefix + '}');
       }
 
+      var nextAnyType;
       for (i = 0; i < this.childs.length; i++) {
-        code.push(this.childs[i].toCode(refs, prefix));
+        if (this.childs[i].param.anyType) {
+          nextAnyType = this.childs[i];
+          break;
+        }
+      }
+
+      for (i = 0; i < this.childs.length; i++) {
+        code.push(this.childs[i].toCode(refs, prefix, nextAnyType));
+      }
+
+      if (anyType && !this.param.anyType) {
+        code.push(anyType.toCode(refs, prefix, nextAnyType));
       }
 
       var exceptions = this._exceptions(refs, prefix);
@@ -921,8 +929,12 @@
         }
       }
 
+      // sort the filtered signatures by param
+      filtered.sort(function (a, b) {
+        return Param.compare(a.params[index], b.params[index]);
+      });
+
       // recurse over the signatures
-      var anySigs = [];
       var entries = [];
       for (i = 0; i < filtered.length; i++) {
         signature = filtered[i];
@@ -930,17 +942,9 @@
         var param = signature.params[index];
 
         // TODO: replace the next filter loop
-        var found = false;
-
-        entries
-          .filter(function (entry) { return param.anyType || entry.param.overlapping(param); })
-          .forEach(function(existing) {
-            found = found || (param.anyType === existing.param.anyType);
-            if (existing.param.varArgs) {
-              throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
-            }
-            existing.signatures.push(signature);
-          });
+        var existing = entries.filter(function (entry) {
+          return entry.param.overlapping(param);
+        })[0];
 
         //var existing;
         //for (var j = 0; j < entries.length; j++) {
@@ -950,20 +954,19 @@
         //  }
         //}
 
-        if(!found) {
+        if (existing) {
+          if (existing.param.varArgs) {
+            throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
+          }
+          existing.signatures.push(signature);
+        }
+        else {
           entries.push({
             param: param,
-            signatures: anySigs.concat(signature)
+            signatures: [signature]
           });
         }
-
-        if(param.anyType) anySigs.push(signature);
       }
-
-      // sort the entries by param
-      entries.sort(function (a, b) {
-        return Param.compare(a.param, b.param);
-      });
 
       // parse the childs
       var childs = new Array(entries.length);
@@ -1249,7 +1252,7 @@
      */
     function convert (value, type) {
       var from = getTypeOf(value);
-      
+
       // check conversion is needed
       if (type === from) {
         return value;

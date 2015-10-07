@@ -1,6 +1,12 @@
 # History
 
 
+## 2015-10-07, version 0.10.3
+
+- Reverted the fix of v0.10.2 until the introduced issue with variable 
+  arguments is fixed too. Added unit test for the latter case.
+
+
 ## 2015-10-04, version 0.10.2
 
 - Fixed support for using `any` multiple times in a single signture.

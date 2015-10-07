@@ -149,4 +149,21 @@ describe('variable arguments', function () {
     }, /SyntaxError: Unexpected variable arguments operator "..."/);
   });
 
+  it('should correctly interact with any', function() {
+    var fn = typed({
+      'string': function () {
+        return 'one';
+      },
+      '...any': function () {
+        return 'two';
+      }
+    });
+
+    assert.equal(fn('a'), 'one');
+    assert.equal(fn([]), 'two');
+    assert.equal(fn('a','a'), 'two');
+    assert.equal(fn('a',[]), 'two');
+    assert.equal(fn([],[]), 'two');
+  });
+
 });
