@@ -661,13 +661,11 @@
           var varIndex = this.signature.params.length - 2;
           if (this.param.anyType) {
             // variable arguments with any type
-            code.push(prefix + 'if (arguments.length > ' + index + ') {');
-            code.push(prefix + '  var varArgs = [];');
-            code.push(prefix + '  for (var i = ' + varIndex + '; i < arguments.length; i++) {');
-            code.push(prefix + '    varArgs.push(arguments[i]);');
-            code.push(prefix + '  }');
-            code.push(this.signature.toCode(refs, prefix + '  '));
+            code.push(prefix + 'var varArgs = [];');
+            code.push(prefix + 'for (var i = ' + varIndex + '; i < arguments.length; i++) {');
+            code.push(prefix + '  varArgs.push(arguments[i]);');
             code.push(prefix + '}');
+            code.push(this.signature.toCode(refs, prefix));
           }
           else {
             // variable arguments with a fixed type
@@ -965,6 +963,11 @@
       for (i = 0; i < entries.length; i++) {
         var entry = entries[i];
         childs[i] = parseTree(entry.signatures, path.concat(entry.param))
+      }
+
+      // don't bother with a varArgs node signature if there are no non-varArgs children
+      if(nodeSignature && nodeSignature.varArgs && childs[0] && childs[0].param.varArgs) {
+        nodeSignature = undefined;
       }
 
       return new Node(path, nodeSignature, childs);
