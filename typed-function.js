@@ -867,40 +867,6 @@
         return Signature.compare(a, b);
       });
 
-      // filter redundant conversions from signatures with varArgs
-      // TODO: simplify this loop or move it to a separate function
-      for (i = 0; i < signatures.length; i++) {
-        signature = signatures[i];
-
-        if (signature.varArgs) {
-          var index = signature.params.length - 1;
-          var param = signature.params[index];
-
-          var t = 0;
-          while (t < param.types.length) {
-            if (param.conversions[t]) {
-              var type = param.types[t];
-
-              for (var j = 0; j < signatures.length; j++) {
-                var other = signatures[j];
-                var p = other.params[index];
-
-                if (other !== signature &&
-                    p &&
-                    contains(p.types, type) && !p.conversions[index]) {
-                  // this (conversion) type already exists, remove it
-                  param.types.splice(t, 1);
-                  param.conversions.splice(t, 1);
-                  t--;
-                  break;
-                }
-              }
-            }
-            t++;
-          }
-        }
-      }
-
       return signatures;
     }
 
