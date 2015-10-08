@@ -337,6 +337,14 @@
       return this.conversions.length > 0;
     };
 
+    Param.prototype.getArg = function(refs, index) {
+      return this.varArgs
+        ? 'varArgs'
+        : this.conversions[0]
+          ? refs.add(this.conversions[0].convert, 'convert') + '(arg' + index + ')'
+          : 'arg' + index;
+    };
+
     /**
      * Tests whether this parameters contains any of the provided types
      * @param {Object} types  A Map with types, like {'number': true}
@@ -600,23 +608,9 @@
         ? this.params.slice(0,-2).concat(this.params.slice(-1))
         : this.params;
 
-      var args = new Array(params.length);
-      for (var i = 0; i < params.length; i++) {
-        var param = params[i];
-        var conversion = param.conversions[0];
-        if (param.varArgs) {
-          args[i] = 'varArgs';
-        }
-        else if (conversion) {
-          args[i] = refs.add(conversion.convert, 'convert') + '(arg' + i + ')';
-        }
-        else {
-          args[i] = 'arg' + i;
-        }
-      }
-
       var ref = this.fn ? refs.add(this.fn, 'signature') : undefined;
       if (ref) {
+        var args = params.map(function(p,i) { return p.getArg(refs, i); });
         return prefix + 'return ' + ref + '(' + args.join(', ') + '); // signature: ' + params.join(', ');
       }
 
@@ -693,7 +687,7 @@
               }
             }
 
-            var args = this.path.slice(varIndex).map(function(p, i) { return 'arg' + (i + varIndex); });
+            var args = this.path.slice(varIndex, -1).map(function(p, i) { return p.getArg(refs, i + varIndex); });
             code.push(prefix + 'var varArgs = [' + args.join(',') + '];');
             code.push(prefix + 'for (var i = ' + (varIndex + args.length) + '; i < arguments.length; i++) {');
             code.push(prefix + '  if (' + getTests(exactTypes, 'arguments[i]') + ') {');
@@ -758,7 +752,7 @@
         code.push(prefix + 'if (arguments.length === ' + this.path.length + ') {');
         if(this.signature.varArgs) {
             var varIndex = this.signature.params.length - 2;
-            var args = this.path.slice(varIndex).map(function(p, i) { return 'arg' + (i + varIndex); });
+            var args = this.path.slice(varIndex).map(function(p, i) { return p.getArg(refs, i + varIndex); });
             code.push(prefix + '  var varArgs = [' + args.join(',') + '];');
         }
         code.push(this.signature.toCode(refs, prefix + '  '));
