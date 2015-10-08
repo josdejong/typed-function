@@ -166,4 +166,15 @@ describe('variable arguments', function () {
     assert.equal(fn([],[]), 'two');
   });
 
+  it('should give precedence to non-varArgs signature in case of overlap', function() {
+    var fn = typed({
+      '...string': function () { return 'many'; },
+      'string': function () { return 'one'; }
+    });
+
+    assert.equal(fn('a'),'one');
+    assert.equal(fn('a','a'),'many');
+    assert.throws(function() { fn(); }, /TypeError: Too few arguments in function unnamed \(expected: string, index: 0\)/);
+  });
+
 });
