@@ -247,8 +247,8 @@
      */
     Param.compare = function (a, b) {
       // TODO: simplify parameter comparison, it's a mess
-      if (a.anyType) return 1;
-      if (b.anyType) return -1;
+      if(a.varArgs ^ b.varArgs) return a.varArgs ? 1 : -1;
+      if(a.anyType ^ b.anyType) return a.anyType ? 1 : -1;
 
       if (contains(a.types, 'Object')) return 1;
       if (contains(b.types, 'Object')) return -1;

@@ -166,6 +166,17 @@ describe('variable arguments', function () {
     assert.equal(fn([],[]), 'two');
   });
 
+  it('should permit correct handling of overlapping varArgs', function() {
+    var fn = typed({
+      '...string': function () { return 'string'; },
+      'string, ...any': function () { return 'any'; }
+    });
+
+    assert.equal(fn('a'), 'string');
+    assert.equal(fn('a', 'a'), 'any'); // Note: edge case. Could be argued either way.
+    assert.equal(fn('a', 2), 'any');
+  });
+
   it('should give precedence to non-varArgs signature in case of overlap', function() {
     var fn = typed({
       '...string': function () { return 'many'; },
