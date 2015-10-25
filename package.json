@@ -1,9 +1,11 @@
 {
   "name": "typed-function",
-  "version": "0.10.1",
+  "version": "0.10.3",
   "description": "Type checking for JavaScript functions",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
-  "contributors": [],
+  "contributors": [
+    "Luke Gumbley (https://github.com/luke-gumbley)"
+  ],
   "homepage": "https://github.com/josdejong/typed-function",
   "repository": {
     "type": "git",
