@@ -305,17 +305,33 @@
     };
 
     /**
-     * Test whether this parameters types overlap an other parameters types.
+     * Return a new param based on this param excluding another
      * @param {Param} other
-     * @return {boolean} Returns true when there are conflicting types
+     * @return {Param} Returns a param representing the types in this param that are not in the other
      */
-    Param.prototype.overlapping = function (other) {
-      for (var i = 0; i < this.types.length; i++) {
-        if (contains(other.types, this.types[i])) {
-          return true;
-        }
-      }
-      return false;
+    Param.prototype.except = function (other) {
+      var types = contains(this.types, 'any') ^ contains(other.types, 'any')
+        ? contains(this.types, 'any') ? this.types : []
+        : this.types.filter(function(type) { return !contains(other.types, type); });
+
+      return this.varArgs ^ other.varArgs
+        // varArgs trumps non-varArgs, filter only one-way
+        ? new Param(this.varArgs ? this.types : types, this.varArgs)
+        // where both are equivalent, filter as normal
+        : new Param(types, this.varArgs);
+    };
+
+    /**
+     * Return a new param based on the intersection of this param and another
+     * @param {Param} other
+     * @return {Param} Returns a param representing the common types to both
+     */
+    Param.prototype.intersect = function (other) {
+      // the intersection of 'any' is always the other param, or 'any' if both are wildcards.
+      var types = contains(this.types, 'any')
+        ? other.types
+        : this.types.filter(function(type) { return contains(other.types, 'any') || contains(other.types, type); })
+      return new Param(types, this.varArgs && other.varArgs);
     };
 
     /**
@@ -417,6 +433,28 @@
     }
 
     /**
+     * Retrieve the parameter of this signature for a given index
+     * @param {number} [index] index of the parameter to retrieve
+     * @return {Param} Returns the parameter at that index, or the last parameter if varArgs is true
+     */
+    Signature.prototype.getParam = function(index) {
+      return index < this.params.length
+        ? this.params[index]
+        : this.varArgs
+          ? this.params[this.params.length - 1]
+          : undefined;
+    };
+
+    /**
+     * Test if this signature is compatible with a certain number of arguments
+     * @param {number} [length] length to test against this signature
+     * @return {boolean} Returns true if the signature may be called with the provided number of arguments.
+     */
+    Signature.prototype.compatibleLength = function(length) {
+      return length === this.params.length || this.varArgs && length > this.params.length;
+    };
+
+    /**
      * Create a clone of this signature
      * @returns {Signature} Returns a cloned version of this signature
      */
@@ -492,8 +530,10 @@
      * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
      */
     Signature.compare = function (a, b) {
-      if (a.params.length > b.params.length) return 1;
-      if (a.params.length < b.params.length) return -1;
+      var varArgs = a.varArgs ? 1 : -1;
+      if (a.varArgs ^ b.varArgs) return varArgs;
+      if (a.params.length > b.params.length) return -varArgs;
+      if (a.params.length < b.params.length) return varArgs;
 
       // count the number of conversions
       var i;
@@ -614,10 +654,10 @@
      * Generate code for this group of signatures
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
+     * @param {boolean | undefined} [fallThrough]  True to suppress exceptions.
      * @returns {string} Returns the code as string
      */
-    Node.prototype.toCode = function (refs, prefix, anyType) {
+    Node.prototype.toCode = function (refs, prefix, fallThrough) {
       // TODO: split this function in multiple functions, it's too large
       var code = [];
 
@@ -686,7 +726,7 @@
           if (this.param.anyType) {
             // any type
             code.push(prefix + '// type: any');
-            code.push(this._innerCode(refs, prefix, anyType));
+            code.push(this._innerCode(refs, prefix, fallThrough));
           }
           else {
             // regular type
@@ -694,14 +734,14 @@
             var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
 
             code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
-            code.push(this._innerCode(refs, prefix + '  ', anyType));
+            code.push(this._innerCode(refs, prefix + '  ', fallThrough));
             code.push(prefix + '}');
           }
         }
       }
       else {
         // root node (path is empty)
-        code.push(this._innerCode(refs, prefix, anyType));
+        code.push(this._innerCode(refs, prefix, fallThrough));
       }
 
       return code.join('\n');
@@ -712,11 +752,11 @@
      * This is a helper function of Node.prototype.toCode
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
+     * @param {boolean | undefined} [fallThrough]  True to suppress exceptions.
      * @returns {string} Returns the inner code as string
      * @private
      */
-    Node.prototype._innerCode = function (refs, prefix, anyType) {
+    Node.prototype._innerCode = function (refs, prefix, fallThrough) {
       var code = [];
       var i;
 
@@ -726,25 +766,20 @@
         code.push(prefix + '}');
       }
 
-      var nextAnyType;
-      for (i = 0; i < this.childs.length; i++) {
-        if (this.childs[i].param.anyType) {
-          nextAnyType = this.childs[i];
-          break;
-        }
-      }
+      var exceptions = [];
 
-      for (i = 0; i < this.childs.length; i++) {
-        code.push(this.childs[i].toCode(refs, prefix, nextAnyType));
-      }
+      var last = this.childs.length - 1;
 
-      if (anyType && !this.param.anyType) {
-        code.push(anyType.toCode(refs, prefix, nextAnyType));
-      }
+      this.childs.forEach(function(child, index) {
+        // don't throw exceptions in an 'any' child node unless it's the last node
+        var skip = child.param.anyType && index < last;
+        code.push(child.toCode(refs, prefix, fallThrough || skip));
+        // if a child is skipped, its exceptions precede those of this node
+        if(skip) exceptions.push(child._exceptions(refs, prefix));
+      });
 
-      var exceptions = this._exceptions(refs, prefix);
-      if (exceptions) {
-        code.push(exceptions);
+      if (!fallThrough) {
+        code = code.concat(exceptions, this._exceptions(refs, prefix));
       }
 
       return code.join('\n');
@@ -920,52 +955,41 @@
         signature = signatures[i];
 
         // filter the first signature with the correct number of params
-        if (signature.params.length === index && !nodeSignature) {
+        if (signature.compatibleLength(index) && !nodeSignature) {
           nodeSignature = signature;
         }
 
-        if (signature.params[index] != undefined) {
+        if (signature.getParam(index) != undefined) {
           filtered.push(signature);
         }
       }
 
-      // sort the filtered signatures by param
-      filtered.sort(function (a, b) {
-        return Param.compare(a.params[index], b.params[index]);
-      });
+      var extrapolated = filtered.every(function(signature) { return signature.params.length < index; });
+      // stop if every remaining signature has varArgs and is beyond its minimum length
+      if(extrapolated && filtered.length === signatures.length)
+        filtered = [];
 
       // recurse over the signatures
       var entries = [];
       for (i = 0; i < filtered.length; i++) {
         signature = filtered[i];
-        // group signatures with the same param at current index
-        var param = signature.params[index];
+        // group signatures with compatible params at current index
+        var param = signature.getParam(index);
 
-        // TODO: replace the next filter loop
-        var existing = entries.filter(function (entry) {
-          return entry.param.overlapping(param);
-        })[0];
+        var remainder = param;
 
-        //var existing;
-        //for (var j = 0; j < entries.length; j++) {
-        //  if (entries[j].param.overlapping(param)) {
-        //    existing = entries[j];
-        //    break;
-        //  }
-        //}
-
-        if (existing) {
-          if (existing.param.varArgs) {
-            throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
-          }
-          existing.signatures.push(signature);
-        }
-        else {
-          entries.push({
-            param: param,
-            signatures: [signature]
-          });
-        }
+        entries = entries.map(function(entry) {
+          remainder = remainder.except(entry.param);
+          return [{
+            param: entry.param.except(param),
+            signatures: entry.signatures
+          }, {
+            param: entry.param.intersect(param),
+            signatures: entry.signatures.concat(signature)
+          }];
+        }).reduce(function(a, b) { return a.concat(b); }, [])
+          .concat({ param: remainder, signatures: [signature] })
+          .filter(function(entry) { return entry.param.types.length; });
       }
 
       // parse the childs
