@@ -120,8 +120,7 @@ describe('any type', function () {
     assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: Array or any, index: 0\)/);
   });
 
-  // FIXME: should should permit multi-layered use of any. See https://github.com/josdejong/typed-function/pull/8
-  it.skip('should permit multi-layered use of any', function() {
+  it('should permit multi-layered use of any', function() {
     var fn = typed({
       'any,any': function () {
         return 'two';
