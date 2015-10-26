@@ -70,7 +70,8 @@ describe('errors', function () {
     }, /Error: Signature "string" is defined twice/);
   });
 
-  it('should give correct error in case of conflicting union arguments (2)', function() {
+  // Note: error can be generated but breaks MathJS (conversions cause many conflicts)
+  it.skip('should give correct error in case of conflicting union arguments (2)', function() {
     assert.throws(function () {
       var fn = typed({
         '...string | number': function () {},

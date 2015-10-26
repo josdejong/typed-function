@@ -936,13 +936,6 @@
             existing.signatures.push(signature);
           });
 
-        // check for overlapping varArgs signatures
-        if(param.varArgs) {
-          entries
-            .filter(function(entry) { return entry.param.varArgs && entry.param.overlapping(param); })
-            .forEach(function(entry) { throw new Error('Conflicting types "' + entry.param + '" and "' + param + '"'); });
-        }
-
         if(!found) {
           entries.push({
             param: param,
