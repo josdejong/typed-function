@@ -1,9 +1,16 @@
 # History
 
 
+## 2016-04-09, version 0.10.4
+
+- Typed functions can only inherit names from other typed functions and no
+  longer from regular JavaScript functions since these names are unreliable:
+  they can be manipulated by minifiers and browsers.
+
+
 ## 2015-10-07, version 0.10.3
 
-- Reverted the fix of v0.10.2 until the introduced issue with variable 
+- Reverted the fix of v0.10.2 until the introduced issue with variable
   arguments is fixed too. Added unit test for the latter case.
 
 
