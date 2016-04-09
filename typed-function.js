@@ -7,7 +7,7 @@
  */
 'use strict';
 
-(function (factory) {
+(function (root, factory) {
   if (typeof define === 'function' && define.amd) {
     // AMD. Register as an anonymous module.
     define([], factory);
@@ -18,9 +18,9 @@
     module.exports = factory();
   } else {
     // Browser globals (root is window)
-    window.typed = factory();
+    root.typed = factory();
   }
-}(function () {
+}(this, function () {
   // factory function to create a new instance of typed-function
   // TODO: allow passing configuration, types, tests via the factory function
   function create() {
@@ -67,8 +67,8 @@
       for (var i = 0; i < fns.length; i++) {
         var fn = fns[i];
 
-        // merge function name
-        if (fn.name != '') {
+        // merge function name when this is a typed function
+        if (fn.signatures && fn.name != '') {
           if (name == '') {
             name = fn.name;
           }
