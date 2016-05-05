@@ -247,8 +247,8 @@
      */
     Param.compare = function (a, b) {
       // TODO: simplify parameter comparison, it's a mess
-      if (a.anyType) return 1;
-      if (b.anyType) return -1;
+      if(a.varArgs ^ b.varArgs) return a.varArgs ? 1 : -1;
+      if(a.anyType ^ b.anyType) return a.anyType ? 1 : -1;
 
       if (contains(a.types, 'Object')) return 1;
       if (contains(b.types, 'Object')) return -1;
@@ -335,6 +335,14 @@
      */
     Param.prototype.hasConversions = function () {
       return this.conversions.length > 0;
+    };
+
+    Param.prototype.getArg = function(refs, index) {
+      return this.varArgs
+        ? 'varArgs'
+        : this.conversions[0]
+          ? refs.add(this.conversions[0].convert, 'convert') + '(arg' + index + ')'
+          : 'arg' + index;
     };
 
     /**
@@ -433,11 +441,13 @@
       var signatures = [];
 
       function recurse(signature, path) {
-        if (path.length < signature.params.length) {
+        if (path.length < signature.params.length + (signature.varArgs ? 1 : 0)) {
           var i, newParam, conversion;
 
-          var param = signature.params[path.length];
-          if (param.varArgs) {
+          var param = signature.getParam(path.length);
+
+          // treat varArgs as two params; one obligatory, and the remainder optional
+          if (param.varArgs && path.length === signature.params.length) {
             // a variable argument. do not split the types in the parameter
             newParam = param.clone();
 
@@ -482,6 +492,25 @@
     };
 
     /**
+     * Retrieve the parameter of this signature for a given index
+     * @param {number} [index] index of the parameter to retrieve
+     * @return {Param} Returns the parameter at that index, or the last parameter if varArgs is true
+     */
+    Signature.prototype.getParam = function(index) {
+      // retrieve the specified parameter or the last parameter if varArgs has been specified
+      return this.params[index] || (this.varArgs && this.params[this.params.length - 1]) || undefined;
+    };
+
+    /**
+     * Test if this signature is compatible with a certain number of arguments
+     * @param {number} [length] length to test against this signature
+     * @return {boolean} Returns true if the signature may be called with the provided number of arguments.
+     */
+    Signature.prototype.compatibleLength = function(length) {
+      return length === this.params.length || this.varArgs && length >= (this.params.length - 1);
+    };
+
+    /**
      * Compare two signatures.
      *
      * When two params are equal and contain conversions, they will be sorted
@@ -492,8 +521,18 @@
      * @returns {number} Returns 1 if a > b, -1 if a < b, and else 0.
      */
     Signature.compare = function (a, b) {
-      if (a.params.length > b.params.length) return 1;
-      if (a.params.length < b.params.length) return -1;
+      var varArgs = a.varArgs ? 1 : -1;
+      // sigs with varArgs are sorted after sigs without
+      if (a.varArgs ^ b.varArgs) return varArgs;
+      // invert length sort by varArgs: (x) > (x,x) > (x,...) > (...)
+      if (a.params.length > b.params.length) return -varArgs;
+      if (a.params.length < b.params.length) return varArgs;
+
+      // count the number of 'any' params (less specific than conversions)
+      var aa = a.params.filter(function(param) { return param.anyType; }).length;
+      var ba = b.params.filter(function(param) { return param.anyType; }).length;
+      if (aa > ba) return 1;
+      if (aa < ba) return -1;
 
       // count the number of conversions
       var i;
@@ -565,24 +604,14 @@
     Signature.prototype.toCode = function (refs, prefix) {
       var code = [];
 
-      var args = new Array(this.params.length);
-      for (var i = 0; i < this.params.length; i++) {
-        var param = this.params[i];
-        var conversion = param.conversions[0];
-        if (param.varArgs) {
-          args[i] = 'varArgs';
-        }
-        else if (conversion) {
-          args[i] = refs.add(conversion.convert, 'convert') + '(arg' + i + ')';
-        }
-        else {
-          args[i] = 'arg' + i;
-        }
-      }
+      var params = this.varArgs
+        ? this.params.slice(0,-2).concat(this.params.slice(-1))
+        : this.params;
 
       var ref = this.fn ? refs.add(this.fn, 'signature') : undefined;
       if (ref) {
-        return prefix + 'return ' + ref + '(' + args.join(', ') + '); // signature: ' + this.params.join(', ');
+        var args = params.map(function(p,i) { return p.getArg(refs, i); });
+        return prefix + 'return ' + ref + '(' + args.join(', ') + '); // signature: ' + params.join(', ');
       }
 
       return code.join('\n');
@@ -614,10 +643,9 @@
      * Generate code for this group of signatures
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
      * @returns {string} Returns the code as string
      */
-    Node.prototype.toCode = function (refs, prefix, anyType) {
+    Node.prototype.toCode = function (refs, prefix) {
       // TODO: split this function in multiple functions, it's too large
       var code = [];
 
@@ -630,15 +658,14 @@
 
         // non-root node (path is non-empty)
         if (this.param.varArgs) {
+          var varIndex = this.signature.params.length - 2;
           if (this.param.anyType) {
             // variable arguments with any type
-            code.push(prefix + 'if (arguments.length > ' + index + ') {');
-            code.push(prefix + '  var varArgs = [];');
-            code.push(prefix + '  for (var i = ' + index + '; i < arguments.length; i++) {');
-            code.push(prefix + '    varArgs.push(arguments[i]);');
-            code.push(prefix + '  }');
-            code.push(this.signature.toCode(refs, prefix + '  '));
+            code.push(prefix + 'var varArgs = [];');
+            code.push(prefix + 'for (var i = ' + varIndex + '; i < arguments.length; i++) {');
+            code.push(prefix + '  varArgs.push(arguments[i]);');
             code.push(prefix + '}');
+            code.push(this.signature.toCode(refs, prefix));
           }
           else {
             // variable arguments with a fixed type
@@ -658,35 +685,35 @@
               }
             }
 
-            code.push(prefix + 'if (' + getTests(allTypes, 'arg' + index) + ') { ' + comment);
-            code.push(prefix + '  var varArgs = [arg' + index + '];');
-            code.push(prefix + '  for (var i = ' + (index + 1) + '; i < arguments.length; i++) {');
-            code.push(prefix + '    if (' + getTests(exactTypes, 'arguments[i]') + ') {');
-            code.push(prefix + '      varArgs.push(arguments[i]);');
+            var args = this.path.slice(varIndex, -1).map(function(p, i) { return p.getArg(refs, i + varIndex); });
+            code.push(prefix + 'var varArgs = [' + args.join(',') + '];');
+            code.push(prefix + 'for (var i = ' + (varIndex + args.length) + '; i < arguments.length; i++) {');
+            code.push(prefix + '  if (' + getTests(exactTypes, 'arguments[i]') + ') {');
+            code.push(prefix + '    varArgs.push(arguments[i]);');
 
             for (var i = 0; i < allTypes.length; i++) {
               var conversion_i = this.param.conversions[i];
               if (conversion_i) {
                 var test = refs.add(getTypeTest(allTypes[i]), 'test');
                 var convert = refs.add(conversion_i.convert, 'convert');
-                code.push(prefix + '    }');
-                code.push(prefix + '    else if (' + test + '(arguments[i])) {');
-                code.push(prefix + '      varArgs.push(' + convert + '(arguments[i]));');
+                code.push(prefix + '  }');
+                code.push(prefix + '  else if (' + test + '(arguments[i])) {');
+                code.push(prefix + '    varArgs.push(' + convert + '(arguments[i]));');
               }
             }
-            code.push(prefix + '    } else {');
-            code.push(prefix + '      throw createError(name, arguments.length, i, arguments[i], \'' + exactTypes.join(',') + '\');');
-            code.push(prefix + '    }');
+            code.push(prefix + '  } else {');
+            code.push(prefix + '    throw createError(name, arguments.length, i, arguments[i], \'' + exactTypes.join(',') + '\');');
             code.push(prefix + '  }');
-            code.push(this.signature.toCode(refs, prefix + '  '));
             code.push(prefix + '}');
+            code.push(this.signature.toCode(refs, prefix));
           }
         }
         else {
           if (this.param.anyType) {
             // any type
-            code.push(prefix + '// type: any');
-            code.push(this._innerCode(refs, prefix, anyType));
+            code.push(prefix + 'if (arguments.length > ' + index + ') { // type: any');
+            code.push(this._innerCode(refs, prefix + '  '));
+            code.push(prefix + '}');
           }
           else {
             // regular type
@@ -694,14 +721,14 @@
             var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
 
             code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
-            code.push(this._innerCode(refs, prefix + '  ', anyType));
+            code.push(this._innerCode(refs, prefix + '  '));
             code.push(prefix + '}');
           }
         }
       }
       else {
         // root node (path is empty)
-        code.push(this._innerCode(refs, prefix, anyType));
+        code.push(this._innerCode(refs, prefix));
       }
 
       return code.join('\n');
@@ -712,34 +739,26 @@
      * This is a helper function of Node.prototype.toCode
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
      * @returns {string} Returns the inner code as string
      * @private
      */
-    Node.prototype._innerCode = function (refs, prefix, anyType) {
+    Node.prototype._innerCode = function (refs, prefix) {
       var code = [];
       var i;
 
       if (this.signature) {
         code.push(prefix + 'if (arguments.length === ' + this.path.length + ') {');
+        if(this.signature.varArgs) {
+            var varIndex = this.signature.params.length - 2;
+            var args = this.path.slice(varIndex).map(function(p, i) { return p.getArg(refs, i + varIndex); });
+            code.push(prefix + '  var varArgs = [' + args.join(',') + '];');
+        }
         code.push(this.signature.toCode(refs, prefix + '  '));
         code.push(prefix + '}');
       }
 
-      var nextAnyType;
       for (i = 0; i < this.childs.length; i++) {
-        if (this.childs[i].param.anyType) {
-          nextAnyType = this.childs[i];
-          break;
-        }
-      }
-
-      for (i = 0; i < this.childs.length; i++) {
-        code.push(this.childs[i].toCode(refs, prefix, nextAnyType));
-      }
-
-      if (anyType && !this.param.anyType) {
-        code.push(anyType.toCode(refs, prefix, nextAnyType));
+        code.push(this.childs[i].toCode(refs, prefix));
       }
 
       var exceptions = this._exceptions(refs, prefix);
@@ -846,40 +865,6 @@
         return Signature.compare(a, b);
       });
 
-      // filter redundant conversions from signatures with varArgs
-      // TODO: simplify this loop or move it to a separate function
-      for (i = 0; i < signatures.length; i++) {
-        signature = signatures[i];
-
-        if (signature.varArgs) {
-          var index = signature.params.length - 1;
-          var param = signature.params[index];
-
-          var t = 0;
-          while (t < param.types.length) {
-            if (param.conversions[t]) {
-              var type = param.types[t];
-
-              for (var j = 0; j < signatures.length; j++) {
-                var other = signatures[j];
-                var p = other.params[index];
-
-                if (other !== signature &&
-                    p &&
-                    contains(p.types, type) && !p.conversions[index]) {
-                  // this (conversion) type already exists, remove it
-                  param.types.splice(t, 1);
-                  param.conversions.splice(t, 1);
-                  t--;
-                  break;
-                }
-              }
-            }
-            t++;
-          }
-        }
-      }
-
       return signatures;
     }
 
@@ -920,59 +905,62 @@
         signature = signatures[i];
 
         // filter the first signature with the correct number of params
-        if (signature.params.length === index && !nodeSignature) {
+        if (signature.compatibleLength(index) && !nodeSignature) {
           nodeSignature = signature;
         }
 
-        if (signature.params[index] != undefined) {
+        if (signature.getParam(index) != undefined) {
           filtered.push(signature);
         }
       }
 
-      // sort the filtered signatures by param
-      filtered.sort(function (a, b) {
-        return Param.compare(a.params[index], b.params[index]);
-      });
+      // don't recurse into varArgs paths
+      if(path.length && path[index - 1].varArgs)
+        filtered = [];
 
       // recurse over the signatures
+      var anySigs = [];
       var entries = [];
       for (i = 0; i < filtered.length; i++) {
         signature = filtered[i];
         // group signatures with the same param at current index
-        var param = signature.params[index];
+        var param = signature.getParam(index);
 
         // TODO: replace the next filter loop
-        var existing = entries.filter(function (entry) {
-          return entry.param.overlapping(param);
-        })[0];
+        var found = false;
 
-        //var existing;
-        //for (var j = 0; j < entries.length; j++) {
-        //  if (entries[j].param.overlapping(param)) {
-        //    existing = entries[j];
-        //    break;
-        //  }
-        //}
+        entries
+          .filter(function (entry) { return !entry.param.varArgs && (param.anyType || entry.param.overlapping(param)); })
+          .forEach(function(existing) {
+            found = found || (param.anyType === existing.param.anyType);
+            existing.signatures.push(signature);
+          });
 
-        if (existing) {
-          if (existing.param.varArgs) {
-            throw new Error('Conflicting types "' + existing.param + '" and "' + param + '"');
-          }
-          existing.signatures.push(signature);
-        }
-        else {
+        if(!found) {
           entries.push({
             param: param,
-            signatures: [signature]
+            signatures: anySigs.concat(signature)
           });
         }
+
+        if(param.anyType) anySigs.push(signature);
       }
+
+      // sort the entries by param
+      entries.sort(function (a, b) {
+        return Param.compare(a.param, b.param);
+      });
 
       // parse the childs
       var childs = new Array(entries.length);
       for (i = 0; i < entries.length; i++) {
         var entry = entries[i];
         childs[i] = parseTree(entry.signatures, path.concat(entry.param))
+      }
+
+      // don't bother with a varArgs node signature if there are no non-varArgs children
+      if(nodeSignature && nodeSignature.varArgs && childs[0] && childs[0].param.varArgs) {
+        nodeSignature = undefined;
       }
 
       return new Node(path, nodeSignature, childs);
@@ -1252,7 +1240,7 @@
      */
     function convert (value, type) {
       var from = getTypeOf(value);
-
+      
       // check conversion is needed
       if (type === from) {
         return value;

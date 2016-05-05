@@ -141,7 +141,7 @@ describe('conversion', function () {
     assert.equal(sum(false, 2,3), 5);
   });
 
-  it('should add conversions to a function with variable arguments in a non-conflicting way', function() {
+  it('should correctly add overlapping conversions to a function with variable arguments', function() {
     var fn = typed({
       '...number': function (values) {
         assert(Array.isArray(values));
@@ -160,8 +160,8 @@ describe('conversion', function () {
     assert.equal(fn(2,3,4), 9);
     assert.equal(fn(false), 'boolean');
     assert.equal(fn(true), 'boolean');
-    assert.throws(function () {fn(2,true,4)}, /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: boolean, index: 1\)/);
-    assert.throws(function () {fn(true,2,4)}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 3\)/);
+    assert.equal(fn(2,true,4), 7);
+    assert.equal(fn(true,2,4), 7);
   });
 
   it('should add conversions to a function with variable and union arguments', function() {
@@ -178,7 +178,7 @@ describe('conversion', function () {
     strictEqualArray(fn('str', true, false), ['str', 1, 0]);
     strictEqualArray(fn('str', 2, false), ['str', 2, 0]);
 
-    assert.throws(function () {fn(new Date(), '2')}, /TypeError: Unexpected type of argument in function unnamed \(expected: string or number, actual: Date, index: 0\)/)
+    assert.throws(function () {fn(new Date(), '2')}, /TypeError: Unexpected type of argument in function unnamed \(expected: number or string, actual: Date, index: 0\)/)
   });
 
   it('should add non-conflicting conversions to a function with one argument', function() {

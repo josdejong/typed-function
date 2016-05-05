@@ -15,6 +15,25 @@
 
   // use the function
   document.write(fn1(2, 'foo') + '<br>'); // outputs 'a is a number, b is a string'
+
+  var fn = function() {
+    return typed({
+      'any,any': function() { return 'two'; },
+      'number,number,string': function() { return 'three'; }
+    });
+  };
+
+  var printParams = function(params) {
+    return params.map(function(p) { return p.types.join('|'); }).join(',');
+  };
+
+  function printNode(node, path) {
+    path = (path || '').concat((node.param && node.param.toString()) || '');
+    return node.childs.length
+      ? node.childs.reduce(function(paths, child) { return paths.concat(printNode(child, path)); }, [])
+      : [path];
+  };
+
 </script>
 </body>
 </html>
