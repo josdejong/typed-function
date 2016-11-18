@@ -614,12 +614,14 @@
      * Generate code for this group of signatures
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
+     * @param {boolean} fallThrough
      * @returns {string} Returns the code as string
      */
-    Node.prototype.toCode = function (refs, prefix, anyType) {
+    Node.prototype.toCode = function (refs, prefix, fallThrough) {
       // TODO: split this function in multiple functions, it's too large
       var code = [];
+
+      // console.log('Node.toCode', this.path.map(String), fallThrough);
 
       if (this.param) {
         var index = this.path.length - 1;
@@ -686,7 +688,7 @@
           if (this.param.anyType) {
             // any type
             code.push(prefix + '// type: any');
-            code.push(this._innerCode(refs, prefix, anyType));
+            code.push(this._innerCode(refs, prefix, fallThrough));
           }
           else {
             // regular type
@@ -694,14 +696,14 @@
             var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
 
             code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
-            code.push(this._innerCode(refs, prefix + '  ', anyType));
+            code.push(this._innerCode(refs, prefix + '  ', fallThrough));
             code.push(prefix + '}');
           }
         }
       }
       else {
         // root node (path is empty)
-        code.push(this._innerCode(refs, prefix, anyType));
+        code.push(this._innerCode(refs, prefix, fallThrough));
       }
 
       return code.join('\n');
@@ -712,11 +714,11 @@
      * This is a helper function of Node.prototype.toCode
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {Node | undefined} [anyType]  Sibling of this node with any type parameter
+     * @param {boolean} fallThrough
      * @returns {string} Returns the inner code as string
      * @private
      */
-    Node.prototype._innerCode = function (refs, prefix, anyType) {
+    Node.prototype._innerCode = function (refs, prefix, fallThrough) {
       var code = [];
       var i;
 
@@ -726,29 +728,39 @@
         code.push(prefix + '}');
       }
 
-      var nextAnyType;
-      for (i = 0; i < this.childs.length; i++) {
-        if (this.childs[i].param.anyType) {
-          nextAnyType = this.childs[i];
-          break;
+      var nextFallThrough;
+      if (!fallThrough) {
+        for (i = 0; i < this.childs.length; i++) {
+          if (this.childs[i].param.anyType) {
+            nextFallThrough = true;
+            break;
+          }
         }
       }
+      else {
+        nextFallThrough = fallThrough;
+      }
+
 
       for (i = 0; i < this.childs.length; i++) {
-        code.push(this.childs[i].toCode(refs, prefix, nextAnyType));
+        code.push(this.childs[i].toCode(refs, prefix, nextFallThrough));
       }
 
-      if (anyType && !this.param.anyType) {
-        code.push(anyType.toCode(refs, prefix, nextAnyType));
-      }
+      // TODO: cleanup
+      // if (anyType && !this.param.anyType) {
+      //   code.push(anyType.toCode(refs, prefix, nextFallThrough));
+      // }
 
-      var exceptions = this._exceptions(refs, prefix);
-      if (exceptions) {
-        code.push(exceptions);
+      if (!fallThrough || (this.param && this.param.anyType)) {
+        var exceptions = this._exceptions(refs, prefix);
+        if (exceptions) {
+          code.push(exceptions);
+        }
       }
 
       return code.join('\n');
     };
+
 
     /**
      * Generate code to throw exceptions
@@ -968,6 +980,8 @@
         }
       }
 
+      // console.log('parseTree', path.map(p => p.toString()), signatures.map(String));
+
       // parse the childs
       var childs = new Array(entries.length);
       for (i = 0; i < entries.length; i++) {
@@ -1029,7 +1043,7 @@
       code.push('function ' + _name + '(' + _args.join(', ') + ') {');
       code.push('  "use strict";');
       code.push('  var name = \'' + _name + '\';');
-      code.push(node.toCode(refs, '  '));
+      code.push(node.toCode(refs, '  ', false));
       code.push('}');
 
       // generate body for the factory function

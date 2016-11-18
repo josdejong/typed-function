@@ -120,8 +120,64 @@ describe('any type', function () {
     assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: Array or any, index: 0\)/);
   });
 
-  // FIXME: should should permit multi-layered use of any. See https://github.com/josdejong/typed-function/pull/8
-  it.skip('should permit multi-layered use of any', function() {
+  it('multiple use of any', function() {
+    var fn = typed({
+      'number,number': function () {
+        return 'numbers';
+      },
+      'any,any': function () {
+        return 'any';
+      }
+    });
+
+    assert(fn.signatures instanceof Object);
+    assert.strictEqual(Object.keys(fn.signatures).length, 2);
+    assert.equal(fn('a','b'), 'any');
+    assert.equal(fn(1,1), 'numbers');
+    assert.equal(fn(1,'b'), 'any');
+    assert.equal(fn('a',1), 'any');
+  });
+
+  it('use one any in combination with vararg', function() {
+    var fn = typed({
+      'number': function () {
+        return 'numbers';
+      },
+      'any,...any': function () {
+        return 'any';
+      }
+    });
+
+    assert(fn.signatures instanceof Object);
+    assert.strictEqual(Object.keys(fn.signatures).length, 2);
+    assert.equal(fn('a','b'), 'any');
+    assert.equal(fn(1), 'numbers');
+    assert.equal(fn(1,'b'), 'any');
+    assert.equal(fn('a',2), 'any');
+    assert.equal(fn(1,2), 'any');
+    assert.equal(fn(1,2,3), 'any');
+  });
+
+  it('use multi-layered any in combination with vararg', function() {
+    var fn = typed({
+      'number,number': function () {
+        return 'numbers';
+      },
+      'any,any,...any': function () {
+        return 'any';
+      }
+    });
+
+    assert(fn.signatures instanceof Object);
+    assert.strictEqual(Object.keys(fn.signatures).length, 2);
+    assert.equal(fn('a','b','c'), 'any');
+    assert.equal(fn(1,2), 'numbers');
+    assert.equal(fn(1,'b',2), 'any');
+    assert.equal(fn('a',2,3), 'any');
+    assert.equal(fn(1,2,3), 'any');
+  });
+
+  it('should permit multi-layered use of any', function() {
     var fn = typed({
       'any,any': function () {
         return 'two';
@@ -136,7 +192,7 @@ describe('any type', function () {
     assert.equal(fn('a','b'), 'two');
     assert.equal(fn(1,1), 'two');
     assert.equal(fn(1,1,'a'), 'three');
-    assert.throws(function () {fn(1,1,1)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: number, index: 2\)/);
+    assert.throws(function () {fn(1,1,1)}, /TypeError: Too many arguments in function unnamed \(expected: 2, actual: 3\)/);
   });
 
 });
