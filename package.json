@@ -20,9 +20,9 @@
   ],
   "dependencies": {},
   "devDependencies": {
-    "istanbul": "^0.3.2",
-    "mocha": "^1.21.5",
-    "uglify-js": "^2.4.15"
+    "istanbul": "0.4.5",
+    "mocha": "3.1.2",
+    "uglify-js": "2.4.15"
   },
   "main": "./typed-function",
   "scripts": {
