@@ -82,6 +82,7 @@ describe('any type', function () {
     assert.equal(fn('foo'), 'any');
     assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: string or any, index: 0\)/);
     assert.throws(function () {fn([], 'foo')}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 2\)/);
+    assert.throws(function () {fn([], 'foo', 4)}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 3\)/);
   });
 
   it('should compose a function with multiple any type arguments (4)', function() {
@@ -102,6 +103,26 @@ describe('any type', function () {
     assert.throws(function () {fn(1,2,3)}, /TypeError: Too many arguments in function fn1 \(expected: 2, actual: 3\)/);
   });
 
+  it('should compose a function with multiple any type arguments (5)', function() {
+    var fn = typed({
+      'string,string': function () {
+        return 'string,string';
+      },
+      'any': function () {
+        return 'any';
+      }
+    });
+
+    assert(fn.signatures instanceof Object);
+    assert.strictEqual(Object.keys(fn.signatures).length, 2);
+    assert.equal(fn('foo', 'bar'), 'string,string');
+    assert.equal(fn([]), 'any');
+    assert.equal(fn('foo'), 'any');
+    assert.throws(function () {fn('foo', 'bar', 5)}, /TypeError: Too many arguments in function unnamed \(expected: 2, actual: 3\)/);
+    assert.throws(function () {fn('foo', 2, 5)}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 3\)/);
+    assert.throws(function () {fn('foo', 5)}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 2\)/);
+  });
+
   it('var arg any type arguments should only handle unmatched types', function() {
     var fn = typed({
       'Array,string': function () {
@@ -113,6 +134,7 @@ describe('any type', function () {
     });
 
     assert.equal(fn([], 'foo'), 'Array,string');
+    assert.equal(fn([], 'foo', 'bar'), 'any');
     assert.equal(fn('string'), 'any');
     assert.equal(fn(2), 'any');
     assert.equal(fn(2,3,4), 'any');

@@ -306,8 +306,9 @@
 
     /**
      * Test whether this parameters types overlap an other parameters types.
+     * Will not match ['any'] with ['number']
      * @param {Param} other
-     * @return {boolean} Returns true when there are conflicting types
+     * @return {boolean} Returns true when there are overlapping types
      */
     Param.prototype.overlapping = function (other) {
       for (var i = 0; i < this.types.length; i++) {
@@ -316,6 +317,16 @@
         }
       }
       return false;
+    };
+
+    /**
+     * Test whether this parameters types matches an other parameters types.
+     * When any of the two parameters contains `any`, true is returned
+     * @param {Param} other
+     * @return {boolean} Returns true when there are matching types
+     */
+    Param.prototype.matches = function (other) {
+      return this.anyType || other.anyType || this.overlapping(other);
     };
 
     /**
@@ -398,9 +409,14 @@
       }
 
       this.params = new Array(_params.length);
+      this.anyType = false;
+      this.varArgs = false;
       for (var i = 0; i < _params.length; i++) {
         var param = new Param(_params[i]);
         this.params[i] = param;
+        if (param.anyType) {
+          this.anyType = true;
+        }
         if (i === _params.length - 1) {
           // the last argument
           this.varArgs = param.varArgs;
@@ -557,6 +573,30 @@
     };
 
     /**
+     * Test whether the path of this signature matches a given path.
+     * @param {Param[]} params
+     */
+    Signature.prototype.paramsStartWith = function (params) {
+      if (params.length === 0) {
+        return true;
+      }
+
+      var aLast = last(this.params);
+      var bLast = last(params);
+
+      for (var i = 0; i < params.length; i++) {
+        var a = this.params[i] || (aLast.varArgs ? aLast: null);
+        var b = params[i]      || (bLast.varArgs ? bLast: null);
+
+        if (!a ||  !b || !a.matches(b)) {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    /**
      * Generate the code to invoke this signature
      * @param {Refs} refs
      * @param {string} prefix
@@ -601,27 +641,26 @@
      * @param {Param[]} path
      * @param {Signature} [signature]
      * @param {Node[]} childs
+     * @param {boolean} [fallThrough=false]
      * @constructor
      */
-    function Node(path, signature, childs) {
+    function Node(path, signature, childs, fallThrough) {
       this.path = path || [];
       this.param = path[path.length - 1] || null;
       this.signature = signature || null;
       this.childs = childs || [];
+      this.fallThrough = fallThrough || false;
     }
 
     /**
      * Generate code for this group of signatures
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {boolean} fallThrough
      * @returns {string} Returns the code as string
      */
-    Node.prototype.toCode = function (refs, prefix, fallThrough) {
+    Node.prototype.toCode = function (refs, prefix) {
       // TODO: split this function in multiple functions, it's too large
       var code = [];
-
-      // console.log('Node.toCode', this.path.map(String), fallThrough);
 
       if (this.param) {
         var index = this.path.length - 1;
@@ -688,7 +727,7 @@
           if (this.param.anyType) {
             // any type
             code.push(prefix + '// type: any');
-            code.push(this._innerCode(refs, prefix, fallThrough));
+            code.push(this._innerCode(refs, prefix));
           }
           else {
             // regular type
@@ -696,14 +735,14 @@
             var test = type !== 'any' ? refs.add(getTypeTest(type), 'test') : null;
 
             code.push(prefix + 'if (' + test + '(arg' + index + ')) { ' + comment);
-            code.push(this._innerCode(refs, prefix + '  ', fallThrough));
+            code.push(this._innerCode(refs, prefix + '  '));
             code.push(prefix + '}');
           }
         }
       }
       else {
         // root node (path is empty)
-        code.push(this._innerCode(refs, prefix, fallThrough));
+        code.push(this._innerCode(refs, prefix));
       }
 
       return code.join('\n');
@@ -714,11 +753,10 @@
      * This is a helper function of Node.prototype.toCode
      * @param {Refs} refs
      * @param {string} prefix
-     * @param {boolean} fallThrough
      * @returns {string} Returns the inner code as string
      * @private
      */
-    Node.prototype._innerCode = function (refs, prefix, fallThrough) {
+    Node.prototype._innerCode = function (refs, prefix) {
       var code = [];
       var i;
 
@@ -728,30 +766,12 @@
         code.push(prefix + '}');
       }
 
-      var nextFallThrough;
-      if (!fallThrough) {
-        for (i = 0; i < this.childs.length; i++) {
-          if (this.childs[i].param.anyType) {
-            nextFallThrough = true;
-            break;
-          }
-        }
-      }
-      else {
-        nextFallThrough = fallThrough;
-      }
-
-
       for (i = 0; i < this.childs.length; i++) {
-        code.push(this.childs[i].toCode(refs, prefix, nextFallThrough));
+        code.push(this.childs[i].toCode(refs, prefix));
       }
 
-      // TODO: cleanup
-      // if (anyType && !this.param.anyType) {
-      //   code.push(anyType.toCode(refs, prefix, nextFallThrough));
-      // }
-
-      if (!fallThrough || (this.param && this.param.anyType)) {
+      // TODO: shouldn't the this.param.anyType check be redundant
+      if (!this.fallThrough || (this.param && this.param.anyType)) {
         var exceptions = this._exceptions(refs, prefix);
         if (exceptions) {
           code.push(exceptions);
@@ -896,6 +916,23 @@
     }
 
     /**
+     * Filter all any type signatures
+     * @param {Signature[]} signatures
+     * @return {Signature[]} Returns only any type signatures
+     */
+    function filterAnyTypeSignatures (signatures) {
+      var filtered = [];
+
+      for (var i = 0; i < signatures.length; i++) {
+        if (signatures[i].anyType) {
+          filtered.push(signatures[i]);
+        }
+      }
+
+      return filtered;
+    }
+
+    /**
      * create a map with normalized signatures as key and the function as value
      * @param {Signature[]} signatures   An array with split signatures
      * @return {Object.<string, Function>} Returns a map with normalized
@@ -920,9 +957,10 @@
      * Parse signatures recursively in a node tree.
      * @param {Signature[]} signatures  Array with expanded signatures
      * @param {Param[]} path            Traversed path of parameter types
+     * @param {Signature[]} anys
      * @return {Node}                   Returns a node tree
      */
-    function parseTree(signatures, path) {
+    function parseTree(signatures, path, anys) {
       var i, signature;
       var index = path.length;
       var nodeSignature;
@@ -980,16 +1018,34 @@
         }
       }
 
-      // console.log('parseTree', path.map(p => p.toString()), signatures.map(String));
+      // find all any type signature that can still match our current path
+      var matchingAnys = [];
+      for (i = 0; i < anys.length; i++) {
+        if (anys[i].paramsStartWith(path)) {
+          matchingAnys.push(anys[i]);
+        }
+      }
+
+      // see if there are any type signatures that don't match any of the
+      // signatures that we have in our tree, i.e. we have alternative
+      // matching signature(s) outside of our current tree and we should
+      // fall through to them instead of throwing an exception
+      var fallThrough = false;
+      for (i = 0; i < matchingAnys.length; i++) {
+        if (!contains(signatures, matchingAnys[i])) {
+          fallThrough = true;
+          break;
+        }
+      }
 
       // parse the childs
       var childs = new Array(entries.length);
       for (i = 0; i < entries.length; i++) {
         var entry = entries[i];
-        childs[i] = parseTree(entry.signatures, path.concat(entry.param))
+        childs[i] = parseTree(entry.signatures, path.concat(entry.param), matchingAnys)
       }
 
-      return new Node(path, nodeSignature, childs);
+      return new Node(path, nodeSignature, childs, fallThrough);
     }
 
     /**
@@ -1029,8 +1085,11 @@
         throw new Error('No signatures provided');
       }
 
+      // filter all any type signatures
+      var anys = filterAnyTypeSignatures(_signatures);
+
       // parse signatures into a node tree
-      var node = parseTree(_signatures, []);
+      var node = parseTree(_signatures, [], anys);
 
       //var util = require('util');
       //console.log('ROOT');
@@ -1109,13 +1168,22 @@
     }
 
     /**
-     * Test whether an array contains some entry
+     * Test whether an array contains some item
      * @param {Array} array
-     * @param {*} entry
-     * @return {boolean} Returns true if array contains entry, false if not.
+     * @param {*} item
+     * @return {boolean} Returns true if array contains item, false if not.
      */
-    function contains(array, entry) {
-      return array.indexOf(entry) !== -1;
+    function contains(array, item) {
+      return array.indexOf(item) !== -1;
+    }
+
+    /**
+     * Returns the last item in the array
+     * @param {Array} array
+     * @return {*} item
+     */
+    function last (array) {
+      return array[array.length - 1];
     }
 
     // data type tests

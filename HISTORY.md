@@ -1,6 +1,11 @@
 # History
 
 
+## not yet released, version 0.10.5
+
+- Fixed the use of multi-layered use of `any` type. See #8.
+
+
 ## 2016-04-09, version 0.10.4
 
 - Typed functions can only inherit names from other typed functions and no
