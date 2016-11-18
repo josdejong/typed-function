@@ -1,7 +1,7 @@
 # History
 
 
-## not yet released, version 0.10.5
+## 2016-11-18, version 0.10.5
 
 - Fixed the use of multi-layered use of `any` type. See #8.
 
