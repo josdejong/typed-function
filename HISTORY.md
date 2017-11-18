@@ -1,7 +1,7 @@
 # History
 
 
-## not yet released, version 0.10.6
+## 2017-11-18, version 0.10.6
 
 - Fixed a security issue allowing to execute aritrary JavaScript code via a 
   specially prepared function name of a typed function. Thanks Masato Kinugawa.
