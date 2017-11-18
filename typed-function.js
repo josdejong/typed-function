@@ -1096,12 +1096,15 @@
       //console.log(util.inspect(node, { depth: null }));
 
       // generate code for the typed function
+      // safeName is a conservative replacement of characters 
+      // to prevend being able to inject JS code at the place of the function name 
+      // the name is useful for stack trackes therefore we want have it there
       var code = [];
-      var _name = name || '';
-      var _args = getArgs(maxParams(_signatures));
-      code.push('function ' + _name + '(' + _args.join(', ') + ') {');
+      var safeName = (name || '').replace(/[^a-zA-Z0-9_$]/g, '_')
+      var args = getArgs(maxParams(_signatures));
+      code.push('function ' + safeName + '(' + args.join(', ') + ') {');
       code.push('  "use strict";');
-      code.push('  var name = \'' + _name + '\';');
+      code.push('  var name = ' + JSON.stringify(name || '') + ';');
       code.push(node.toCode(refs, '  ', false));
       code.push('}');
 
