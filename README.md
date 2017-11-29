@@ -1,4 +1,6 @@
 # typed-function
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fjosdejong%2Ftyped-function.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fjosdejong%2Ftyped-function?ref=badge_shield)
+
 
 Move type checking logic and type conversions outside of your function in a
 flexible, organized way. Automatically throw informative errors in case of
@@ -353,3 +355,7 @@ To test the library, run:
 To generate the minified version of the library, run:
 
     npm run minify
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fjosdejong%2Ftyped-function.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fjosdejong%2Ftyped-function?ref=badge_large)
