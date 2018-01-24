@@ -110,7 +110,7 @@
       var data = {
         fn: fn,
         index: index,
-        actual: actual,
+        actual: actualType,
         expected: _expected
       };
 

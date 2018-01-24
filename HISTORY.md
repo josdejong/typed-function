@@ -1,6 +1,12 @@
 # History
 
 
+## 2018-01-24, version 0.10.7
+
+- Fixed the field `data.actual` in a `TypeError` message containing
+  the type index instead of the actual type of the argument.
+
+
 ## 2017-11-18, version 0.10.6
 
 - Fixed a security issue allowing to execute aritrary JavaScript code via a 
