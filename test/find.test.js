@@ -1,6 +1,7 @@
 var assert = require('assert');
-var typed = require('../typed-function');
+var typed = require('../typed-function2');
 
+// TODO: re-implement find
 describe('find', function () {
 
   function a () {}

@@ -1,6 +1,6 @@
 // test parse
 var assert = require('assert');
-var typed = require('../typed-function');
+var typed = require('../typed-function2');
 
 describe('construction', function() {
 
@@ -32,7 +32,7 @@ describe('construction', function() {
     assert.equal(fn.name, '');
   });
 
-  it('should not inherit the name of typed functions', function() {
+  it('should inherit the name of typed functions', function() {
     var fn = typed({
       'string': typed('fn1', {
         'string': function (str) {

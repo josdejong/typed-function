@@ -1,5 +1,5 @@
 var assert = require('assert');
-var typed = require('../typed-function');
+var typed = require('../typed-function2');
 
 describe('security', function () {
 

@@ -1,5 +1,5 @@
 var assert = require('assert');
-var typed = require('../typed-function');
+var typed = require('../typed-function2');
 
 describe('errors', function () {
   it('should give correct error in case of too few arguments (named function)', function() {

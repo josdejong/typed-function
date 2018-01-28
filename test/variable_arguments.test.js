@@ -1,5 +1,5 @@
 var assert = require('assert');
-var typed = require('../typed-function');
+var typed = require('../typed-function2');
 var strictEqualArray = require('./strictEqualArray');
 
 describe('variable arguments', function () {
@@ -146,7 +146,7 @@ describe('variable arguments', function () {
   it('should throw an error in case of unexpected variable arguments', function() {
     assert.throws(function () {
       typed({'...number, string': function () {}});
-    }, /SyntaxError: Unexpected variable arguments operator "..."/);
+    }, /SyntaxError: Variable argument operator "..." only allowed for the last parameter/);
   });
 
   it('should correctly interact with any', function() {
