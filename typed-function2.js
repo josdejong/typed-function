@@ -54,9 +54,13 @@
     // types which need to be ignored
     var _ignore = [];
 
+    // type conversions
+    var _conversions = [];
+
     // This is a temporary object, will be replaced with a typed function at the end
     var typed = {
       types: _types,
+      conversions: _conversions,
       ignore: _ignore
     };
 
@@ -187,6 +191,8 @@
     function compileParams(signature) {
       var tests, test0, test1;
 
+      // TODO: implement conversions
+
       if (signature.restParam) { // variable arguments like '...number'
         tests = initial(signature.params).map(compileParam);
         var varIndex = tests.length;
@@ -311,6 +317,10 @@
      * @return {function}  Returns the created typed function.
      */
     function createTypedFunction(name, signatures) {
+      if (Object.keys(signatures).length === 0) {
+        throw new SyntaxError('No signatures provided');
+      }
+
       // parse the signatures
       var defs = [];
       for (var signature in signatures) {
@@ -428,6 +438,7 @@
 
     typed.create = create;
     typed.types = _types;
+    typed.conversions = _conversions;
     typed.ignore = _ignore;
 
     // add a type
