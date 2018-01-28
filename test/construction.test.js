@@ -214,7 +214,7 @@ describe('construction', function() {
       'string': function () {}
     });
 
-    assert.deepEqual(Object.keys(fn.signatures).sort(), ['number', 'number,number']);
+    assert.deepEqual(Object.keys(fn.signatures).sort(), ['boolean,boolean', 'number', 'number,number']);
   });
 
   it('should give a hint when composing with a wrongly cased type', function() {
