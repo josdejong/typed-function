@@ -256,7 +256,7 @@
         return entry ? entry.name : 'unknown';
       });
 
-      return new Error('Signature "' + typesList.join(', ') +
+      return new TypeError('Signature "' + typesList.join(', ') +
           '" doesn\'t match any of the defined signatures of function ' +
           (name || 'unnamed') + '.');
     }
@@ -285,11 +285,82 @@
     }
 
     /**
-     * Turn an object with signatures into an array, sorted by
-     * @param signatures
+     * Create a map with the name of a type as key and the index as value.
+     * Used for sorting
+     * @param {Array} types
+     * @return {Object}
      */
-    function sortSignatures (signatures) {
-      // TODO: sort the signatures
+    function createTypesIndexMap (types) {
+      var typesIndexMap = {};
+
+      types.forEach(function (type, index) {
+        typesIndexMap[type.name] = index;
+      });
+
+      // Object and any should always be ordered last
+      typesIndexMap['Object'] = types.length;
+      typesIndexMap['any'] = types.length + 1;
+
+      return typesIndexMap;
+    }
+
+    /**
+     *
+     * @param {Param} param
+     * @param {Object} typesIndexMap
+     * @return {number}
+     */
+    function getLowestTypeIndex (param, typesIndexMap) {
+      var min = typesIndexMap[param[0]];
+
+      for (var i = 1; i < param.length; i++) {
+        min = Math.min(min, typesIndexMap[param[i]]);
+      }
+
+      return min;
+    }
+
+    /**
+     * Compare two params
+     * @param {Param} param1
+     * @param {Param} param2
+     * @param {Object} typesIndexMap
+     * @return {number} returns a negative number when param1 must get a lower
+     *                  index than param2, a positive number when the opposite,
+     *                  or zero when both are equal
+     */
+    function compareParams (param1, param2, typesIndexMap) {
+      return getLowestTypeIndex(param1, typesIndexMap) - getLowestTypeIndex(param2, typesIndexMap);
+    }
+
+    /**
+     * Compare two signatures
+     * @param {Signature} signature1
+     * @param {Signature} signature2
+     * @param {Object} typesIndexMap
+     * @return {number} returns a negative number when param1 must get a lower
+     *                  index than param2, a positive number when the opposite,
+     *                  or zero when both are equal
+     */
+    function compareSignatures (signature1, signature2, typesIndexMap) {
+      var len = Math.min(signature1.params.length, signature2.params.length);
+
+      // compare having a rest operator
+      var rest = (signature1.restParam - signature2.restParam) // coerce boolean to number
+      if (rest !== 0) {
+        return rest;
+      }
+
+      // compare the params one by one
+      for (var i = 0; i < len; i++) {
+        var c = compareParams(signature1.params[i], signature2.params[i], typesIndexMap);
+        if (c !== 0) {
+          return c;
+        }
+      }
+
+      // compare the number of params
+      return signature1.params.length - signature2.params.length;
     }
 
     /**
@@ -344,7 +415,11 @@
         }
       }
 
-      // TODO: sort signatures
+      // sort signatures by the order of types
+      var typesIndexMap = createTypesIndexMap(typed.types);
+      defs.sort(function (a, b) {
+        return compareSignatures(a.signature, b.signature, typesIndexMap);
+      });
 
       // create the typed function
       var fn = function () {
