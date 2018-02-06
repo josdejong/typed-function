@@ -181,7 +181,7 @@
           }
         }
 
-        params.push(parseParam(rest ? param.slice(3) : param));
+        params.push(parseParam(rest ? (param.length > 3) ? param.slice(3) : 'any' : param));
       });
 
       return {
