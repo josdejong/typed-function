@@ -197,7 +197,7 @@
      * @return {function(x: *) : boolean} Returns a test function
      */
     function compileParam(param) {
-      if (param.length === 0) {
+      if (!param || param.length === 0) {
         // nothing to do
         return ok;
       }
@@ -585,10 +585,40 @@
       }
 
       // create the typed function
-      var fn = function () {
-        var i;
+      // we create a highly optimized checks for the first couple of signatures with max 2 arguments
+      var test00 = defs[0] ? compileParam(defs[0].signature.params[0]) : null;
+      var test10 = defs[1] ? compileParam(defs[1].signature.params[0]) : null;
+      var test20 = defs[2] ? compileParam(defs[2].signature.params[0]) : null;
+      var test30 = defs[3] ? compileParam(defs[3].signature.params[0]) : null;
+      var test40 = defs[4] ? compileParam(defs[4].signature.params[0]) : null;
+      var test50 = defs[5] ? compileParam(defs[5].signature.params[0]) : null;
 
-        for (i = 0; i < defs.length; i++) {
+      var test01 = defs[0] ? compileParam(defs[0].signature.params[1]) : null;
+      var test11 = defs[1] ? compileParam(defs[1].signature.params[1]) : null;
+      var test21 = defs[2] ? compileParam(defs[2].signature.params[1]) : null;
+      var test31 = defs[3] ? compileParam(defs[3].signature.params[1]) : null;
+      var test41 = defs[4] ? compileParam(defs[4].signature.params[1]) : null;
+      var test51 = defs[5] ? compileParam(defs[5].signature.params[1]) : null;
+
+      var fn0 = defs[0] ? defs[0].fn : null;
+      var fn1 = defs[1] ? defs[1].fn : null;
+      var fn2 = defs[2] ? defs[2].fn : null;
+      var fn3 = defs[3] ? defs[3].fn : null;
+      var fn4 = defs[4] ? defs[4].fn : null;
+      var fn5 = defs[5] ? defs[5].fn : null;
+
+      var len0 = defs[0] ? defs[0].signature.params.length : -1;
+      var len1 = defs[1] ? defs[1].signature.params.length : -1;
+      var len2 = defs[2] ? defs[2].signature.params.length : -1;
+      var len3 = defs[3] ? defs[3].signature.params.length : -1;
+      var len4 = defs[4] ? defs[4].signature.params.length : -1;
+      var len5 = defs[5] ? defs[5].signature.params.length : -1;
+
+      // simple and generic, but also slow
+      var generic = function generic() {
+        'use strict';
+
+        for (var i = 0; i < defs.length; i++) {
           if (defs[i].test(arguments)) {
             if (defs[i].restParam) {
               return defs[i].fn.apply(null, defs[i].preprocess(arguments));
@@ -602,11 +632,26 @@
         throw createError(name, arguments);
       }
 
+      // fast, specialized function. Falls back to the slower, generic one if needed
+      var fn = function fn(arg0, arg1) {
+        'use strict';
+
+        if (arguments.length === len0 && test00(arg0) && test01(arg1)) { return fn0.apply(null, arguments); }
+        if (arguments.length === len1 && test10(arg0) && test11(arg1)) { return fn1.apply(null, arguments); }
+        if (arguments.length === len2 && test20(arg0) && test21(arg1)) { return fn2.apply(null, arguments); }
+        if (arguments.length === len3 && test30(arg0) && test31(arg1)) { return fn3.apply(null, arguments); }
+        if (arguments.length === len4 && test40(arg0) && test41(arg1)) { return fn4.apply(null, arguments); }
+        if (arguments.length === len5 && test50(arg0) && test51(arg1)) { return fn5.apply(null, arguments); }
+
+        return generic(arguments);
+      }
+
       // attach name and signatures to the typed function
       Object.defineProperty(fn, 'name', {value: name});
       fn.signatures = {}
       defs.forEach(function (def) {
         if (!def.conversion) {
+          // FIXME: split the signatures per individual type, split union types
           fn.signatures[stringifyParams(def.signature)] = def.fn;
         }
       });
