@@ -25,6 +25,14 @@
     return true;
   }
 
+  function notOk (x) {
+    return false;
+  }
+
+  function undef () {
+    return undefined;
+  }
+
   /**
    * @typedef {{
    *   params: Param[],
@@ -584,35 +592,41 @@
         }
       }
 
-      // create the typed function
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
-      var test00 = defs[0] ? compileParam(defs[0].signature.params[0]) : null;
-      var test10 = defs[1] ? compileParam(defs[1].signature.params[0]) : null;
-      var test20 = defs[2] ? compileParam(defs[2].signature.params[0]) : null;
-      var test30 = defs[3] ? compileParam(defs[3].signature.params[0]) : null;
-      var test40 = defs[4] ? compileParam(defs[4].signature.params[0]) : null;
-      var test50 = defs[5] ? compileParam(defs[5].signature.params[0]) : null;
+      var ok0 = defs[0] && defs[0].signature.params.length <= 2 && !defs[0].signature.restParam;
+      var ok1 = defs[1] && defs[1].signature.params.length <= 2 && !defs[1].signature.restParam;
+      var ok2 = defs[2] && defs[2].signature.params.length <= 2 && !defs[2].signature.restParam;
+      var ok3 = defs[3] && defs[3].signature.params.length <= 2 && !defs[3].signature.restParam;
+      var ok4 = defs[4] && defs[4].signature.params.length <= 2 && !defs[4].signature.restParam;
+      var ok5 = defs[5] && defs[5].signature.params.length <= 2 && !defs[5].signature.restParam;
 
-      var test01 = defs[0] ? compileParam(defs[0].signature.params[1]) : null;
-      var test11 = defs[1] ? compileParam(defs[1].signature.params[1]) : null;
-      var test21 = defs[2] ? compileParam(defs[2].signature.params[1]) : null;
-      var test31 = defs[3] ? compileParam(defs[3].signature.params[1]) : null;
-      var test41 = defs[4] ? compileParam(defs[4].signature.params[1]) : null;
-      var test51 = defs[5] ? compileParam(defs[5].signature.params[1]) : null;
+      var test00 = ok0 ? compileParam(defs[0].signature.params[0]) : notOk;
+      var test10 = ok1 ? compileParam(defs[1].signature.params[0]) : notOk;
+      var test20 = ok2 ? compileParam(defs[2].signature.params[0]) : notOk;
+      var test30 = ok3 ? compileParam(defs[3].signature.params[0]) : notOk;
+      var test40 = ok4 ? compileParam(defs[4].signature.params[0]) : notOk;
+      var test50 = ok5 ? compileParam(defs[5].signature.params[0]) : notOk;
 
-      var fn0 = defs[0] ? defs[0].fn : null;
-      var fn1 = defs[1] ? defs[1].fn : null;
-      var fn2 = defs[2] ? defs[2].fn : null;
-      var fn3 = defs[3] ? defs[3].fn : null;
-      var fn4 = defs[4] ? defs[4].fn : null;
-      var fn5 = defs[5] ? defs[5].fn : null;
+      var test01 = ok0 ? compileParam(defs[0].signature.params[1]) : notOk;
+      var test11 = ok1 ? compileParam(defs[1].signature.params[1]) : notOk;
+      var test21 = ok2 ? compileParam(defs[2].signature.params[1]) : notOk;
+      var test31 = ok3 ? compileParam(defs[3].signature.params[1]) : notOk;
+      var test41 = ok4 ? compileParam(defs[4].signature.params[1]) : notOk;
+      var test51 = ok5 ? compileParam(defs[5].signature.params[1]) : notOk;
 
-      var len0 = defs[0] ? defs[0].signature.params.length : -1;
-      var len1 = defs[1] ? defs[1].signature.params.length : -1;
-      var len2 = defs[2] ? defs[2].signature.params.length : -1;
-      var len3 = defs[3] ? defs[3].signature.params.length : -1;
-      var len4 = defs[4] ? defs[4].signature.params.length : -1;
-      var len5 = defs[5] ? defs[5].signature.params.length : -1;
+      var fn0 = ok0 ? defs[0].fn : undef;
+      var fn1 = ok1 ? defs[1].fn : undef;
+      var fn2 = ok2 ? defs[2].fn : undef;
+      var fn3 = ok3 ? defs[3].fn : undef;
+      var fn4 = ok4 ? defs[4].fn : undef;
+      var fn5 = ok5 ? defs[5].fn : undef;
+
+      var len0 = ok0 ? defs[0].signature.params.length : -1;
+      var len1 = ok1 ? defs[1].signature.params.length : -1;
+      var len2 = ok2 ? defs[2].signature.params.length : -1;
+      var len3 = ok3 ? defs[3].signature.params.length : -1;
+      var len4 = ok4 ? defs[4].signature.params.length : -1;
+      var len5 = ok5 ? defs[5].signature.params.length : -1;
 
       // simple and generic, but also slow
       var generic = function generic() {
@@ -632,7 +646,8 @@
         throw createError(name, arguments);
       }
 
-      // fast, specialized function. Falls back to the slower, generic one if needed
+      // create the typed function
+      // fast, specialized version. Falls back to the slower, generic one if needed
       var fn = function fn(arg0, arg1) {
         'use strict';
 
@@ -643,7 +658,7 @@
         if (arguments.length === len4 && test40(arg0) && test41(arg1)) { return fn4.apply(null, arguments); }
         if (arguments.length === len5 && test50(arg0) && test51(arg1)) { return fn5.apply(null, arguments); }
 
-        return generic(arguments);
+        return generic.apply(null, arguments);
       }
 
       // attach name and signatures to the typed function
