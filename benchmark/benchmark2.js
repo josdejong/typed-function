@@ -15,22 +15,15 @@ if (typeof window !== 'undefined') {
   window['Benchmark'] = Benchmark;
 }
 
+function add(x, y) {
+  return x + y;
+}
+
 var signatures = {
-  'number, number': function (x, y) {
-    return x + y;
-  },
-
-  'boolean, boolean': function (x, y) {
-    return x + y;
-  },
-
-  'Date, Date': function (x, y) {
-    return x + y;
-  },
-
-  'string, string': function (x, y) {
-    return x + y;
-  }
+  'number, number': add,
+  'boolean, boolean': add,
+  'Date, Date': add,
+  'string, string': add
 };
 
 var add1 = typed1('add', signatures);
@@ -52,12 +45,16 @@ var result = 0;
 var suite = new Benchmark.Suite();
 suite
     .add(pad('add v1'), function() {
-      result += add1(2, 4);
-      result += add1('hello', 'world').length;
+      result += add1(result, 4);
+      result += add1(String(result), 'world').length;
     })
     .add(pad('add v2'), function() {
-      result += add2(2, 4);
-      result += add2('hello', 'world').length;
+      result += add2(result, 4);
+      result += add2(String(result), 'world').length;
+    })
+    .add(pad('direct'), function() {
+      result += add(result, 4);
+      result += add(String(result), 'world').length;
     })
 
     .on('cycle', function(event) {
