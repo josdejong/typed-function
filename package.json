@@ -27,7 +27,7 @@
     "mocha": "3.1.2",
     "uglify-js": "2.4.15"
   },
-  "main": "./typed-function",
+  "main": "./typed-function2",
   "scripts": {
     "minify": "uglifyjs typed-function.js -o typed-function.min.js -c -m",
     "test": "mocha test --recursive",

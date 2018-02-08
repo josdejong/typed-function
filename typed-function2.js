@@ -228,12 +228,12 @@
       var restParam = false;
 
       if (signature.trim() !== '') {
-        var split = signature.split(',');
+        var arr = signature.split(',');
 
-        signature.split(',').map(trim).forEach(function (param, index) {
+        arr.map(trim).forEach(function (param, index) {
           var rest = param.indexOf('...') === 0;
           if (rest) {
-            if (index === split.length - 1) {
+            if (index === arr.length - 1) {
               restParam = true; // only allowed as for last parameter
             }
             else {
@@ -763,31 +763,81 @@
     }
 
     /**
-     * Find the first typed function in a set of signatures, and return the
-     * name of this function
-     * @param {Object<string, function>} signatures
-     * @return {string | null}  Returns the name of the first typed function
-     *                          Returns null if not found
+     * Retrieve the function name from a set of typed functions,
+     * and check whether the name of all functions match (if given)
+     * @param {function[]} fns
      */
-    function findTypedFunctionName(signatures) {
-      for (var signature in signatures) {
-        // noinspection JSUnfilteredForInLoop
-        if (hasOwnProperty(signatures, signature)) {
-          // noinspection JSUnfilteredForInLoop
-          if (signatures[signature].signatures) { // test whether a typed-function
-            // noinspection JSUnfilteredForInLoop
-            return signatures[signature].name; // copy the first name of a typed function
+    function getName (fns) {
+      var name = '';
+
+      for (var i = 0; i < fns.length; i++) {
+        var fn = fns[i];
+
+        // check whether the names are the same when defined
+        if (fn.signatures && fn.name !== '') {
+          if (name === '') {
+            name = fn.name;
+          }
+          else if (name !== fn.name) {
+            var err = new Error('Function names do not match (expected: ' + name + ', actual: ' + fn.name + ')');
+            err.data = {
+              actual: fn.name,
+              expected: name
+            };
+            throw err;
           }
         }
       }
-      return null;
+
+      return name;
     }
 
     typed = createTypedFunction('typed', {
       'string, Object': createTypedFunction,
       'Object': function (signatures) {
         // find existing name
-        var name = findTypedFunctionName(signatures) || '';
+        var fns = [];
+        for (var signature in signatures) {
+          if (signatures.hasOwnProperty(signature)) {
+            fns.push(signatures[signature]);
+          }
+        }
+        var name = getName(fns);
+        return createTypedFunction(name, signatures);
+      },
+      '...Function': function (fns) {
+        var err;
+        var name = getName(fns);
+        var signatures = {};
+
+        for (var i = 0; i < fns.length; i++) {
+          var fn = fns[i];
+
+          // test whether this is a typed-function
+          if (!(typeof fn.signatures === 'object')) {
+            err = new TypeError('Function is no typed-function (index: ' + i + ')');
+            err.data = {index: i};
+            throw err;
+          }
+
+          // merge the signatures
+          for (var signature in fn.signatures) {
+            if (fn.signatures.hasOwnProperty(signature)) {
+              if (signatures.hasOwnProperty(signature)) {
+                if (fn.signatures[signature] !== signatures[signature]) {
+                  err = new Error('Signature "' + signature + '" is defined twice');
+                  err.data = {signature: signature};
+                  throw err;
+                }
+                // else: both signatures point to the same function, that's fine
+              }
+              else {
+                signatures[signature] = fn.signatures[signature];
+              }
+            }
+          }
+        }
+
         return createTypedFunction(name, signatures);
       }
     });
