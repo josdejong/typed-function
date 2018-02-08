@@ -25,6 +25,8 @@
     return true;
   }
 
+  console.log('loading typed-function2...'); // TODO: cleanup at the end (used in mathjs to know for sure what is loaded)
+
   function notOk (x) {
     return false;
   }
@@ -116,6 +118,55 @@
     }
 
     /**
+     * Find a specific signature from a (composed) typed function, for
+     * example:
+     *
+     *   typed.find(fn, ['number', 'string'])
+     *   typed.find(fn, 'number, string')
+     *
+     * Function find only only works for exact matches.
+     *
+     * @param {Function} fn                   A typed-function
+     * @param {string | string[]} signature   Signature to be found, can be
+     *                                        an array or a comma separated string.
+     * @return {Function}                     Returns the matching signature, or
+     *                                        throws an error when no signature
+     *                                        is found.
+     */
+    function find (fn, signature) {
+      if (!fn.signatures) {
+        throw new TypeError('Function is no typed-function');
+      }
+
+      // normalize input
+      var arr;
+      if (typeof signature === 'string') {
+        arr = signature.split(',');
+        for (var i = 0; i < arr.length; i++) {
+          arr[i] = arr[i].trim();
+        }
+      }
+      else if (Array.isArray(signature)) {
+        arr = signature;
+      }
+      else {
+        throw new TypeError('String array or a comma separated string expected');
+      }
+
+      var str = arr.join(',');
+
+      // find an exact match
+      var match = fn.signatures[str];
+      if (match) {
+        return match;
+      }
+
+      // TODO: extend find to match non-exact signatures
+
+      throw new TypeError('Signature not found (signature: ' + (fn.name || 'unnamed') + '(' + arr.join(', ') + '))');
+    }
+
+    /**
      * Convert a given value to another data type.
      * @param {*} value
      * @param {string} type
@@ -173,24 +224,27 @@
      * @return {Signature} params
      */
     function parseParams (signature) {
-      var split = signature.split(',');
       var params = [];
       var restParam = false;
 
-      signature.split(',').map(trim).forEach(function (param, index) {
-        var rest = param.indexOf('...') === 0;
-        if (rest) {
-          if (index === split.length - 1) {
-            restParam = true; // only allowed as for last parameter
-          }
-          else {
-            throw new SyntaxError('Unexpected rest parameter "' + param + '": ' +
-                'only allowed for the last parameter');
-          }
-        }
+      if (signature.trim() !== '') {
+        var split = signature.split(',');
 
-        params.push(parseParam(rest ? (param.length > 3) ? param.slice(3) : 'any' : param));
-      });
+        signature.split(',').map(trim).forEach(function (param, index) {
+          var rest = param.indexOf('...') === 0;
+          if (rest) {
+            if (index === split.length - 1) {
+              restParam = true; // only allowed as for last parameter
+            }
+            else {
+              throw new SyntaxError('Unexpected rest parameter "' + param + '": ' +
+                  'only allowed for the last parameter');
+            }
+          }
+
+          params.push(parseParam(rest ? (param.length > 3) ? param.slice(3) : 'any' : param));
+        });
+      }
 
       return {
         params: params,
@@ -743,6 +797,7 @@
     typed.conversions = _conversions;
     typed.ignore = _ignore;
     typed.convert = convert;
+    typed.find = find;
 
     // add a type
     typed.addType = function (type) {
