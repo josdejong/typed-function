@@ -351,17 +351,115 @@
       }
     }
 
-    function createError(name, args) {
-      var typesList = Array.prototype.map.call(args, function (arg) {
+    // TODO: comment
+    function getExpectedParam (signature, index) {
+      return index < signature.params.length
+          ? signature.params[index]
+          : signature.restParam
+              ? signature.params[signature.params.length - 1]
+              : []
+    }
+
+    // TODO: comment
+    function isCorrectType(expectedParam, actualType) {
+      return (expectedParam &&
+             (expectedParam.indexOf(actualType) !== -1 ||
+              expectedParam.indexOf('any') !== -1))
+    }
+
+    // TODO: comment
+    function mergeExpectedParams(defs, index) {
+      var params = uniq(flatMap(defs, function (def) {
+        return getExpectedParam(def.signature, index);
+      }));
+
+      return (params.indexOf('any') !== -1) ? ['any'] : params;
+    }
+
+    // TODO: comment
+    function createError(name, args, defs) {
+      var err, expected;
+      var _name = name || 'unnamed';
+
+      // find the actual types
+      var actualTypes = Array.prototype.map.call(args, function (arg) {
         var entry = typed.types.find(function (entry) {
           return entry.test(arg);
         });
         return entry ? entry.name : 'unknown';
       });
 
-      return new TypeError('Signature "' + typesList.join(', ') +
-          '" doesn\'t match any of the defined signatures of function ' +
-          (name || 'unnamed') + '.');
+      // test for wrong type
+      var matchingDefs = defs;
+      var index;
+      for (index = 0; index < actualTypes.length; index++) {
+        var actualType = actualTypes[index];
+
+        var nextMatchingDefs = matchingDefs.filter(function (def) {
+          return isCorrectType(getExpectedParam(def.signature, index), actualType)
+        });
+
+        if (nextMatchingDefs.length === 0) {
+          // no matching signatures anymore, throw error "wrong type"
+          expected = mergeExpectedParams(matchingDefs, index);
+          if (expected.length > 0) {
+            err = new TypeError('Unexpected type of argument in function ' + _name +
+                ' (expected: ' + expected.join(' or ') +
+                ', actual: ' + actualType + ', index: ' + index + ')');
+            err.data = {
+              category: 'wrongType',
+              fn: _name,
+              index: index,
+              actual: actualType,
+              expected: expected
+            }
+            return err;
+          }
+        }
+        else {
+          matchingDefs = nextMatchingDefs;
+        }
+      }
+
+      // test for too few arguments
+      var lengths = matchingDefs.map(function (def) {
+        return def.signature.restParam ? Infinity : def.signature.params.length;
+      });
+      if (actualTypes.length < Math.min.apply(null, lengths)) {
+        expected = mergeExpectedParams(matchingDefs, index);
+        err = new TypeError('Too few arguments in function ' + _name +
+            ' (expected: ' + expected.join(' or ') +
+            ', index: ' + actualTypes.length + ')');
+        err.data = {
+          category: 'tooFewArgs',
+          fn: _name,
+          index: actualTypes.length,
+          expected: expected
+        }
+        return err;
+      }
+
+      // test for too many arguments
+      var maxLength = Math.max.apply(null, lengths);
+      if (actualTypes.length > maxLength) {
+        err = new TypeError('Too many arguments in function ' + _name +
+            ' (expected: ' + maxLength + ', actual: ' + actualTypes.length + ')');
+        err.data = {
+          category: 'tooManyArgs',
+          fn: _name,
+          index: actualTypes.length,
+          expectedLength: maxLength
+        }
+        return err;
+      }
+
+      err = new TypeError('Arguments of type "' + actualTypes.join(', ') +
+          '" do not match any of the defined signatures of function ' + _name + '.');
+      err.data = {
+        category: 'mismatch',
+        actual: actualTypes
+      }
+      return err;
     }
 
     /**
@@ -653,6 +751,7 @@
       var ok3 = defs[3] && defs[3].signature.params.length <= 2 && !defs[3].signature.restParam;
       var ok4 = defs[4] && defs[4].signature.params.length <= 2 && !defs[4].signature.restParam;
       var ok5 = defs[5] && defs[5].signature.params.length <= 2 && !defs[5].signature.restParam;
+      var allOk = ok0 && ok1 && ok2 && ok3 && ok4 && ok5;
 
       var test00 = ok0 ? compileParam(defs[0].signature.params[0]) : notOk;
       var test10 = ok1 ? compileParam(defs[1].signature.params[0]) : notOk;
@@ -683,10 +782,12 @@
       var len5 = ok5 ? defs[5].signature.params.length : -1;
 
       // simple and generic, but also slow
+      var iStart = allOk ? 6 : 0;
+      var iEnd = defs.length;
       var generic = function generic() {
         'use strict';
 
-        for (var i = 0; i < defs.length; i++) {
+        for (var i = iStart; i < iEnd; i++) {
           if (defs[i].test(arguments)) {
             if (defs[i].restParam) {
               return defs[i].fn.apply(null, defs[i].preprocess(arguments));
@@ -697,7 +798,7 @@
           }
         }
 
-        throw createError(name, arguments);
+        throw createError(name, arguments, defs);
       }
 
       // create the typed function
@@ -720,7 +821,7 @@
       fn.signatures = {}
       defs.forEach(function (def) {
         if (!def.conversion) {
-          // FIXME: split the signatures per individual type, split union types
+          // FIXME: split the signatures per individual type, split union types. add unit test
           fn.signatures[stringifyParams(def.signature)] = def.fn;
         }
       });
@@ -760,6 +861,19 @@
 
     function slice(arr, start, end) {
       return Array.prototype.slice.call(arr, start, end);
+    }
+
+    function uniq(arr) {
+      var entries = {}
+      for (var i = 0; i < arr.length; i++) {
+        entries[arr[i]] = true;
+      }
+      return Object.keys(entries);
+    }
+
+    // https://gist.github.com/samgiles/762ee337dff48623e729
+    function flatMap(arr, callback) {
+      return Array.prototype.concat.apply([], arr.map(callback));
     }
 
     /**
