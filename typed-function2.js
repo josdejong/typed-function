@@ -592,7 +592,9 @@
         var conversions = {};
 
         typed.conversions.forEach(function (conversion) {
-          if (param.indexOf(conversion.to) !== -1 && !conversions[conversion.to]) {
+          if (param.indexOf(conversion.from) === -1 &&
+              param.indexOf(conversion.to) !== -1 &&
+              !conversions[conversion.from]) {
             // console.log('MATCH', param, conversion.from, '->', conversion.to)
             conversions[conversion.from] = conversion;
           }
@@ -638,16 +640,16 @@
      * @return {function}
      */
     function compileArgsConversion(fn, conversions, restParam) {
-      var conv = conversions.map(compileArgConversion)
+      var compiledConversions = conversions.map(compileArgConversion)
 
       return function convertArgs() {
         var args = [];
         var last = restParam ? arguments.length - 1 : arguments.length;
         for (var i = 0; i < last; i++) {
-          args[i] = conv[i](arguments[i]);
+          args[i] = compiledConversions[i](arguments[i]);
         }
         if (restParam) {
-          args[last] = arguments[last].map(conv[last]);
+          args[last] = arguments[last].map(compiledConversions[last]);
         }
 
         return fn.apply(null, args);
