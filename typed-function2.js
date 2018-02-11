@@ -49,6 +49,8 @@
    *   to: string,
    *   convert: function (*) : boolean
    * }} Conversion
+   *
+   * TODO: define a type for the defs array containing a signature and stuff
    */
 
   // create a new instance of typed-function
@@ -683,6 +685,63 @@
     }
 
     /**
+     * Convert an array with defs into an object with signatures,
+     * where signatures with union types are split into separate signatures
+     *
+     * Throws an error when there are conflicting types
+     *
+     * @param {Array} defs
+     * @return {Object}
+     */
+    function defsToSignaturesMap(defs) {
+      var signaturesMap = {};
+      defs.forEach(function (def) {
+        if (!def.conversion) {
+          splitParams(def.signature.params, 0).forEach(function (params) {
+            var splittedSignature = {
+              params: params,
+              restParam: def.signature.restParam
+            };
+            signaturesMap[stringifyParams(splittedSignature)] = def.fn;
+          });
+        }
+      });
+
+      return signaturesMap;
+    }
+
+    /**
+     * Split params with union types in to separate params. For example
+     *
+     *     splitParams([['Array', 'Object'], ['string', 'RegExp'])
+     *     // returns:
+     *     // [
+     *     //   ['Array', 'string'],
+     *     //   ['Array', 'RegExp'],
+     *     //   ['Object', 'string'],
+     *     //   ['Object', 'RegExp']
+     *     // ]
+     *
+     * @param params
+     * @return {*}
+     */
+    function splitParams(params) {
+      function _splitParams(params, index, types) {
+        if (index < params.length) {
+          // recurse over the params
+          return flatMap(params[index], function (type) {
+            return _splitParams(params, index + 1, types.concat([[type]]));
+          });
+        }
+        else {
+          return [types]; // pack in an array so we can do flatMap on a single entry
+        }
+      }
+
+      return _splitParams(params, 0, []);
+    }
+
+    /**
      * Create a typed function
      * @param {String} name               The name for the typed function
      * @param {Object.<string, function>} signatures
@@ -820,13 +879,7 @@
 
       // attach name and signatures to the typed function
       Object.defineProperty(fn, 'name', {value: name});
-      fn.signatures = {}
-      defs.forEach(function (def) {
-        if (!def.conversion) {
-          // FIXME: split the signatures per individual type, split union types. add unit test
-          fn.signatures[stringifyParams(def.signature)] = def.fn;
-        }
-      });
+      fn.signatures = defsToSignaturesMap(defs);
 
       return fn;
     }
