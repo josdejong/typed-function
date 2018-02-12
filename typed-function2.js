@@ -21,11 +21,12 @@
     root.typed = factory();
   }
 }(this, function () {
+
+  console.log('loading typed-function2...'); // TODO: cleanup at the end (used in mathjs to know for sure what is loaded)
+
   function ok (x) {
     return true;
   }
-
-  console.log('loading typed-function2...'); // TODO: cleanup at the end (used in mathjs to know for sure what is loaded)
 
   function notOk (x) {
     return false;
@@ -497,6 +498,11 @@
       var typesIndexMap = {};
 
       types.forEach(function (type, index) {
+        if (type.name in typesIndexMap) {
+          throw new TypeError('Type "' + type.name + '" is defined twice. ' +
+              'Check the definitions in typed.types');
+        }
+
         typesIndexMap[type.name] = index;
       });
 
@@ -581,8 +587,7 @@
     }
 
     /**
-     * Get params containing all types that can be converted to the
-     * defined types.
+     * Get params containing all types that can be converted to the defined types.
      *
      * @param {Param[]} params
      * @return {Conversion[][] | null} Returns the conversions that are available
