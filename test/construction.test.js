@@ -119,21 +119,30 @@ describe('construction', function() {
   });
 
   it('should create a new, isolated instance of typed-function', function() {
+    var typed1 = typed.create();
     var typed2 = typed.create();
     function Person() {}
 
-    typed.types.push({
+    typed1.types.push({
       name: 'Person',
       test: function (x) {
         return x instanceof Person;
       }
     });
 
+    assert.strictEqual(typed.create, typed1.create);
+    assert.notStrictEqual(typed.types, typed1.types);
+    assert.notStrictEqual(typed.conversions, typed1.conversions);
+
     assert.strictEqual(typed.create, typed2.create);
     assert.notStrictEqual(typed.types, typed2.types);
     assert.notStrictEqual(typed.conversions, typed2.conversions);
 
-    typed({
+    assert.strictEqual(typed1.create, typed2.create);
+    assert.notStrictEqual(typed1.types, typed2.types);
+    assert.notStrictEqual(typed1.conversions, typed2.conversions);
+
+    typed1({
       'Person': function (p) {return 'Person'}
     });
 
@@ -162,7 +171,7 @@ describe('construction', function() {
 
   it('should throw an error when passing an invalid type to addType', function() {
     var typed2 = typed.create();
-    var errMsg = /TypeError: Object with properties \{name: string, test: function} expected/;
+    var errMsg = /TypeError: Object with properties {name: string, test: function} expected/;
 
     assert.throws(function () {typed2.addType({})}, errMsg);
     assert.throws(function () {typed2.addType({name: 2, test: function () {}})}, errMsg);
@@ -235,6 +244,33 @@ describe('construction', function() {
     }, /Error: Unknown type "function". Did you mean "Function"?/);
   });
 
+  it('should attach signatures to the created typed-function', function() {
+    var fn1 = function () {}
+    var fn2 = function () {}
+    var fn3 = function () {}
+    var fn4 = function () {}
+
+    var fn = typed({
+      'string': fn1,
+      'string, boolean': fn2,
+      'number | Date, boolean': fn3,
+      'Array | Object, string | RegExp': fn3,
+      'number, ...string | number': fn4
+    });
+
+    assert.deepStrictEqual(fn.signatures, {
+      'string': fn1,
+      'string,boolean': fn2,
+      'number,boolean': fn3,
+      'Date,boolean': fn3,
+      'Array,string': fn3,
+      'Array,RegExp': fn3,
+      'Object,string': fn3,
+      'Object,RegExp': fn3,
+      'number,...number': fn4,
+      'number,...string': fn4
+    });
+  });
 
   it('should correctly order type checks based on their index in typed.types', function () {
     var fn = typed({
@@ -249,10 +285,11 @@ describe('construction', function() {
       }
     });
 
-    var str = fn.toString();
-    var booleanIndex = str.indexOf('// signature: boolean');
-    var stringIndex  = str.indexOf('// signature: string');
-    var numberIndex  = str.indexOf('// signature: number');
+    // TODO: this is tricky, object keys do not have a guaranteed order
+    var signatures = Object.keys(fn.signatures);
+    var booleanIndex = signatures.indexOf('boolean');
+    var stringIndex  = signatures.indexOf('string');
+    var numberIndex  = signatures.indexOf('number');
 
     assert(stringIndex > numberIndex, 'string must come after number');
     assert(booleanIndex > numberIndex, 'boolean must come after number');

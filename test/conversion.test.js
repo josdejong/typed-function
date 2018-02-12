@@ -99,23 +99,19 @@ describe('conversion', function () {
   });
 
   it('should add conversions to a function with variable arguments (1)', function() {
-    var sum = typed({
+    var toNumber = typed({
       '...number': function (values) {
         assert(Array.isArray(values));
-        var sum = 0;
-        for (var i = 0; i < values.length; i++) {
-          sum += values[i];
-        }
-        return sum;
+        return values;
       }
     });
 
-    assert.equal(sum(2,3,4), 9);
-    assert.equal(sum(2,true,4), 7);
-    assert.equal(sum(1,2,false), 3);
-    assert.equal(sum(1,2,true), 4);
-    assert.equal(sum(true,1,2), 4);
-    assert.equal(sum(true,false, true), 2);
+    assert.deepStrictEqual(toNumber(2,3,4), [2,3,4]);
+    assert.deepStrictEqual(toNumber(2,true,4), [2,1,4]);
+    assert.deepStrictEqual(toNumber(1,2,false), [1,2,0]);
+    assert.deepStrictEqual(toNumber(1,2,true), [1,2,1]);
+    assert.deepStrictEqual(toNumber(true,1,2), [1,1,2]);
+    assert.deepStrictEqual(toNumber(true,false, true), [1,0,1]);
   });
 
   it('should add conversions to a function with variable arguments (2)', function() {
@@ -144,12 +140,7 @@ describe('conversion', function () {
   it('should add conversions to a function with variable arguments in a non-conflicting way', function() {
     var fn = typed({
       '...number': function (values) {
-        assert(Array.isArray(values));
-        var sum = 0;
-        for (var i = 0; i < values.length; i++) {
-          sum += values[i];
-        }
-        return sum;
+        return values;
       },
       'boolean': function (value) {
         assert.equal(typeof value, 'boolean');
@@ -157,11 +148,11 @@ describe('conversion', function () {
       }
     });
 
-    assert.equal(fn(2,3,4), 9);
+    assert.deepStrictEqual(fn(2,3,4), [2,3,4]);
+    assert.deepStrictEqual(fn(2,true,4), [2,1,4]);
+    assert.deepStrictEqual(fn(true,3,4), [1,3,4]);
     assert.equal(fn(false), 'boolean');
     assert.equal(fn(true), 'boolean');
-    assert.throws(function () {fn(2,true,4)}, /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: boolean, index: 1\)/);
-    assert.throws(function () {fn(true,2,4)}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 3\)/);
   });
 
   it('should add conversions to a function with variable and union arguments', function() {
@@ -172,13 +163,13 @@ describe('conversion', function () {
       }
     });
 
-    strictEqualArray(fn(2,3,4), [2,3,4]);
-    strictEqualArray(fn(2,true,4), [2,1,4]);
-    strictEqualArray(fn(2,'str'), [2,'str']);
-    strictEqualArray(fn('str', true, false), ['str', 1, 0]);
-    strictEqualArray(fn('str', 2, false), ['str', 2, 0]);
+    assert.deepStrictEqual(fn(2,3,4), [2,3,4]);
+    assert.deepStrictEqual(fn(2,true,4), [2,1,4]);
+    assert.deepStrictEqual(fn(2,'str'), [2,'str']);
+    assert.deepStrictEqual(fn('str', true, false), ['str', 1, 0]);
+    assert.deepStrictEqual(fn('str', 2, false), ['str', 2, 0]);
 
-    assert.throws(function () {fn(new Date(), '2')}, /TypeError: Unexpected type of argument in function unnamed \(expected: string or number, actual: Date, index: 0\)/)
+    assert.throws(function () {fn(new Date(), '2')}, /TypeError: Unexpected type of argument in function unnamed \(expected: string or number or boolean, actual: Date, index: 0\)/)
   });
 
   it('should add non-conflicting conversions to a function with one argument', function() {
@@ -254,7 +245,7 @@ describe('conversion', function () {
     assert.equal(fn(2, 4, 5), 'numbers');
   });
 
-  it('should insert conversions when having an any type argument', function() {
+  it('should not apply conversions when having an any type argument', function() {
     var fn = typed({
       'number': function (a) {
         return 'number';
@@ -264,9 +255,8 @@ describe('conversion', function () {
       }
     });
 
-    // booleans should be converted to number
     assert.equal(fn(2), 'number');
-    assert.equal(fn(true), 'number');
+    assert.equal(fn(true), 'any');
     assert.equal(fn('foo'), 'any');
     assert.equal(fn('{}'), 'any');
   });
@@ -310,6 +300,81 @@ describe('conversion', function () {
 
     });
 
-  })
+    it('should select the signatures with the conversion with the lowest index (1)', function () {
+      typed.conversions = [
+        {from: 'boolean', to: 'string', convert: function (x) {return x + '';}},
+        {from: 'boolean', to: 'number', convert: function (x) {return x + 0;}}
+      ];
+
+      // in the following typed function, a boolean input can be converted to
+      // both a string or a number, which is both ok. In that case,
+      // the conversion with the lowest index should be picked: boolean -> string
+      var fn = typed({
+        'string | number': function (a) {
+          return a;
+        }
+      });
+
+      assert.strictEqual(fn(true), 'true');
+    });
+
+    it('should select the signatures with the conversion with the lowest index (2)', function () {
+      typed.conversions = [
+        {from: 'boolean', to: 'number', convert: function (x) {return x + 0;}},
+        {from: 'boolean', to: 'string', convert: function (x) {return x + '';}}
+      ];
+
+      // in the following typed function, a boolean input can be converted to
+      // both a string or a number, which is both ok. In that case,
+      // the conversion with the lowest index should be picked: boolean -> number
+      var fn = typed({
+        'string | number': function (a) {
+          return a;
+        }
+      });
+
+      assert.strictEqual(fn(true), 1);
+    });
+
+    // FIXME: should select the signatures with least needed conversions (1)
+    it.skip('should select the signatures with least needed conversions (1)', function () {
+      typed.conversions = [
+        {from: 'number', to: 'boolean', convert: function (x) {return !!x }},
+        {from: 'number', to: 'string', convert: function (x) {return x + '' }},
+        {from: 'boolean', to: 'string', convert: function (x) {return x + '' }}
+      ];
+
+      // in the following typed function, the number input can be converted to
+      // both a string or a boolean, which is both ok. It should pick the
+      // conversion to boolean because that is defined first
+      var fn = typed({
+        'string': function (a) { return a; },
+        'boolean': function (a) { return a; }
+      });
+
+      assert.strictEqual(fn(1), true);
+    });
+
+    // FIXME: should select the signatures with least needed conversions (2)
+    it('should select the signatures with least needed conversions (2)', function () {
+      typed.conversions = [
+        {from: 'number', to: 'boolean', convert: function (x) {return !!x }},
+        {from: 'number', to: 'string', convert: function (x) {return x + '' }},
+        {from: 'boolean', to: 'string', convert: function (x) {return x + '' }}
+      ];
+
+      // in the following typed function, the number input can be converted to
+      // both a string or a boolean, which is both ok. It should pick the
+      // conversion to boolean because that is defined first
+      var fn = typed({
+        'number, number': function (a, b) { return [a, b]; },
+        'string, string': function (a, b) { return [a, b]; },
+        'boolean, boolean': function (a, b) { return [a, b]; }
+      });
+
+      assert.deepStrictEqual(fn(1, true), [true, true]);
+    });
+
+  });
 
 });
