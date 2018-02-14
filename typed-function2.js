@@ -468,17 +468,23 @@
               expectedParam.indexOf('any') !== -1))
     }
 
-    // TODO: comment
-    function mergeExpectedParams(defs, index) {
-      var params = uniq(flatMap(defs, function (def) {
+    /**
+     * Helper function for creating error messages: create an array with
+     * all available types on a specific argument index.
+     * @param {Signature[]} signatures
+     * @param {number} index
+     * @return {string[]} Returns an array with available types
+     */
+    function mergeExpectedParams(signatures, index) {
+      var typeNames = uniq(flatMap(signatures, function (def) {
         return getExpectedTypeNames(def, index);
       }));
 
-      return (params.indexOf('any') !== -1) ? ['any'] : params;
+      return (typeNames.indexOf('any') !== -1) ? ['any'] : typeNames;
     }
 
     // TODO: comment
-    function createError(name, args, defs) {
+    function createError(name, args, signatures) {
       var err, expected;
       var _name = name || 'unnamed';
 
@@ -491,18 +497,18 @@
       });
 
       // test for wrong type
-      var matchingDefs = defs;
+      var matchingSignatures = signatures;
       var index;
       for (index = 0; index < actualTypes.length; index++) {
         var actualType = actualTypes[index];
 
-        var nextMatchingDefs = matchingDefs.filter(function (def) {
+        var nextMatchingDefs = matchingSignatures.filter(function (def) {
           return isCorrectType(getExpectedTypeNames(def, index), actualType)
         });
 
         if (nextMatchingDefs.length === 0) {
           // no matching signatures anymore, throw error "wrong type"
-          expected = mergeExpectedParams(matchingDefs, index);
+          expected = mergeExpectedParams(matchingSignatures, index);
           if (expected.length > 0) {
             err = new TypeError('Unexpected type of argument in function ' + _name +
                 ' (expected: ' + expected.join(' or ') +
@@ -518,16 +524,16 @@
           }
         }
         else {
-          matchingDefs = nextMatchingDefs;
+          matchingSignatures = nextMatchingDefs;
         }
       }
 
       // test for too few arguments
-      var lengths = matchingDefs.map(function (def) {
+      var lengths = matchingSignatures.map(function (def) {
         return hasRestParam(def.params) ? Infinity : def.params.length;
       });
       if (actualTypes.length < Math.min.apply(null, lengths)) {
-        expected = mergeExpectedParams(matchingDefs, index);
+        expected = mergeExpectedParams(matchingSignatures, index);
         err = new TypeError('Too few arguments in function ' + _name +
             ' (expected: ' + expected.join(' or ') +
             ', index: ' + actualTypes.length + ')');
@@ -776,17 +782,19 @@
     }
 
     /**
-     * Convert an array with defs into an object with signatures,
+     * Convert an array with signatures into a map with signatures,
      * where signatures with union types are split into separate signatures
      *
      * Throws an error when there are conflicting types
      *
-     * @param {Signature[]} defs
-     * @return {Object.<string, function>}
+     * @param {Signature[]} signatures
+     * @return {Object.<string, function>}  Returns a map with signatures
+     *                                      as key and the original function
+     *                                      of this signature as value.
      */
-    function defsToSignaturesMap(defs) {
+    function createSignaturesMap(signatures) {
       var signaturesMap = {};
-      defs.forEach(function (def) {
+      signatures.forEach(function (def) {
         if (!hasConversions(def.params)) {
           splitParams(def.params).forEach(function (params) {
             signaturesMap[stringifyParams(params)] = def.fnOriginal;
@@ -844,85 +852,81 @@
     /**
      * Create a typed function
      * @param {String} name               The name for the typed function
-     * @param {Object.<string, function>} signatures
+     * @param {Object.<string, function>} signaturesMap
      *                                    An object with one or
      *                                    multiple signatures as key, and the
      *                                    function corresponding to the
      *                                    signature as value.
      * @return {function}  Returns the created typed function.
      */
-    function createTypedFunction(name, signatures) {
-      if (Object.keys(signatures).length === 0) {
+    function createTypedFunction(name, signaturesMap) {
+      if (Object.keys(signaturesMap).length === 0) {
         throw new SyntaxError('No signatures provided');
       }
 
       // parse the signatures
-      // TODO: rename defs to some more meaningful name
-
-      var defs = flatMap(Object.keys(signatures), function (signature) {
+      var signatures = flatMap(Object.keys(signaturesMap), function (signature) {
         // parse with and without conversions,
         // the version without can be executed much faster
         return [
-          parseSignature(signature, signatures[signature], []),
-          parseSignature(signature, signatures[signature], typed.conversions)
+          parseSignature(signature, signaturesMap[signature], []),
+          parseSignature(signature, signaturesMap[signature], typed.conversions)
         ];
       }).filter(notNull)
 
-      // sort signatures by the order of types
-      defs.sort(compareSignatures);
-
-      // console.log('SORTED defs', JSON.stringify(defs, null, 2))
+      // sort signatures, ordered by how the types and conversions are ordered
+      signatures.sort(compareSignatures);
 
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
-      var ok0 = defs[0] && defs[0].params.length <= 2 && !hasRestParam(defs[0].params);
-      var ok1 = defs[1] && defs[1].params.length <= 2 && !hasRestParam(defs[1].params);
-      var ok2 = defs[2] && defs[2].params.length <= 2 && !hasRestParam(defs[2].params);
-      var ok3 = defs[3] && defs[3].params.length <= 2 && !hasRestParam(defs[3].params);
-      var ok4 = defs[4] && defs[4].params.length <= 2 && !hasRestParam(defs[4].params);
-      var ok5 = defs[5] && defs[5].params.length <= 2 && !hasRestParam(defs[5].params);
+      var ok0 = signatures[0] && signatures[0].params.length <= 2 && !hasRestParam(signatures[0].params);
+      var ok1 = signatures[1] && signatures[1].params.length <= 2 && !hasRestParam(signatures[1].params);
+      var ok2 = signatures[2] && signatures[2].params.length <= 2 && !hasRestParam(signatures[2].params);
+      var ok3 = signatures[3] && signatures[3].params.length <= 2 && !hasRestParam(signatures[3].params);
+      var ok4 = signatures[4] && signatures[4].params.length <= 2 && !hasRestParam(signatures[4].params);
+      var ok5 = signatures[5] && signatures[5].params.length <= 2 && !hasRestParam(signatures[5].params);
       var allOk = ok0 && ok1 && ok2 && ok3 && ok4 && ok5;
 
-      var test00 = ok0 ? compileTest(defs[0].params[0]) : notOk;
-      var test10 = ok1 ? compileTest(defs[1].params[0]) : notOk;
-      var test20 = ok2 ? compileTest(defs[2].params[0]) : notOk;
-      var test30 = ok3 ? compileTest(defs[3].params[0]) : notOk;
-      var test40 = ok4 ? compileTest(defs[4].params[0]) : notOk;
-      var test50 = ok5 ? compileTest(defs[5].params[0]) : notOk;
+      var test00 = ok0 ? compileTest(signatures[0].params[0]) : notOk;
+      var test10 = ok1 ? compileTest(signatures[1].params[0]) : notOk;
+      var test20 = ok2 ? compileTest(signatures[2].params[0]) : notOk;
+      var test30 = ok3 ? compileTest(signatures[3].params[0]) : notOk;
+      var test40 = ok4 ? compileTest(signatures[4].params[0]) : notOk;
+      var test50 = ok5 ? compileTest(signatures[5].params[0]) : notOk;
 
-      var test01 = ok0 ? compileTest(defs[0].params[1]) : notOk;
-      var test11 = ok1 ? compileTest(defs[1].params[1]) : notOk;
-      var test21 = ok2 ? compileTest(defs[2].params[1]) : notOk;
-      var test31 = ok3 ? compileTest(defs[3].params[1]) : notOk;
-      var test41 = ok4 ? compileTest(defs[4].params[1]) : notOk;
-      var test51 = ok5 ? compileTest(defs[5].params[1]) : notOk;
+      var test01 = ok0 ? compileTest(signatures[0].params[1]) : notOk;
+      var test11 = ok1 ? compileTest(signatures[1].params[1]) : notOk;
+      var test21 = ok2 ? compileTest(signatures[2].params[1]) : notOk;
+      var test31 = ok3 ? compileTest(signatures[3].params[1]) : notOk;
+      var test41 = ok4 ? compileTest(signatures[4].params[1]) : notOk;
+      var test51 = ok5 ? compileTest(signatures[5].params[1]) : notOk;
 
-      var fn0 = ok0 ? defs[0].fn : undef;
-      var fn1 = ok1 ? defs[1].fn : undef;
-      var fn2 = ok2 ? defs[2].fn : undef;
-      var fn3 = ok3 ? defs[3].fn : undef;
-      var fn4 = ok4 ? defs[4].fn : undef;
-      var fn5 = ok5 ? defs[5].fn : undef;
+      var fn0 = ok0 ? signatures[0].fn : undef;
+      var fn1 = ok1 ? signatures[1].fn : undef;
+      var fn2 = ok2 ? signatures[2].fn : undef;
+      var fn3 = ok3 ? signatures[3].fn : undef;
+      var fn4 = ok4 ? signatures[4].fn : undef;
+      var fn5 = ok5 ? signatures[5].fn : undef;
 
-      var len0 = ok0 ? defs[0].params.length : -1;
-      var len1 = ok1 ? defs[1].params.length : -1;
-      var len2 = ok2 ? defs[2].params.length : -1;
-      var len3 = ok3 ? defs[3].params.length : -1;
-      var len4 = ok4 ? defs[4].params.length : -1;
-      var len5 = ok5 ? defs[5].params.length : -1;
+      var len0 = ok0 ? signatures[0].params.length : -1;
+      var len1 = ok1 ? signatures[1].params.length : -1;
+      var len2 = ok2 ? signatures[2].params.length : -1;
+      var len3 = ok3 ? signatures[3].params.length : -1;
+      var len4 = ok4 ? signatures[4].params.length : -1;
+      var len5 = ok5 ? signatures[5].params.length : -1;
 
       // simple and generic, but also slow
       var iStart = allOk ? 6 : 0;
-      var iEnd = defs.length;
+      var iEnd = signatures.length;
       var generic = function generic() {
         'use strict';
 
         for (var i = iStart; i < iEnd; i++) {
-          if (defs[i].test(arguments)) {
-            return defs[i].fn.apply(null, arguments);
+          if (signatures[i].test(arguments)) {
+            return signatures[i].fn.apply(null, arguments);
           }
         }
 
-        throw createError(name, arguments, defs);
+        throw createError(name, arguments, signatures);
       }
 
       // create the typed function
@@ -942,7 +946,7 @@
 
       // attach name and signatures to the typed function
       Object.defineProperty(fn, 'name', {value: name});
-      fn.signatures = defsToSignaturesMap(defs);
+      fn.signatures = createSignaturesMap(signatures);
 
       return fn;
     }
@@ -1035,21 +1039,21 @@
 
     typed = createTypedFunction('typed', {
       'string, Object': createTypedFunction,
-      'Object': function (signatures) {
+      'Object': function (signaturesMap) {
         // find existing name
         var fns = [];
-        for (var signature in signatures) {
-          if (signatures.hasOwnProperty(signature)) {
-            fns.push(signatures[signature]);
+        for (var signature in signaturesMap) {
+          if (signaturesMap.hasOwnProperty(signature)) {
+            fns.push(signaturesMap[signature]);
           }
         }
         var name = getName(fns);
-        return createTypedFunction(name, signatures);
+        return createTypedFunction(name, signaturesMap);
       },
       '...Function': function (fns) {
         var err;
         var name = getName(fns);
-        var signatures = {};
+        var signaturesMap = {};
 
         for (var i = 0; i < fns.length; i++) {
           var fn = fns[i];
@@ -1064,8 +1068,8 @@
           // merge the signatures
           for (var signature in fn.signatures) {
             if (fn.signatures.hasOwnProperty(signature)) {
-              if (signatures.hasOwnProperty(signature)) {
-                if (fn.signatures[signature] !== signatures[signature]) {
+              if (signaturesMap.hasOwnProperty(signature)) {
+                if (fn.signatures[signature] !== signaturesMap[signature]) {
                   err = new Error('Signature "' + signature + '" is defined twice');
                   err.data = {signature: signature};
                   throw err;
@@ -1073,13 +1077,13 @@
                 // else: both signatures point to the same function, that's fine
               }
               else {
-                signatures[signature] = fn.signatures[signature];
+                signaturesMap[signature] = fn.signatures[signature];
               }
             }
           }
         }
 
-        return createTypedFunction(name, signatures);
+        return createTypedFunction(name, signaturesMap);
       }
     });
 
