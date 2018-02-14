@@ -67,8 +67,6 @@
    *   name: string,
    *   test: function(*) : boolean
    * }} TypeDef
-   *
-   * TODO: define a type for the defs array containing a signature and stuff
    */
 
   // create a new instance of typed-function
@@ -655,11 +653,16 @@
     function compareSignatures (signature1, signature2) {
       var len = Math.min(signature1.params.length, signature2.params.length);
 
-      // compare having a rest operator
-      // (we coerce booleans to numbers here)
-      var rest = (hasRestParam(signature1.params) - hasRestParam(signature2.params));
-      if (rest !== 0) {
-        return rest;
+      // compare having conversions (we coerce booleans to numbers here)
+      var conversions = (hasConversions(signature1.params) - hasConversions(signature2.params));
+      if (conversions !== 0) {
+        return conversions;
+      }
+
+      // compare having a rest operator (we coerce booleans to numbers here)
+      var restParam = (hasRestParam(signature1.params) - hasRestParam(signature2.params));
+      if (restParam !== 0) {
+        return restParam;
       }
 
       // compare the params one by one
@@ -856,29 +859,17 @@
       // parse the signatures
       // TODO: rename defs to some more meaningful name
 
-      // without conversions
-      var defs = Object.keys(signatures)
-          .map(function (signature) {
-            return parseSignature(signature, signatures[signature], []);
-          })
-          .filter(notNull)
-
-      // with conversions
-      var conversionDefs = Object.keys(signatures)
-          .map(function (signature) {
-            return parseSignature(signature, signatures[signature], typed.conversions);
-          })
-          .filter(notNull)
+      var defs = flatMap(Object.keys(signatures), function (signature) {
+        // parse with and without conversions,
+        // the version without can be executed much faster
+        return [
+          parseSignature(signature, signatures[signature], []),
+          parseSignature(signature, signatures[signature], typed.conversions)
+        ];
+      }).filter(notNull)
 
       // sort signatures by the order of types
       defs.sort(compareSignatures);
-
-      // sort signatures by the order of types
-      conversionDefs.sort(compareSignatures);
-
-      // TODO: improve sorting signatures, sort all conversions when mixed
-
-      defs = defs.concat(conversionDefs);
 
       // console.log('SORTED defs', JSON.stringify(defs, null, 2))
 
