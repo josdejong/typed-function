@@ -39,17 +39,34 @@
   /**
    * @typedef {{
    *   params: Param[],
-   *   convertableParams?: Param[],
-   *   restParam: boolean
+   *   test: function,
+   *   fn: function
+   *   fnOriginal: function
    * }} Signature
    *
-   * @typedef {string[]} Param
+   * @typedef {{
+   *   types: Type[],
+   *   restParam: boolean
+   * }} Param
+   *
+   * @typedef {{
+   *   name: string,
+   *   typeIndex: number,
+   *   test: function,
+   *   conversion?: ConversionDef,
+   *   conversionIndex: number,
+   * }} Type
    *
    * @typedef {{
    *   from: string,
    *   to: string,
-   *   convert: function (*) : boolean
-   * }} Conversion
+   *   convert: function (*) : *
+   * }} ConversionDef
+   *
+   * @typedef {{
+   *   name: string,
+   *   test: function(*) : boolean
+   * }} TypeDef
    *
    * TODO: define a type for the defs array containing a signature and stuff
    */
@@ -86,24 +103,24 @@
 
     /**
      * Find the test function for a type
-     * @param {String} type
-     * @return {function} Returns the test function of the type when found,
+     * @param {String} typeName
+     * @return {TypeDef} Returns the type definition when found,
      *                    Throws a TypeError otherwise
      */
-    function findTest (type) {
+    function findTypeByName (typeName) {
       var entry = typed.types.find(function (entry) {
-        return entry.name === type;
+        return entry.name === typeName;
       });
 
       if (entry) {
-        return entry.test;
+        return entry;
       }
 
       var hint = typed.types.find(function (entry) {
-        return entry.name.toLowerCase() === type.toLowerCase();
+        return entry.name.toLowerCase() === typeName.toLowerCase();
       });
 
-      throw new TypeError('Unknown type "' + type + '"' +
+      throw new TypeError('Unknown type "' + typeName + '"' +
           (hint ? ('. Did you mean "' + hint.name + '"?') : ''));
     }
 
@@ -191,68 +208,135 @@
 
       throw new Error('Cannot convert from ' + from + ' to ' + type);
     }
-
-    /**
-     * Parse a parameter like `string | number` into an array with types.
-     * @param {string} param
-     * @return {string[]}
-     */
-    function parseParam (param) {
-      return param.split('|')
-          .map(trim)
-          .filter(notEmpty);
-
-      // TODO: check existence of the params
-
-      // TODO: order the params by their index in types to get normalized types?
-    }
-
+    
     /**
      * Stringify parameters in a normalized way
-     * @param {Signature} params
+     * @param {Param[]} params
      * @return {string}
      */
     function stringifyParams (params) {
-      return params.params
-          .map(function (param, index) {
-            var restParam = (params.restParam && index === params.params.length - 1) ? '...' : '';
-            return restParam + param.join('|');
+      return params
+          .map(function (param) {
+            var typeNames = param.types.map(getTypeName);
+
+            return (param.restParam ? '...' : '') + typeNames.join('|');
           })
           .join(',');
     }
 
     /**
-     * Parse a signature with comma separated parameters, like "number, string"
-     * @param {string} signature
-     * @return {Signature} params
+     * Parse a parameter, like "...number | boolean"
+     * @param {string} param
+     * @param {ConversionDef[]} conversions
+     * @return {Param} param
      */
-    function parseParams (signature) {
+    function parseParam (param, conversions) { // TODO: pass types as an argument too
+      var restParam = param.indexOf('...') === 0;
+      var types = (!restParam)
+          ? param
+          : (param.length > 3)
+              ? param.slice(3)
+              : 'any';
+
+      var typeNames = types.split('|').map(trim)
+          .filter(notEmpty)
+          .filter(notIgnore);
+
+      var matchingConversions = filterConversions(conversions, typeNames);
+
+      var exactTypes = typeNames.map(function (typeName) {
+        var type = findTypeByName(typeName);
+
+        return {
+          name: typeName,
+          typeIndex: typed.types.indexOf(type),
+          test: type.test,
+          conversion: null,
+          conversionIndex: -1
+        };
+      });
+
+      var convertableTypes = matchingConversions.map(function (conversion) {
+        var type = findTypeByName(conversion.from);
+
+        return {
+          name: conversion.from,
+          typeIndex: typed.types.indexOf(type),
+          test: type.test,
+          conversion: conversion,
+          conversionIndex: conversions.indexOf(conversion)
+        };
+      });
+
+      return {
+        types: exactTypes.concat(convertableTypes),
+        restParam: restParam
+      };
+    }
+
+    /**
+     * Parse a signature with comma separated parameters,
+     * like "number | boolean, ...string"
+     * @param {string} signature
+     * @param {function} fn
+     * @param {ConversionDef[]} conversions
+     * @return {Signature | null} signature
+     */
+    function parseSignature (signature, fn, conversions) {
       var params = [];
-      var restParam = false;
 
       if (signature.trim() !== '') {
-        var arr = signature.split(',');
+        params = signature
+            .split(',')
+            .map(trim)
+            .map(function (param, index, array) {
+              var parsedParam = parseParam(param, conversions);
 
-        arr.map(trim).forEach(function (param, index) {
-          var rest = param.indexOf('...') === 0;
-          if (rest) {
-            if (index === arr.length - 1) {
-              restParam = true; // only allowed as for last parameter
-            }
-            else {
-              throw new SyntaxError('Unexpected rest parameter "' + param + '": ' +
-                  'only allowed for the last parameter');
-            }
-          }
+              if (parsedParam.restParam && (index !== array.length - 1)) {
+                throw new SyntaxError('Unexpected rest parameter "' + param + '": ' +
+                    'only allowed for the last parameter');
+              }
 
-          params.push(parseParam(rest ? (param.length > 3) ? param.slice(3) : 'any' : param));
-        });
+              return parsedParam;
+          });
+      }
+
+      if (params.some(isInvalidParam)) {
+        // invalid signature: at least one parameter has no types
+        // (they may have been filtered)
+        return null;
       }
 
       return {
         params: params,
-        restParam: restParam
+        test: compileTests(params),
+        fn: compileArgsPreprocessing(params, fn),
+        fnOriginal: fn
       };
+    }
+
+    /**
+     * Test whether a set of params contains a restParam
+     * @param {Param[]} params
+     * @return {boolean} Returns true when the last parameter is a restParam
+     */
+    function hasRestParam(params) {
+      var param = last(params)
+      return param ? param.restParam : false;
+    }
+
+    /**
+     * Test whether a set of params contains conversions
+     * @param {Param[]} params
+     * @return {boolean} Returns true when at least one of the parameters
+     *                   contains a conversion.
+     */
+    function hasConversions(params) {
+      return params.some(function (param) {
+        return param.types.some(function (type) {
+          return type.conversion != null;
+        });
+      });
     }
 
     /**
@@ -261,24 +345,24 @@
      * @param {Param} param
      * @return {function(x: *) : boolean} Returns a test function
      */
-    function compileParam(param) {
-      if (!param || param.length === 0) {
+    function compileTest(param) {
+      if (!param || param.types.length === 0) {
         // nothing to do
         return ok;
       }
-      else if (param.length === 1) {
-        return findTest(param[0]);
+      else if (param.types.length === 1) {
+        return findTypeByName(param.types[0].name).test;
       }
-      else if (param.length === 2) {
-        var test0 = findTest(param[0]);
-        var test1 = findTest(param[1]);
+      else if (param.types.length === 2) {
+        var test0 = findTypeByName(param.types[0].name).test;
+        var test1 = findTypeByName(param.types[1].name).test;
         return function or(x) {
           return test0(x) || test1(x);
         }
       }
-      else { // types.length > 2
-        var tests = param.map(function (type) {
-          return findTest(type);
+      else { // param.types.length > 2
+        var tests = param.types.map(function (type) {
+          return findTypeByName(type.name).test;
         })
         return function or(x) {
           for (var i = 0; i < tests.length; i++) {
@@ -293,16 +377,18 @@
 
     /**
      * Create a test for all parameters of a signature
-     * @param {Signature} signature
+     * @param {Param[]} params
      * @return {function(args: Array<*>) : boolean}
      */
-    function compileParams(signature) {
+    function compileTests(params) {
       var tests, test0, test1;
 
-      if (signature.restParam) { // variable arguments like '...number'
-        tests = initial(signature.params).map(compileParam);
+      // console.log('compileTests', JSON.stringify(params))
+
+      if (hasRestParam(params)) { // variable arguments like '...number'
+        tests = initial(params).map(compileTest);
         var varIndex = tests.length;
-        var lastTest = compileParam(last(signature.params));
+        var lastTest = compileTest(last(params));
         var testRestParam = function (args) {
           for (var i = varIndex; i < args.length; i++) {
             if (!lastTest(args[i])) {
@@ -322,26 +408,26 @@
         };
       }
       else { // no variable arguments
-        if (signature.params.length === 0) {
+        if (params.length === 0) {
           return function testArgs(args) {
             return args.length === 0;
           };
         }
-        else if (signature.params.length === 1) {
-          test0 = compileParam(signature.params[0]);
+        else if (params.length === 1) {
+          test0 = compileTest(params[0]);
           return function testArgs(args) {
             return test0(args[0]) && args.length === 1;
           };
         }
-        else if (signature.params.length === 2) {
-          test0 = compileParam(signature.params[0]);
-          test1 = compileParam(signature.params[1]);
+        else if (params.length === 2) {
+          test0 = compileTest(params[0]);
+          test1 = compileTest(params[1]);
           return function testArgs(args) {
             return test0(args[0]) && test1(args[1]) && args.length === 2;
           };
         }
         else { // arguments.length > 2
-          tests = signature.params.map(compileParam);
+          tests = params.map(compileTest);
           return function testArgs(args) {
             for (var i = 0; i < tests.length; i++) {
               if (!tests[i](args[i])) {
@@ -355,12 +441,26 @@
     }
 
     // TODO: comment
-    function getExpectedParam (signature, index) {
+    function getExpectedTypeNames (signature, index) {
       return index < signature.params.length
-          ? signature.params[index]
-          : signature.restParam
-              ? signature.params[signature.params.length - 1]
+          ? signature.params[index].types.map(getTypeName)
+          : hasRestParam(signature.params)
+              ? last(signature.params).types.map(getTypeName)
               : []
+    }
+
+    /**
+     * Returns the name of a type
+     * @param {Type} type
+     * @return {string} Returns the type name
+     */
+    function getTypeName(type) {
+      return type.name;
+    }
+
+    // TODO: comment
+    function isExactType(type) {
+      return type.conversion === null || type.conversion === undefined;
     }
 
     // TODO: comment
@@ -373,7 +473,7 @@
     // TODO: comment
     function mergeExpectedParams(defs, index) {
       var params = uniq(flatMap(defs, function (def) {
-        return getExpectedParam(def.signature, index);
+        return getExpectedTypeNames(def, index);
       }));
 
       return (params.indexOf('any') !== -1) ? ['any'] : params;
@@ -399,7 +499,7 @@
         var actualType = actualTypes[index];
 
         var nextMatchingDefs = matchingDefs.filter(function (def) {
-          return isCorrectType(getExpectedParam(def.signature, index), actualType)
+          return isCorrectType(getExpectedTypeNames(def, index), actualType)
         });
 
         if (nextMatchingDefs.length === 0) {
@@ -426,7 +526,7 @@
 
       // test for too few arguments
       var lengths = matchingDefs.map(function (def) {
-        return def.signature.restParam ? Infinity : def.signature.params.length;
+        return hasRestParam(def.params) ? Infinity : def.params.length;
       });
       if (actualTypes.length < Math.min.apply(null, lengths)) {
         expected = mergeExpectedParams(matchingDefs, index);
@@ -466,35 +566,12 @@
     }
 
     /**
-     * @param {Signature} signature
-     * @return {Signature | null} Returns a filtered copy of the signature,
-     *                            or null when the signature is invalid
-     *                            (when a parameter has no types left)
-     */
-    function filterIgnoredTypes (signature) {
-      var filteredParams = [];
-
-      for (var i = 0; i < signature.params.length; i++) {
-        var param = signature.params[i].filter(notIgnore);
-        if (param.length === 0) {
-          return null;
-        }
-        filteredParams.push(param);
-      }
-
-      return {
-        params: filteredParams,
-        restParam: signature.restParam
-      }
-    }
-
-    /**
      * Create a map with the name of a type as key and the index as value.
      * Used for sorting
      * @param {Array} types
      * @return {Object}
      */
-    function createTypesIndexMap (types) {
+    function createTypesIndexMap (types) {  // TODO: cleanup. But first fix the ordering of object and any
       var typesIndexMap = {};
 
       types.forEach(function (type, index) {
@@ -514,16 +591,33 @@
     }
 
     /**
-     *
+     * TODO: comment
      * @param {Param} param
-     * @param {Object} typesIndexMap
      * @return {number}
      */
-    function getLowestTypeIndex (param, typesIndexMap) {
-      var min = typesIndexMap[param[0]];
+    function getLowestTypeIndex (param) {
+      var exactTypes = param.types.filter(isExactType);
+      var min = exactTypes[0].typeIndex;
 
-      for (var i = 1; i < param.length; i++) {
-        min = Math.min(min, typesIndexMap[param[i]]);
+      for (var i = 1; i < exactTypes.length; i++) {
+        if (!exactTypes[i].conversion) {
+          min = Math.min(min, exactTypes[i].typeIndex);
+        }
+      }
+
+      return min;
+    }
+
+    /**
+     * TODO: comment
+     * @param {Param} param
+     * @return {number}
+     */
+    function getLowestConversionIndex (param) {
+      var min = param.types[0].conversionIndex;
+
+      for (var i = 1; i < param.types.length; i++) {
+        min = Math.min(min, param.types[i].conversionIndex);
       }
 
       return min;
@@ -533,36 +627,44 @@
      * Compare two params
      * @param {Param} param1
      * @param {Param} param2
-     * @param {Object} typesIndexMap
      * @return {number} returns a negative number when param1 must get a lower
      *                  index than param2, a positive number when the opposite,
      *                  or zero when both are equal
      */
-    function compareParams (param1, param2, typesIndexMap) {
-      return getLowestTypeIndex(param1, typesIndexMap) - getLowestTypeIndex(param2, typesIndexMap);
+    function compareParams (param1, param2) {
+      return getLowestTypeIndex(param1) - getLowestTypeIndex(param2);
+
+      // TODO: compare with conversion index
+      // var typeIndexDiff = getLowestTypeIndex(param1) - getLowestTypeIndex(param2);
+      //
+      // if (typeIndexDiff !== 0) {
+      //   return typeIndexDiff;
+      // }
+      //
+      // return getLowestConversionIndex(param1) - getLowestConversionIndex(param2);
     }
 
     /**
      * Compare two signatures
      * @param {Signature} signature1
      * @param {Signature} signature2
-     * @param {Object} typesIndexMap
      * @return {number} returns a negative number when param1 must get a lower
      *                  index than param2, a positive number when the opposite,
      *                  or zero when both are equal
      */
-    function compareSignatures (signature1, signature2, typesIndexMap) {
+    function compareSignatures (signature1, signature2) {
       var len = Math.min(signature1.params.length, signature2.params.length);
 
       // compare having a rest operator
-      var rest = (signature1.restParam - signature2.restParam) // coerce boolean to number
+      // (we coerce booleans to numbers here)
+      var rest = (hasRestParam(signature1.params) - hasRestParam(signature2.params));
       if (rest !== 0) {
         return rest;
       }
 
       // compare the params one by one
       for (var i = 0; i < len; i++) {
-        var c = compareParams(signature1.params[i], signature2.params[i], typesIndexMap);
+        var c = compareParams(signature1.params[i], signature2.params[i]);
         if (c !== 0) {
           return c;
         }
@@ -573,116 +675,97 @@
     }
 
     /**
-     * Create a preprocessing function which picks puts the rest parameters
-     * in a single array.
-     *
-     * @param {Signature} signature
-     * @return {function (Array) : Array}
-     */
-    function createRestParamPreProcess (signature) {
-      var offset = signature.params.length - 1;
-      return function (args) {
-        return slice(args, 0, offset).concat([slice(args, offset)])
-      }
-    }
-
-    /**
      * Get params containing all types that can be converted to the defined types.
      *
-     * @param {Param[]} params
-     * @return {Conversion[][] | null} Returns the conversions that are available
-     *                               For every parameter if any,
-     *                               returns null if there are no conversions.
+     * @param {ConversionDef[]} conversions
+     * @param {string[]} typeNames
+     * @return {ConversionDef[]} Returns the conversions that are available
+     *                        for every type (if any)
      */
-    function getConversions (params) {
-      var paramConversions = params.map(function (param) {
-        var conversions = {};
+    function filterConversions (conversions, typeNames) {
+      var matches = {};
 
-        typed.conversions.forEach(function (conversion) {
-          if (param.indexOf(conversion.from) === -1 &&
-              param.indexOf(conversion.to) !== -1 &&
-              !conversions[conversion.from]) {
-            // console.log('MATCH', param, conversion.from, '->', conversion.to)
-            conversions[conversion.from] = conversion;
-          }
-        });
-
-        return Object.keys(conversions).map(function (from) {
-          return conversions[from];
-        });
-      });
-
-      var hasConvertableParams = paramConversions.some(function (param) {
-        return param.length > 0
-      });
-
-      return hasConvertableParams ? paramConversions : null;
-    }
-
-    /**
-     * Extend the parameters of a signature with convertableParams
-     * @param {Signature} signature
-     * @param {Conversion[][]} conversions
-     * @return {Signature} Returns a copy of the signature with added params
-     */
-    function addConvertableParams(signature, conversions) {
-      return {
-        params: signature.params.map(function (param, i) {
-          var froms = conversions[i].map(function (conversion) {
-            return conversion.from;
-          })
-
-          return param.concat(froms)
-        }),
-        restParam: signature.restParam
-      };
-    }
-
-    // TODO: comment
-    /**
-     *
-     * @param {function} fn
-     * @param {Conversion[][]} conversions
-     * @param {boolean} restParam
-     * @return {function}
-     */
-    function compileArgsConversion(fn, conversions, restParam) {
-      var compiledConversions = conversions.map(compileArgConversion)
-
-      return function convertArgs() {
-        var args = [];
-        var last = restParam ? arguments.length - 1 : arguments.length;
-        for (var i = 0; i < last; i++) {
-          args[i] = compiledConversions[i](arguments[i]);
-        }
-        if (restParam) {
-          args[last] = arguments[last].map(compiledConversions[last]);
-        }
-
-        return fn.apply(null, args);
-      }
-    }
-
-    // TODO: comment
-    /**
-     *
-     * @param {Conversion[]} conversions
-     * @return {function}
-     */
-    function compileArgConversion(conversions) {
-      var converts = [];
-      var tests = [];
       conversions.forEach(function (conversion) {
-        tests.push(findTest(conversion.from));
-        converts.push(conversion.convert);
+        if (typeNames.indexOf(conversion.from) === -1 &&
+            typeNames.indexOf(conversion.to) !== -1 &&
+            !matches[conversion.from]) {
+          // console.log('MATCH', param, conversion.from, '->', conversion.to)
+          matches[conversion.from] = conversion;
+        }
       });
 
-      // TODO: make optimized versions for 1 and 2 arguments
+      return Object.keys(matches).map(function (from) {
+        return matches[from];
+      });
+    }
+
+    /**
+     * Preprocess arguments before calling the original function:
+     * - if needed convert the parameters
+     * - in case of rest parameters, move the rest parameters into an Array
+     * @param {Param[]} params
+     * @param {function} fn
+     * @return {function} Returns a wrapped function
+     */
+    function compileArgsPreprocessing(params, fn) {
+      var fnConvert = fn;
+
+      // TODO: can we make this wrapper function smarter/simpler?
+
+      if (hasConversions(params)) {
+        // console.log('compileArgsPreprocessing...', JSON.stringify(params))
+        var restParam = hasRestParam(params);
+        var compiledConversions = params.map(compileArgConversion)
+
+        fnConvert = function convertArgs() {
+          var args = [];
+          var last = restParam ? arguments.length - 1 : arguments.length;
+          for (var i = 0; i < last; i++) {
+            args[i] = compiledConversions[i](arguments[i]);
+          }
+          if (restParam) {
+            args[last] = arguments[last].map(compiledConversions[last]);
+          }
+
+          return fn.apply(null, args);
+        }
+      }
+
+      var fnPreprocess = fnConvert;
+      if (hasRestParam(params)) {
+        var offset = params.length - 1;
+
+        fnPreprocess = function preprocessRestParams () {
+          return fnConvert.apply(null,
+              slice(arguments, 0, offset).concat([slice(arguments, offset)]));
+        }
+      }
+
+      return fnPreprocess;
+    }
+
+    // TODO: comment
+    /**
+     *
+     * @param {Param} param
+     * @return {function}
+     */
+    function compileArgConversion(param) {
+      var tests = [];
+      var conversions = [];
+      param.types.forEach(function (type) {
+        if (type.conversion) {
+          tests.push(findTypeByName(type.conversion.from).test);
+          conversions.push(type.conversion.convert);
+        }
+      });
+
+      // TODO: make optimized versions for 0, 1 and 2 conversions
 
       return function convertArg(arg) {
-        for (var i = 0; i < converts.length; i++) {
+        for (var i = 0; i < conversions.length; i++) {
           if (tests[i](arg)) {
-            return converts[i](arg);
+            return conversions[i](arg);
           }
         }
         return arg;
@@ -695,19 +778,15 @@
      *
      * Throws an error when there are conflicting types
      *
-     * @param {Array} defs
-     * @return {Object}
+     * @param {Signature[]} defs
+     * @return {Object.<string, function>}
      */
     function defsToSignaturesMap(defs) {
       var signaturesMap = {};
       defs.forEach(function (def) {
-        if (!def.conversion) {
-          splitParams(def.signature.params, 0).forEach(function (params) {
-            var splittedSignature = {
-              params: params,
-              restParam: def.signature.restParam
-            };
-            signaturesMap[stringifyParams(splittedSignature)] = def.fn;
+        if (!hasConversions(def.params)) {
+          splitParams(def.params).forEach(function (params) {
+            signaturesMap[stringifyParams(params)] = def.fnOriginal;
           });
         }
       });
@@ -716,7 +795,11 @@
     }
 
     /**
-     * Split params with union types in to separate params. For example
+     * Split params with union types in to separate params.
+     *
+     * Conversion types are ignored!
+     *
+     * For example:
      *
      *     splitParams([['Array', 'Object'], ['string', 'RegExp'])
      *     // returns:
@@ -727,19 +810,28 @@
      *     //   ['Object', 'RegExp']
      *     // ]
      *
-     * @param params
-     * @return {*}
+     * @param {Param[]} params
+     * @return {Param[]}
      */
     function splitParams(params) {
       function _splitParams(params, index, types) {
         if (index < params.length) {
           // recurse over the params
-          return flatMap(params[index], function (type) {
-            return _splitParams(params, index + 1, types.concat([[type]]));
+          var exactTypes = params[index].types.filter(isExactType);
+          return flatMap(exactTypes, function (type) {
+            return _splitParams(params, index + 1, types.concat(type));
           });
         }
         else {
-          return [types]; // pack in an array so we can do flatMap on a single entry
+          // we've reached the end of the parameters. Now build a new Param
+          var splittedParams = types.map(function (type, typeIndex) {
+            return {
+              types: [type],
+              restParam: (typeIndex === params.length - 1) && hasRestParam(params)
+            }
+          });
+
+          return [splittedParams];
         }
       }
 
@@ -762,76 +854,56 @@
       }
 
       // parse the signatures
-      var defs = [];
-      for (var signature in signatures) {
-        // noinspection JSUnfilteredForInLoop
-        if (hasOwnProperty(signatures, signature)) {
-          // noinspection JSUnfilteredForInLoop
-          var parsedSignature = filterIgnoredTypes(parseParams(signature));
+      // TODO: rename defs to some more meaningful name
 
-          if (parsedSignature) {
-            // noinspection JSUnfilteredForInLoop
-            defs.push({
-              signature: parsedSignature,
-              restParam: parsedSignature.restParam,
-              conversion: false,
-              preprocess: parsedSignature.restParam
-                  ? createRestParamPreProcess(parsedSignature)
-                  : null,
-              test: compileParams(parsedSignature),
-              fn: signatures[signature]
-            });
-          }
+      // without conversions
+      var defs = Object.keys(signatures)
+          .map(function (signature) {
+            return parseSignature(signature, signatures[signature], []);
+          })
+          .filter(notNull)
 
-        }
-      }
+      // with conversions
+      var conversionDefs = Object.keys(signatures)
+          .map(function (signature) {
+            return parseSignature(signature, signatures[signature], typed.conversions);
+          })
+          .filter(notNull)
 
       // sort signatures by the order of types
-      var typesIndexMap = createTypesIndexMap(typed.types);
-      defs.sort(function (a, b) {
-        return compareSignatures(a.signature, b.signature, typesIndexMap);
-      });
+      defs.sort(compareSignatures);
 
-      // add signatures with conversions
-      var count = defs.length;
-      for (var i = 0; i < count; i++) {
-        var conversions = getConversions(defs[i].signature.params);
-        if (conversions) {
-          var signature = addConvertableParams(defs[i].signature, conversions);
-          // console.log('SIGNATURE', signature)
-          defs.push({
-            signature: signature,
-            restParam: defs[i].restParam,
-            conversion: true,
-            preprocess: defs[i].preprocess,
-            test: compileParams(signature),
-            fn: compileArgsConversion(defs[i].fn, conversions, defs[i].restParam)
-          });
-        }
-      }
+      // sort signatures by the order of types
+      conversionDefs.sort(compareSignatures);
+
+      // TODO: improve sorting signatures, sort all conversions when mixed
+
+      defs = defs.concat(conversionDefs);
+
+      // console.log('SORTED defs', JSON.stringify(defs, null, 2))
 
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
-      var ok0 = defs[0] && defs[0].signature.params.length <= 2 && !defs[0].signature.restParam;
-      var ok1 = defs[1] && defs[1].signature.params.length <= 2 && !defs[1].signature.restParam;
-      var ok2 = defs[2] && defs[2].signature.params.length <= 2 && !defs[2].signature.restParam;
-      var ok3 = defs[3] && defs[3].signature.params.length <= 2 && !defs[3].signature.restParam;
-      var ok4 = defs[4] && defs[4].signature.params.length <= 2 && !defs[4].signature.restParam;
-      var ok5 = defs[5] && defs[5].signature.params.length <= 2 && !defs[5].signature.restParam;
+      var ok0 = defs[0] && defs[0].params.length <= 2 && !hasRestParam(defs[0].params);
+      var ok1 = defs[1] && defs[1].params.length <= 2 && !hasRestParam(defs[1].params);
+      var ok2 = defs[2] && defs[2].params.length <= 2 && !hasRestParam(defs[2].params);
+      var ok3 = defs[3] && defs[3].params.length <= 2 && !hasRestParam(defs[3].params);
+      var ok4 = defs[4] && defs[4].params.length <= 2 && !hasRestParam(defs[4].params);
+      var ok5 = defs[5] && defs[5].params.length <= 2 && !hasRestParam(defs[5].params);
       var allOk = ok0 && ok1 && ok2 && ok3 && ok4 && ok5;
 
-      var test00 = ok0 ? compileParam(defs[0].signature.params[0]) : notOk;
-      var test10 = ok1 ? compileParam(defs[1].signature.params[0]) : notOk;
-      var test20 = ok2 ? compileParam(defs[2].signature.params[0]) : notOk;
-      var test30 = ok3 ? compileParam(defs[3].signature.params[0]) : notOk;
-      var test40 = ok4 ? compileParam(defs[4].signature.params[0]) : notOk;
-      var test50 = ok5 ? compileParam(defs[5].signature.params[0]) : notOk;
+      var test00 = ok0 ? compileTest(defs[0].params[0]) : notOk;
+      var test10 = ok1 ? compileTest(defs[1].params[0]) : notOk;
+      var test20 = ok2 ? compileTest(defs[2].params[0]) : notOk;
+      var test30 = ok3 ? compileTest(defs[3].params[0]) : notOk;
+      var test40 = ok4 ? compileTest(defs[4].params[0]) : notOk;
+      var test50 = ok5 ? compileTest(defs[5].params[0]) : notOk;
 
-      var test01 = ok0 ? compileParam(defs[0].signature.params[1]) : notOk;
-      var test11 = ok1 ? compileParam(defs[1].signature.params[1]) : notOk;
-      var test21 = ok2 ? compileParam(defs[2].signature.params[1]) : notOk;
-      var test31 = ok3 ? compileParam(defs[3].signature.params[1]) : notOk;
-      var test41 = ok4 ? compileParam(defs[4].signature.params[1]) : notOk;
-      var test51 = ok5 ? compileParam(defs[5].signature.params[1]) : notOk;
+      var test01 = ok0 ? compileTest(defs[0].params[1]) : notOk;
+      var test11 = ok1 ? compileTest(defs[1].params[1]) : notOk;
+      var test21 = ok2 ? compileTest(defs[2].params[1]) : notOk;
+      var test31 = ok3 ? compileTest(defs[3].params[1]) : notOk;
+      var test41 = ok4 ? compileTest(defs[4].params[1]) : notOk;
+      var test51 = ok5 ? compileTest(defs[5].params[1]) : notOk;
 
       var fn0 = ok0 ? defs[0].fn : undef;
       var fn1 = ok1 ? defs[1].fn : undef;
@@ -840,12 +912,12 @@
       var fn4 = ok4 ? defs[4].fn : undef;
       var fn5 = ok5 ? defs[5].fn : undef;
 
-      var len0 = ok0 ? defs[0].signature.params.length : -1;
-      var len1 = ok1 ? defs[1].signature.params.length : -1;
-      var len2 = ok2 ? defs[2].signature.params.length : -1;
-      var len3 = ok3 ? defs[3].signature.params.length : -1;
-      var len4 = ok4 ? defs[4].signature.params.length : -1;
-      var len5 = ok5 ? defs[5].signature.params.length : -1;
+      var len0 = ok0 ? defs[0].params.length : -1;
+      var len1 = ok1 ? defs[1].params.length : -1;
+      var len2 = ok2 ? defs[2].params.length : -1;
+      var len3 = ok3 ? defs[3].params.length : -1;
+      var len4 = ok4 ? defs[4].params.length : -1;
+      var len5 = ok5 ? defs[5].params.length : -1;
 
       // simple and generic, but also slow
       var iStart = allOk ? 6 : 0;
@@ -855,12 +927,7 @@
 
         for (var i = iStart; i < iEnd; i++) {
           if (defs[i].test(arguments)) {
-            if (defs[i].restParam) {
-              return defs[i].fn.apply(null, defs[i].preprocess(arguments));
-            }
-            else {
-              return defs[i].fn.apply(null, arguments);
-            }
+            return defs[i].fn.apply(null, arguments);
           }
         }
 
@@ -894,11 +961,6 @@
       return typed.ignore.indexOf(type) === -1;
     }
 
-    // secure version of object.hasOwnProperty
-    function hasOwnProperty(object, prop) {
-      return Object.hasOwnProperty.call(object, prop);
-    }
-
     // trim a string
     function trim(str) {
       return str.trim();
@@ -907,6 +969,20 @@
     // test whether a string is undefined or empty
     function notEmpty(str) {
       return !!str;
+    }
+
+    // test whether a value is strict equal to null
+    function notNull(value ) {
+      return value !== null;
+    }
+
+    /**
+     * Test whether a parameter has no types defined
+     * @param {Param} param
+     * @return {boolean}
+     */
+    function isInvalidParam (param) {
+      return param.types.length === 0;
     }
 
     // return all but the last items of an array

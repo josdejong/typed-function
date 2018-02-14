@@ -2,9 +2,9 @@ var assert = require('assert');
 var typed = require('../typed-function2');
 var strictEqualArray = require('./strictEqualArray');
 
-describe('variable arguments', function () {
+describe('rest parameters', function () {
 
-  it('should create a typed function with variable arguments', function() {
+  it('should create a typed function with rest parameters', function() {
     var sum = typed({
       '...number': function (values) {
         assert(Array.isArray(values));
@@ -25,7 +25,7 @@ describe('variable arguments', function () {
     assert.throws(function () {sum(2, 3, 'string')},  /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: string, index: 2\)/);
   });
 
-  it('should create a typed function with variable arguments (2)', function() {
+  it('should create a typed function with rest parameters (2)', function() {
     var fn = typed({
       'string, ...number': function (str, values) {
         assert.equal(typeof str, 'string');
@@ -105,7 +105,7 @@ describe('variable arguments', function () {
     assert.throws(function () {fn(2, 3, false)},    /TypeError: Unexpected type of argument. Index: 2 in function unnamed \(expected: string | number/);
   });
 
-  it('should create a composed function with variable arguments', function() {
+  it('should create a composed function with rest parameters', function() {
     var fn = typed({
       'string, ...number': function (str, values) {
         assert.equal(typeof str, 'string');
@@ -143,7 +143,7 @@ describe('variable arguments', function () {
     assert.equal(fn({}), 'Object');
   });
 
-  it('should throw an error in case of unexpected variable arguments', function() {
+  it('should throw an error in case of unexpected rest parameters', function() {
     assert.throws(function () {
       typed({'...number, string': function () {}});
     }, /SyntaxError: Unexpected rest parameter "...number": only allowed for the last parameter/);
