@@ -265,9 +265,9 @@ describe('conversion', function () {
 
     it('should correctly select the signatures with the least amount of conversions', function () {
       typed.conversions = [
+        {from: 'boolean', to: 'number', convert: function (x) {return +x;}},
         {from: 'number',  to: 'string', convert: function (x) {return x + '';}},
-        {from: 'boolean', to: 'string', convert: function (x) {return x + '';}},
-        {from: 'boolean', to: 'number', convert: function (x) {return +x;}}
+        {from: 'boolean', to: 'string', convert: function (x) {return x + '';}}
       ];
 
       var fn = typed({
@@ -336,8 +336,7 @@ describe('conversion', function () {
       assert.strictEqual(fn(true), 1);
     });
 
-    // FIXME: should select the signatures with least needed conversions (1)
-    it.skip('should select the signatures with least needed conversions (1)', function () {
+    it('should select the signatures with least needed conversions (1)', function () {
       typed.conversions = [
         {from: 'number', to: 'boolean', convert: function (x) {return !!x }},
         {from: 'number', to: 'string', convert: function (x) {return x + '' }},
@@ -355,8 +354,7 @@ describe('conversion', function () {
       assert.strictEqual(fn(1), true);
     });
 
-    // FIXME: should select the signatures with least needed conversions (2)
-    it.skip('should select the signatures with least needed conversions (2)', function () {
+    it('should select the signatures with least needed conversions (2)', function () {
       typed.conversions = [
         {from: 'number', to: 'boolean', convert: function (x) {return !!x }},
         {from: 'number', to: 'string', convert: function (x) {return x + '' }},
@@ -365,13 +363,14 @@ describe('conversion', function () {
 
       // in the following typed function, the number input can be converted to
       // both a string or a boolean, which is both ok. It should pick the
-      // conversion to boolean because that is defined first
+      // conversion to boolean because that conversion is defined first
       var fn = typed({
         'number, number': function (a, b) { return [a, b]; },
         'string, string': function (a, b) { return [a, b]; },
         'boolean, boolean': function (a, b) { return [a, b]; }
       });
 
+      assert.deepStrictEqual(fn('foo', 2), ['foo', '2']);
       assert.deepStrictEqual(fn(1, true), [true, true]);
     });
 

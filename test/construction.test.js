@@ -267,8 +267,7 @@ describe('construction', function() {
       'Array,RegExp': fn3,
       'Object,string': fn3,
       'Object,RegExp': fn3,
-      'number,...number': fn4,
-      'number,...string': fn4
+      'number,...string|number': fn4
     });
   });
 
