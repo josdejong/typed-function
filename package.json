@@ -34,6 +34,6 @@
     "coverage": "istanbul cover _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\""
   },
   "engines": {
-    "node": ">= 0.10"
+    "node": ">= 6"
   }
 }
