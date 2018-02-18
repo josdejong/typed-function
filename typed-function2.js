@@ -252,7 +252,7 @@
         };
       });
 
-      var convertableTypes = matchingConversions.map(function (conversion) {
+      var convertibleTypes = matchingConversions.map(function (conversion) {
         var type = findTypeByName(conversion.from);
 
         return {
@@ -265,7 +265,7 @@
       });
 
       return {
-        types: exactTypes.concat(convertableTypes),
+        types: exactTypes.concat(convertibleTypes),
         restParam: restParam
       };
     }
@@ -650,16 +650,27 @@
      *                  or zero when both are equal
      */
     function compareSignatures (signature1, signature2) {
-      // compare having a rest operator (we coerce booleans to numbers here)
+      var len = Math.min(signature1.params.length, signature2.params.length);
+      var i;
+      var c;
+
+      // compare whether the params have conversions one by one
+      for (i = 0; i < len; i++) {
+        c = hasConversions(signature1.params[i]) - hasConversions(signature2.params[i]);
+        if (c !== 0) {
+          return c;
+        }
+      }
+
+      // compare having a rest operator
       var restParam = (hasRestParam(signature1.params) - hasRestParam(signature2.params));
       if (restParam !== 0) {
         return restParam;
       }
 
-      // compare the params one by one
-      var len = Math.min(signature1.params.length, signature2.params.length);
-      for (var i = 0; i < len; i++) {
-        var c = compareParams(signature1.params[i], signature2.params[i]);
+      // compare the types of the params one by one
+      for (i = 0; i < len; i++) {
+        c = compareParams(signature1.params[i], signature2.params[i]);
         if (c !== 0) {
           return c;
         }
@@ -677,7 +688,7 @@
      * @return {ConversionDef[]} Returns the conversions that are available
      *                        for every type (if any)
      */
-    function filterConversions (conversions, typeNames) {
+    function filterConversions(conversions, typeNames) {
       var matches = {};
 
       conversions.forEach(function (conversion) {
