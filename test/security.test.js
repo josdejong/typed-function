@@ -9,7 +9,7 @@ describe('security', function () {
     //   "": function () {} 
     // });
 
-    // example resulting in throwing an error
+    // example resulting in throwing an error if successful
     var fn = typed("(){}+(function(){throw new Error('Hacked... should not have executed this function!!!')})();function a", { 
       "": function () {} 
     });

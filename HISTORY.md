@@ -1,5 +1,18 @@
 # History
 
+## 2018-02-20, version 1.0.0
+
+Version 1.0.0 is rewritten from scratch. The API is the same,
+though generated error messages may differ slightly.
+
+Version 1.0.0 no longer uses `eval` under the hood to achieve good
+performance. This reduces security risks and makes typed-functions
+easier to debug.
+
+Type `Object` is no longer treated specially from other types. This
+means that the test for `Object` must not give false positives for
+types like `Array`, `Date`, or class instances.
+
 
 ## 2018-01-24, version 0.10.7
 
@@ -9,8 +22,9 @@
 
 ## 2017-11-18, version 0.10.6
 
-- Fixed a security issue allowing to execute aritrary JavaScript code via a 
-  specially prepared function name of a typed function. Thanks Masato Kinugawa.
+- Fixed a security issue allowing to execute arbitrary JavaScript
+  code via a specially prepared function name of a typed function.
+  Thanks Masato Kinugawa.
 
 
 ## 2016-11-18, version 0.10.5
