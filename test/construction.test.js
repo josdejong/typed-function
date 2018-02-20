@@ -1,6 +1,6 @@
 // test parse
 var assert = require('assert');
-var typed = require('../typed-function2');
+var typed = require('../typed-function');
 
 describe('construction', function() {
 

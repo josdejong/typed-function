@@ -27,11 +27,12 @@
     "pad-right": "0.2.2",
     "uglify-js": "3.3.10"
   },
-  "main": "./typed-function2",
+  "main": "./typed-function",
   "scripts": {
-    "minify": "uglifyjs typed-function.js -o typed-function.min.js -c -m",
+    "build": "uglifyjs typed-function.js -o typed-function.min.js -c -m",
     "test": "mocha test --recursive",
-    "coverage": "istanbul cover _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\""
+    "coverage": "istanbul cover _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\"",
+    "prepublishOnly": "npm test && npm run build"
   },
   "engines": {
     "node": ">= 6"

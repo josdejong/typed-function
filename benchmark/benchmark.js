@@ -1,91 +1,71 @@
+//
+// typed-function benchmark
+//
+// WARNING: be careful, these are micro-benchmarks, which can only be used
+//          to get an indication of the performance. Real performance and
+//          bottlenecks should be assessed in real world applications,
+//          not in micro-benchmarks.
+//
+// Before running, make sure you've installed the needed packages which
+// are defined in the devDependencies of the project.
+//
+// To create a bundle:
+//
+//     browserify -o benchmark/benchmark.bundle.js benchmark/benchmark.js
+//
+
+'use strict';
+
+var assert = require('assert');
+var Benchmark = require('benchmark');
+var padRight = require('pad-right');
 var typed = require('../typed-function');
 
-var I_MAX = 1e6;
-
-function benchmark(name, test) {
-  var start = +new Date();
-
-  var repetitions = test();
-
-  var end = +new Date();
-  var duration = end - start;
-
-  console.log(name + ': ' + repetitions.toExponential() + ' calls, ' +
-      Math.round(duration) + ' ms, ' +
-      parseFloat((duration / repetitions).toPrecision(4)).toExponential() + ' ms per call');
-
-  return {
-    repetitions: repetitions,
-    duration: duration
-  };
+// expose on window when using bundled in a browser
+if (typeof window !== 'undefined') {
+  window['Benchmark'] = Benchmark;
 }
 
-
-//var count = 0;
-//function direct() {
-//  var args = Array.prototype.slice.apply(arguments);
-//  args.forEach(function (arg) {
-//    count = count + (arg && arg.length) ? arg.length : 1;
-//  });
-//  return count;
-//}
-
-function direct(text) {
-  var reverse = '';
-  var i = text.length;
-  while (i > 0) {
-    reverse += text.substring(i-1, i);
-    i--;
-  }
-  return reverse;
+function add(x, y) {
+  return x + y;
 }
 
-//var count = 0;
-//function direct() {
-//  return count++;
-//}
+var signatures = {
+  'number, number': add,
+  'boolean, boolean': add,
+  'Date, Date': add,
+  'string, string': add
+};
 
-var fn = typed({
-  'number': direct,
-  'number,boolean': direct,
-  'number,number': direct,
-  'number,Date': direct,
-  'string': direct,
-  'string,boolean': direct
-});
+var addTyped = typed('add', signatures);
 
-//console.log(composed.toString())
+assert(add(2,3), 5);
+assert(addTyped(2,3), 5);
+assert(addTyped('hello', 'world'), 'helloworld');
+assert.throws(function () { addTyped(1) }, /TypeError/)
+assert.throws(function () { addTyped(1,2,3) }, /TypeError/)
 
-var directResult = benchmark('Direct', function () {
-  var i, r, d = new Date();
-  for (i = 0; i < I_MAX; i++) {
-    r = direct(1, d);
-    r = direct('hello you there', false);
-    r = direct(2, 4);
-  }
+var result = 0;
+var suite = new Benchmark.Suite();
+suite
+    .add(pad('typed add'), function() {
+      result += addTyped(result, 4);
+      result += addTyped(String(result), 'world').length;
+    })
+    .add(pad('native add'), function() {
+      result += add(result, 4);
+      result += add(String(result), 'world').length;
+    })
+    .on('cycle', function(event) {
+      console.log(String(event.target));
+    })
+    .on('complete', function() {
+      if (result > Infinity) {
+        console.log()
+      }
+    })
+    .run();
 
-  return I_MAX * 3;
-});
-
-var typedResult = benchmark('Composed', function () {
-  var i, r, d = new Date();
-  for (i = 0; i < I_MAX; i++) {
-    r = fn(1, d);
-    r = fn('hello you there', false);
-    r = fn(2, 4);
-  }
-
-  return I_MAX * 3;
-});
-
-
-var overhead = ((typedResult.duration - directResult.duration) / typedResult.repetitions);
-var percentage = overhead / (directResult.duration / directResult.repetitions) * 100;
-console.log('Overhead: ' + percentage.toPrecision(4) + '%, ' +
-    parseFloat(overhead.toPrecision(4)).toExponential() + ' ms per call');
-
-// Output is for example:
-//   Direct: 3e+6 calls, 1865 ms, 6.217e-4 ms per call
-//   Composed: 3e+6 calls, 1982 ms, 6.607e-4 ms per call
-//   Overhead: 6.3%, 3.9e-5 ms per call
-
+function pad (text) {
+  return padRight(text, 20, ' ');
+}
