@@ -454,12 +454,18 @@
     }
 
     // TODO: comment
-    function getExpectedTypeNames (signature, index) {
+    function getParamAtIndex(signature, index) {
       return index < signature.params.length
-          ? signature.params[index].types.map(getTypeName)
+          ? signature.params[index]
           : hasRestParam(signature.params)
-              ? last(signature.params).types.map(getTypeName)
-              : []
+              ? last(signature.params)
+              : null
+    }
+
+    // TODO: comment
+    function getExpectedTypeNames (signature, index) {
+      var param = getParamAtIndex(signature, index);
+      return param ? param.types.map(getTypeName): [];
     }
 
     /**
@@ -476,13 +482,6 @@
       return type.conversion === null || type.conversion === undefined;
     }
 
-    // TODO: comment
-    function isCorrectType(expectedParam, actualType) {
-      return (expectedParam &&
-             (expectedParam.indexOf(actualType) !== -1 ||
-              expectedParam.indexOf('any') !== -1))
-    }
-
     /**
      * Helper function for creating error messages: create an array with
      * all available types on a specific argument index.
@@ -491,8 +490,8 @@
      * @return {string[]} Returns an array with available types
      */
     function mergeExpectedParams(signatures, index) {
-      var typeNames = uniq(flatMap(signatures, function (def) {
-        return getExpectedTypeNames(def, index);
+      var typeNames = uniq(flatMap(signatures, function (signature) {
+        return getExpectedTypeNames(signature, index);
       }));
 
       return (typeNames.indexOf('any') !== -1) ? ['any'] : typeNames;
@@ -503,28 +502,22 @@
       var err, expected;
       var _name = name || 'unnamed';
 
-      // find the actual types
-      var actualTypes = Array.prototype.map.call(args, function (arg) {
-        var entry = typed.types.find(function (entry) {
-          return entry.test(arg);
-        });
-        return entry ? entry.name : 'unknown';
-      });
-
-      // test for wrong type
+      // test for wrong type at some index
       var matchingSignatures = signatures;
       var index;
-      for (index = 0; index < actualTypes.length; index++) {
-        var actualType = actualTypes[index];
-
-        var nextMatchingDefs = matchingSignatures.filter(function (def) {
-          return isCorrectType(getExpectedTypeNames(def, index), actualType)
+      for (index = 0; index < args.length; index++) {
+        var nextMatchingDefs = matchingSignatures.filter(function (signature) {
+          var test = compileTest(getParamAtIndex(signature, index));
+          return (index < signature.params.length || hasRestParam(signature.params)) &&
+              test(args[index]);
         });
 
         if (nextMatchingDefs.length === 0) {
           // no matching signatures anymore, throw error "wrong type"
           expected = mergeExpectedParams(matchingSignatures, index);
           if (expected.length > 0) {
+            var actualType = findType(args[index]);
+
             err = new TypeError('Unexpected type of argument in function ' + _name +
                 ' (expected: ' + expected.join(' or ') +
                 ', actual: ' + actualType + ', index: ' + index + ')');
@@ -544,18 +537,18 @@
       }
 
       // test for too few arguments
-      var lengths = matchingSignatures.map(function (def) {
-        return hasRestParam(def.params) ? Infinity : def.params.length;
+      var lengths = matchingSignatures.map(function (signature) {
+        return hasRestParam(signature.params) ? Infinity : signature.params.length;
       });
-      if (actualTypes.length < Math.min.apply(null, lengths)) {
+      if (args.length < Math.min.apply(null, lengths)) {
         expected = mergeExpectedParams(matchingSignatures, index);
         err = new TypeError('Too few arguments in function ' + _name +
             ' (expected: ' + expected.join(' or ') +
-            ', index: ' + actualTypes.length + ')');
+            ', index: ' + args.length + ')');
         err.data = {
           category: 'tooFewArgs',
           fn: _name,
-          index: actualTypes.length,
+          index: args.length,
           expected: expected
         }
         return err;
@@ -563,23 +556,23 @@
 
       // test for too many arguments
       var maxLength = Math.max.apply(null, lengths);
-      if (actualTypes.length > maxLength) {
+      if (args.length > maxLength) {
         err = new TypeError('Too many arguments in function ' + _name +
-            ' (expected: ' + maxLength + ', actual: ' + actualTypes.length + ')');
+            ' (expected: ' + maxLength + ', actual: ' + args.length + ')');
         err.data = {
           category: 'tooManyArgs',
           fn: _name,
-          index: actualTypes.length,
+          index: args.length,
           expectedLength: maxLength
         }
         return err;
       }
 
-      err = new TypeError('Arguments of type "' + actualTypes.join(', ') +
+      err = new TypeError('Arguments of type "' + args.join(', ') +
           '" do not match any of the defined signatures of function ' + _name + '.');
       err.data = {
         category: 'mismatch',
-        actual: actualTypes
+        actual: args.map(findType)
       }
       return err;
     }
