@@ -98,7 +98,7 @@ describe('conversion', function () {
     assert.deepEqual(Object.keys(fn.signatures).sort(), ['string,number', 'string,string']);
   });
 
-  it('should add conversions to a function with variable arguments (1)', function() {
+  it('should add conversions to a function with rest parameters (1)', function() {
     var toNumber = typed({
       '...number': function (values) {
         assert(Array.isArray(values));
@@ -114,7 +114,7 @@ describe('conversion', function () {
     assert.deepStrictEqual(toNumber(true,false, true), [1,0,1]);
   });
 
-  it('should add conversions to a function with variable arguments (2)', function() {
+  it('should add conversions to a function with rest parameters (2)', function() {
     var sum = typed({
       'string, ...number': function (name, values) {
         assert.equal(typeof name, 'string');
@@ -137,7 +137,7 @@ describe('conversion', function () {
     assert.equal(sum(false, 2,3), 5);
   });
 
-  it('should add conversions to a function with variable arguments in a non-conflicting way', function() {
+  it('should add conversions to a function with rest parameters in a non-conflicting way', function() {
     var fn = typed({
       '...number': function (values) {
         return values;
@@ -153,6 +153,31 @@ describe('conversion', function () {
     assert.deepStrictEqual(fn(true,3,4), [1,3,4]);
     assert.equal(fn(false), 'boolean');
     assert.equal(fn(true), 'boolean');
+  });
+
+  it('should add conversions to a function with rest parameters in a non-conflicting way', function() {
+    var typed2 = typed.create();
+    typed2.conversions = [
+      {from: 'boolean', to: 'number', convert: function (x) {return +x}},
+      {from: 'string',  to: 'number', convert: function (x) {return parseFloat(x)}},
+      {from: 'string', to: 'boolean', convert: function (x) {return !!x}}
+    ];
+
+    // booleans can be converted to numbers, so the `...number` signature
+    // will match. But the `...boolean` signature is a better (exact) match so that
+    // should be picked
+    var fn = typed2({
+      '...number': function (values) {
+        return values;
+      },
+      '...boolean': function (values) {
+        return values;
+      }
+    });
+
+    assert.deepStrictEqual(fn(2,3,4), [2,3,4]);
+    assert.deepStrictEqual(fn(2,true,4), [2,1,4]);
+    assert.deepStrictEqual(fn(true,true,true), [true,true,true]);
   });
 
   it('should add conversions to a function with variable and union arguments', function() {

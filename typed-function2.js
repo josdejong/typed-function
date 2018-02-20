@@ -22,7 +22,7 @@
   }
 }(this, function () {
 
-  console.log('loading typed-function2...'); // TODO: cleanup at the end (used in mathjs to know for sure what is loaded)
+  // console.log('loading typed-function2...'); // TODO: cleanup at the end (used in mathjs to know for sure what is loaded)
 
   function ok (x) {
     return true;
@@ -828,17 +828,29 @@
           var filteredTypes = ignoreConversionTypes
               ? param.types.filter(isExactType)
               : param.types;
+          var typeGroups
 
           if (param.restParam) {
-            // do not split the types of a rest parameter
-            return _splitParams(params, index + 1, types.concat([filteredTypes]));
+            // split the types of a rest parameter in two:
+            // one with only exact types, and one with exact types and conversions
+            var exactTypes = filteredTypes.filter(isExactType)
+            typeGroups = exactTypes.length < filteredTypes.length
+                ? [exactTypes, filteredTypes]
+                : [filteredTypes]
+
           }
           else {
-            // split the types of a regular parameter, recurse over the params
-            return flatMap(filteredTypes, function (type) {
-              return _splitParams(params, index + 1, types.concat([[type]]));
-            });
+            // split all the types of a regular parameter into one type per group
+            typeGroups = filteredTypes.map(function (type) {
+              return [type]
+            })
           }
+
+          // recurse over the groups with types
+          return flatMap(typeGroups, function (typeGroup) {
+            return _splitParams(params, index + 1, types.concat([typeGroup]));
+          });
+
         }
         else {
           // we've reached the end of the parameters. Now build a new Param
