@@ -477,11 +477,18 @@
      * Get all type names of a parameter
      * @param {Signature} signature
      * @param {number} index
+     * @param {boolean} excludeConversions
      * @return {string[]} Returns an array with type names
      */
-    function getExpectedTypeNames (signature, index) {
+    function getExpectedTypeNames (signature, index, excludeConversions) {
       var param = getParamAtIndex(signature, index);
-      return param ? param.types.map(getTypeName): [];
+      var types = param
+          ? excludeConversions
+                  ? param.types.filter(isExactType)
+                  : param.types
+          : [];
+
+      return types.map(getTypeName);
     }
 
     /**
@@ -511,7 +518,7 @@
      */
     function mergeExpectedParams(signatures, index) {
       var typeNames = uniq(flatMap(signatures, function (signature) {
-        return getExpectedTypeNames(signature, index);
+        return getExpectedTypeNames(signature, index, false);
       }));
 
       return (typeNames.indexOf('any') !== -1) ? ['any'] : typeNames;
@@ -931,6 +938,34 @@
     }
 
     /**
+     * Test whether two signatures have a conflicting signature
+     * @param {Signature} signature1
+     * @param {Signature} signature2
+     * @return {boolean} Returns true when the signatures conflict, false otherwise.
+     */
+    function hasConflictingParams(signature1, signature2) {
+      var ii = Math.max(signature1.params.length, signature2.params.length);
+
+      for (var i = 0; i < ii; i++) {
+        var typesNames1 = getExpectedTypeNames(signature1, i, true);
+        var typesNames2 = getExpectedTypeNames(signature2, i, true);
+
+        if (!hasOverlap(typesNames1, typesNames2)) {
+          return false;
+        }
+      }
+
+      var len1 = signature1.params.length;
+      var len2 = signature2.params.length;
+      var restParam1 = hasRestParam(signature1.params);
+      var restParam2 = hasRestParam(signature2.params);
+
+      return restParam1
+          ? restParam2 ? (len1 === len2) : (len2 >= len1)
+          : restParam2 ? (len1 >= len2)  : (len1 === len2)
+    }
+
+    /**
      * Create a typed function
      * @param {String} name               The name for the typed function
      * @param {Object.<string, function>} signaturesMap
@@ -945,9 +980,29 @@
         throw new SyntaxError('No signatures provided');
       }
 
-      // parse the signatures
-      var signatures = flatMap(Object.keys(signaturesMap), function (signature) {
-        var parsedSignature = parseSignature(signature, signaturesMap[signature], typed.conversions)
+      // parse the signatures, and check for conflicts
+      var parsedSignatures = [];
+      Object.keys(signaturesMap)
+          .map(function (signature) {
+            return parseSignature(signature, signaturesMap[signature], typed.conversions);
+          })
+          .filter(notNull)
+          .forEach(function (parsedSignature) {
+            // check whether this parameter conflicts with already parsed signatures
+            var conflictingSignature = parsedSignatures.find(function (s) {
+              return hasConflictingParams(s, parsedSignature)
+            });
+            if (conflictingSignature) {
+              throw new TypeError('Conflicting signatures "' +
+                  stringifyParams(conflictingSignature.params) + '" and "' +
+                  stringifyParams(parsedSignature.params) + '".');
+            }
+
+            parsedSignatures.push(parsedSignature);
+          });
+
+      // split and filter the types of the signatures, and then order them
+      var signatures = flatMap(parsedSignatures, function (parsedSignature) {
         var params = parsedSignature ? splitParams(parsedSignature.params, false) : []
 
         return params.map(function (params) {
@@ -1116,6 +1171,32 @@
      */
     function slice(arr, start, end) {
       return Array.prototype.slice.call(arr, start, end);
+    }
+
+    /**
+     * Test whether an array contains some item
+     * @param {Array} array
+     * @param {*} item
+     * @return {boolean} Returns true if array contains item, false if not.
+     */
+    function contains(array, item) {
+      return array.indexOf(item) !== -1;
+    }
+
+    /**
+     * Test whether two arrays have overlapping items
+     * @param {Array} array1
+     * @param {Array} array2
+     * @return {boolean} Returns true when at least one item exists in both arrays
+     */
+    function hasOverlap(array1, array2) {
+      for (var i = 0; i < array1.length; i++) {
+        if (contains(array2, array1[i])) {
+          return true;
+        }
+      }
+
+      return false;
     }
 
     /**
