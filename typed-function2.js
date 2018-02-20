@@ -884,7 +884,6 @@
      * @return {Param[]}
      */
     function splitParams(params, ignoreConversionTypes) {
-      // TODO: remove the option ignoreConversionTypes ?
       function _splitParams(params, index, types) {
         if (index < params.length) {
           var param = params[index]
@@ -1043,26 +1042,6 @@
       fn.signatures = createSignaturesMap(signatures);
 
       return fn;
-    }
-
-    /**
-     * Stringify a signature for debugging purposes
-     * @param {Signature} signature
-     * @return {string}
-     */
-    // TODO: use or cleanup
-    function stringifySignature (signature) {
-      return signature.params
-          .map(function (param) {
-            var typeNames = param.types.map(function (type) {
-              return type.conversion
-                  ? ('c(' + type.conversion.from + ' -> ' + type.conversion.to + ')')
-                  : type.name
-            });
-
-            return (param.restParam ? '...' : '') + typeNames.join(' | ');
-          })
-          .join(', ');
     }
 
     /**

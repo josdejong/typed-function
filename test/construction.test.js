@@ -271,7 +271,7 @@ describe('construction', function() {
     });
   });
 
-  it('should correctly order type checks based on their index in typed.types', function () {
+  it('should correctly order signatures', function () {
     var fn = typed({
       'boolean': function (a) {
         return 'boolean';
@@ -284,15 +284,9 @@ describe('construction', function() {
       }
     });
 
-    // TODO: this is tricky, object keys do not have a guaranteed order
-    var signatures = Object.keys(fn.signatures);
-    var booleanIndex = signatures.indexOf('boolean');
-    var stringIndex  = signatures.indexOf('string');
-    var numberIndex  = signatures.indexOf('number');
-
-    assert(stringIndex > numberIndex, 'string must come after number');
-    assert(booleanIndex > numberIndex, 'boolean must come after number');
-    assert(booleanIndex > stringIndex, 'boolean must come after string');
+    // TODO: this is tricky, object keys do not officially have a guaranteed order
+    assert.deepEqual(Object.keys(fn.signatures),
+        ['number', 'string', 'boolean']);
   });
 
 });

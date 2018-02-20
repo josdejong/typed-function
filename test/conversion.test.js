@@ -95,7 +95,10 @@ describe('conversion', function () {
     assert.equal(fn('foo', true), 'string, number');
     assert.equal(fn('foo', 2), 'string, number');
     assert.equal(fn('foo', 'foo'), 'string, string');
-    assert.deepEqual(Object.keys(fn.signatures).sort(), ['string,number', 'string,string']);
+    assert.deepEqual(Object.keys(fn.signatures), [
+      'string,number',
+      'string,string'
+    ]);
   });
 
   it('should add conversions to a function with rest parameters (1)', function() {
@@ -343,6 +346,11 @@ describe('conversion', function () {
       assert.equal(fn(true, 'foo'), 'strings');
       assert.equal(fn('foo', true), 'strings');
 
+      assert.deepEqual(Object.keys(fn.signatures), [
+        'number,number',
+        'string,string',
+        'boolean,boolean'
+      ]);
     });
 
     it('should select the signatures with the conversion with the lowest index (1)', function () {
@@ -361,6 +369,11 @@ describe('conversion', function () {
       });
 
       assert.strictEqual(fn(true), 'true');
+
+      assert.deepEqual(Object.keys(fn.signatures), [
+        'number',
+        'string'
+      ]);
     });
 
     it('should select the signatures with the conversion with the lowest index (2)', function () {

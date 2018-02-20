@@ -127,7 +127,7 @@ describe('rest parameters', function () {
     assert.throws(function () {fn('string', true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: boolean, index: 1\)/);
   });
 
-  it('should continue with other options if varArgs do not match', function() {
+  it('should continue with other options if rest params do not match', function() {
     var fn = typed({
       '...number': function (values) {
         return '...number';
@@ -141,6 +141,37 @@ describe('rest parameters', function () {
     assert.equal(fn(2, 3), '...number');
     assert.equal(fn(2), '...number');
     assert.equal(fn({}), 'Object');
+    assert.deepEqual(Object.keys(fn.signatures), [
+      'Object',
+      '...number'
+    ]);
+  });
+
+  it('should split rest params with conversions in two and order them correctly', function() {
+    var typed2 = typed.create()
+    typed2.conversions = [
+      {from: 'string', to: 'number', convert: function (x) {return parseFloat(x)}}
+    ];
+
+    var fn = typed2({
+      '...number': function (values) {
+        return values;
+      },
+
+      '...string': function (value) {
+        return value;
+      }
+    });
+
+    assert.deepEqual(fn(2, 3), [2,3]);
+    assert.deepEqual(fn(2), [2]);
+    assert.deepEqual(fn(2, '4'), [2, 4]);
+    assert.deepEqual(fn('2', 4), [2, 4]);
+    assert.deepEqual(fn('foo'), ['foo']);
+    assert.deepEqual(Object.keys(fn.signatures), [
+      '...number',
+      '...string'
+    ]);
   });
 
   it('should throw an error in case of unexpected rest parameters', function() {
