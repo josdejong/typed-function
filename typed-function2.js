@@ -22,13 +22,11 @@
   }
 }(this, function () {
 
-  // console.log('loading typed-function2...'); // TODO: cleanup at the end (used in mathjs to know for sure what is loaded)
-
-  function ok (x) {
+  function ok () {
     return true;
   }
 
-  function notOk (x) {
+  function notOk () {
     return false;
   }
 
@@ -143,8 +141,13 @@
       return typed.types.indexOf(type);
     }
 
-    // TODO: comment
-    function findType (value) {
+    /**
+     * Find a type that matches a value.
+     * @param {*} value
+     * @return {string} Returns the name of the first type for which
+     *                  the type test matches the value.
+     */
+    function findTypeName(value) {
       var entry = typed.types.find(function (entry) {
         return entry.test(value);
       });
@@ -157,8 +160,7 @@
     }
 
     /**
-     * Find a specific signature from a (composed) typed function, for
-     * example:
+     * Find a specific signature from a (composed) typed function, for example:
      *
      *   typed.find(fn, ['number', 'string'])
      *   typed.find(fn, 'number, string')
@@ -211,7 +213,7 @@
      * @param {string} type
      */
     function convert (value, type) {
-      var from = findType(value);
+      var from = findTypeName(value);
 
       // check conversion is needed
       if (type === from) {
@@ -249,7 +251,7 @@
      * @param {ConversionDef[]} conversions
      * @return {Param} param
      */
-    function parseParam (param, conversions) { // TODO: pass types as an argument too
+    function parseParam (param, conversions) {
       var restParam = param.indexOf('...') === 0;
       var types = (!restParam)
           ? param
@@ -398,7 +400,8 @@
     function compileTests(params) {
       var tests, test0, test1;
 
-      if (hasRestParam(params)) { // variable arguments like '...number'
+      if (hasRestParam(params)) {
+        // variable arguments like '...number'
         tests = initial(params).map(compileTest);
         var varIndex = tests.length;
         var lastTest = compileTest(last(params));
@@ -420,7 +423,8 @@
           return testRestParam(args) && (args.length >= varIndex + 1);
         };
       }
-      else { // no variable arguments
+      else {
+        // no variable arguments
         if (params.length === 0) {
           return function testArgs(args) {
             return args.length === 0;
@@ -453,7 +457,14 @@
       }
     }
 
-    // TODO: comment
+    /**
+     * Find the parameter at a specific index of a signature.
+     * Handles rest parameters.
+     * @param {Signature} signature
+     * @param {number} index
+     * @return {Param | null} Returns the matching parameter when found,
+     *                        null otherwise.
+     */
     function getParamAtIndex(signature, index) {
       return index < signature.params.length
           ? signature.params[index]
@@ -462,7 +473,12 @@
               : null
     }
 
-    // TODO: comment
+    /**
+     * Get all type names of a parameter
+     * @param {Signature} signature
+     * @param {number} index
+     * @return {string[]} Returns an array with type names
+     */
     function getExpectedTypeNames (signature, index) {
       var param = getParamAtIndex(signature, index);
       return param ? param.types.map(getTypeName): [];
@@ -477,7 +493,11 @@
       return type.name;
     }
 
-    // TODO: comment
+    /**
+     * Test whether a type is an exact type or conversion
+     * @param {Type} type
+     * @return {boolean} Returns true when
+     */
     function isExactType(type) {
       return type.conversion === null || type.conversion === undefined;
     }
@@ -497,7 +517,14 @@
       return (typeNames.indexOf('any') !== -1) ? ['any'] : typeNames;
     }
 
-    // TODO: comment
+    /**
+     * Create
+     * @param {string} name             The name of the function
+     * @param {array.<*>} args          The actual arguments passed to the function
+     * @param {Signature[]} signatures  A list with available signatures
+     * @return {TypeError} Returns a type error with additional data
+     *                     attached to it in the property `data`
+     */
     function createError(name, args, signatures) {
       var err, expected;
       var _name = name || 'unnamed';
@@ -516,7 +543,7 @@
           // no matching signatures anymore, throw error "wrong type"
           expected = mergeExpectedParams(matchingSignatures, index);
           if (expected.length > 0) {
-            var actualType = findType(args[index]);
+            var actualType = findTypeName(args[index]);
 
             err = new TypeError('Unexpected type of argument in function ' + _name +
                 ' (expected: ' + expected.join(' or ') +
@@ -572,23 +599,22 @@
           '" do not match any of the defined signatures of function ' + _name + '.');
       err.data = {
         category: 'mismatch',
-        actual: args.map(findType)
+        actual: args.map(findTypeName)
       }
       return err;
     }
 
     /**
-     * TODO: comment
+     * Find the lowest index of all exact types of a parameter (no conversions)
      * @param {Param} param
-     * @return {number}
+     * @return {number} Returns the index of the lowest type in typed.types
      */
     function getLowestTypeIndex (param) {
-      var exactTypes = param.types.filter(isExactType);
       var min = 999;
 
-      for (var i = 0; i < exactTypes.length; i++) {
-        if (!exactTypes[i].conversion) {
-          min = Math.min(min, exactTypes[i].typeIndex);
+      for (var i = 0; i < param.types.length; i++) {
+        if (isExactType(param.types[i])) {
+          min = Math.min(min, param.types[i].typeIndex);
         }
       }
 
@@ -596,19 +622,17 @@
     }
 
     /**
-     * TODO: comment
+     * Find the lowest index of the conversion of all types of the parameter
+     * having a conversion
      * @param {Param} param
-     * @return {number}
+     * @return {number} Returns the lowest index of the conversions of this type
      */
     function getLowestConversionIndex (param) {
-      var filteredTypes = param.types.filter(function (type) {
-        return type.conversion !== null;
-      })
       var min = 999;
 
-      for (var i = 0; i < filteredTypes.length; i++) {
-        if (filteredTypes[i].conversion) {
-          min = Math.min(min, filteredTypes[i].conversionIndex);
+      for (var i = 0; i < param.types.length; i++) {
+        if (!isExactType(param.types[i])) {
+          min = Math.min(min, param.types[i].conversionIndex);
         }
       }
 
@@ -702,7 +726,6 @@
         if (typeNames.indexOf(conversion.from) === -1 &&
             typeNames.indexOf(conversion.to) !== -1 &&
             !matches[conversion.from]) {
-          // console.log('MATCH', param, conversion.from, '->', conversion.to)
           matches[conversion.from] = conversion;
         }
       });
@@ -726,7 +749,6 @@
       // TODO: can we make this wrapper function smarter/simpler?
 
       if (params.some(hasConversions)) {
-        // console.log('compileArgsPreprocessing...', JSON.stringify(params))
         var restParam = hasRestParam(params);
         var compiledConversions = params.map(compileArgConversion)
 
@@ -757,15 +779,17 @@
       return fnPreprocess;
     }
 
-    // TODO: comment
     /**
-     *
+     * Compile conversion for a parameter to the right type
      * @param {Param} param
-     * @return {function}
+     * @return {function} Returns the wrapped function that will convert arguments
+     *
      */
     function compileArgConversion(param) {
+      var test0, test1, conversion0, conversion1;
       var tests = [];
       var conversions = [];
+
       param.types.forEach(function (type) {
         if (type.conversion) {
           tests.push(findTypeByName(type.conversion.from).test);
@@ -773,15 +797,47 @@
         }
       });
 
-      // TODO: make optimized versions for 0, 1 and 2 conversions
-
-      return function convertArg(arg) {
-        for (var i = 0; i < conversions.length; i++) {
-          if (tests[i](arg)) {
-            return conversions[i](arg);
+      // create optimized conversion functions depending on the number of conversions
+      switch (conversions.length) {
+        case 0:
+          return function convertArg(arg) {
+            return arg;
           }
-        }
-        return arg;
+
+        case 1:
+          test0 = tests[0]
+          conversion0 = conversions[0];
+          return function convertArg(arg) {
+            if (test0(arg)) {
+              return conversion0(arg)
+            }
+            return arg;
+          }
+
+        case 2:
+          test0 = tests[0]
+          test1 = tests[1]
+          conversion0 = conversions[0];
+          conversion1 = conversions[1];
+          return function convertArg(arg) {
+            if (test0(arg)) {
+              return conversion0(arg)
+            }
+            if (test1(arg)) {
+              return conversion1(arg)
+            }
+            return arg;
+          }
+
+        default:
+          return function convertArg(arg) {
+            for (var i = 0; i < conversions.length; i++) {
+              if (tests[i](arg)) {
+                return conversions[i](arg);
+              }
+            }
+            return arg;
+          }
       }
     }
 
@@ -905,16 +961,6 @@
 
       signatures.sort(compareSignatures);
 
-      // TODO: cleanup, or put behind a "debug" flag
-      // if (name === 'compare') {
-      //   console.log()
-      //   console.log('FUNCTION: ' + name)
-      //   console.log('---- after sort ----')
-      //   signatures.map(stringifySignature).forEach(function (str) {
-      //     console.log(str)
-      //   })
-      // }
-
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
       var ok0 = signatures[0] && signatures[0].params.length <= 2 && !hasRestParam(signatures[0].params);
       var ok1 = signatures[1] && signatures[1].params.length <= 2 && !hasRestParam(signatures[1].params);
@@ -1019,23 +1065,39 @@
           .join(', ');
     }
 
-    // Test whether a type should be NOT be ignored
-    function notIgnore(type) {
-      return typed.ignore.indexOf(type) === -1;
+    /**
+     * Test whether a type should be NOT be ignored
+     * @param {string} typeName
+     * @return {boolean}
+     */
+    function notIgnore(typeName) {
+      return typed.ignore.indexOf(typeName) === -1;
     }
 
-    // trim a string
+    /**
+     * trim a string
+     * @param {string} str
+     * @return {string}
+     */
     function trim(str) {
       return str.trim();
     }
 
-    // test whether a string is undefined or empty
+    /**
+     * Test whether a string is not empty
+     * @param {string} str
+     * @return {boolean}
+     */
     function notEmpty(str) {
       return !!str;
     }
 
-    // test whether a value is strict equal to null
-    function notNull(value ) {
+    /**
+     * test whether a value is not strict equal to null
+     * @param {*} value
+     * @return {boolean}
+     */
+    function notNull(value) {
       return value !== null;
     }
 
@@ -1048,24 +1110,40 @@
       return param.types.length === 0;
     }
 
-    // return all but the last items of an array
+    /**
+     * Return all but the last items of an array
+     * @param {Array} arr
+     * @return {Array}
+     */
     function initial(arr) {
       return arr.slice(0, arr.length - 1);
     }
 
-    // return the last item of an array
+    /**
+     * return the last item of an array
+     * @param {Array} arr
+     * @return {*}
+     */
     function last(arr) {
       return arr[arr.length - 1];
     }
 
+    /**
+     * Slice an array or function Arguments
+     * @param {Array | Arguments | IArguments} arr
+     * @param {number} start
+     * @param {number} [end]
+     * @return {Array}
+     */
     function slice(arr, start, end) {
       return Array.prototype.slice.call(arr, start, end);
     }
 
-    function contains(arr, item) {
-      return arr.indexOf(item) !== -1;
-    }
-
+    /**
+     * Filter unique items of an array with strings
+     * @param {string[]} arr
+     * @return {string[]}
+     */
     function uniq(arr) {
       var entries = {}
       for (var i = 0; i < arr.length; i++) {
@@ -1074,7 +1152,13 @@
       return Object.keys(entries);
     }
 
-    // https://gist.github.com/samgiles/762ee337dff48623e729
+    /**
+     * Flat map the result invoking a callback for every item in an array.
+     * https://gist.github.com/samgiles/762ee337dff48623e729
+     * @param {Array} arr
+     * @param {function} callback
+     * @return {Array}
+     */
     function flatMap(arr, callback) {
       return Array.prototype.concat.apply([], arr.map(callback));
     }
