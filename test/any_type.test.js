@@ -76,13 +76,13 @@ describe('any type', function () {
     });
 
     assert(fn.signatures instanceof Object);
-    assert.strictEqual(Object.keys(fn.signatures).length, 2);
+    assert.deepEqual(Object.keys(fn.signatures), ['string,any', 'any']);
     assert.equal(fn('foo', 2), 'string,any');
     assert.equal(fn([]), 'any');
     assert.equal(fn('foo'), 'any');
-    assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: string or any, index: 0\)/);
+    assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: any, index: 0\)/);
     assert.throws(function () {fn([], 'foo')}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 2\)/);
-    assert.throws(function () {fn([], 'foo', 4)}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 3\)/);
+    assert.throws(function () {fn('foo', 4, [])}, /TypeError: Too many arguments in function unnamed \(expected: 2, actual: 3\)/);
   });
 
   it('should compose a function with multiple any type arguments (4)', function() {
@@ -119,8 +119,8 @@ describe('any type', function () {
     assert.equal(fn([]), 'any');
     assert.equal(fn('foo'), 'any');
     assert.throws(function () {fn('foo', 'bar', 5)}, /TypeError: Too many arguments in function unnamed \(expected: 2, actual: 3\)/);
-    assert.throws(function () {fn('foo', 2, 5)}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 3\)/);
-    assert.throws(function () {fn('foo', 5)}, /TypeError: Too many arguments in function unnamed \(expected: 1, actual: 2\)/);
+    assert.throws(function () {fn('foo', 2, 5)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: number, index: 1\)/);
+    assert.throws(function () {fn('foo', 'bar', 5)}, /TypeError: Too many arguments in function unnamed \(expected: 2, actual: 3\)/);
   });
 
   it('var arg any type arguments should only handle unmatched types', function() {
@@ -139,7 +139,7 @@ describe('any type', function () {
     assert.equal(fn(2), 'any');
     assert.equal(fn(2,3,4), 'any');
     assert.equal(fn([]), 'any');
-    assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: Array or any, index: 0\)/);
+    assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: any, index: 0\)/);
   });
 
   it('multiple use of any', function() {
@@ -214,7 +214,7 @@ describe('any type', function () {
     assert.equal(fn('a','b'), 'two');
     assert.equal(fn(1,1), 'two');
     assert.equal(fn(1,1,'a'), 'three');
-    assert.throws(function () {fn(1,1,1)}, /TypeError: Too many arguments in function unnamed \(expected: 2, actual: 3\)/);
+    assert.throws(function () {fn(1,1,1)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: number, index: 2\)/);
   });
 
 });

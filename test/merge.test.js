@@ -30,6 +30,26 @@ describe('merge', function () {
     assert.throws(function () {typed4(new Date())}, /TypeError: Unexpected type of argument in function unnamed \(expected: number or string or boolean, actual: Date, index: 0\)/);
   });
 
+  it('should not copy conversions as exact signatures', function () {
+    var typed2 = typed.create();
+    typed2.conversions = [
+      {from: 'string', to: 'number', convert: function (x) {return parseFloat(x)}}
+    ];
+
+    var fn2 = typed2({'number': function (value) { return value }});
+
+    assert.strictEqual(fn2(2), 2);
+    assert.strictEqual(fn2('123'), 123);
+
+    var fn1 = typed({ 'Date': function (value) {return value} });
+    var fn3 = typed(fn1, fn2); // create via typed which has no conversions
+
+    var date = new Date()
+    assert.strictEqual(fn3(2), 2);
+    assert.strictEqual(fn3(date), date);
+    assert.throws(function () {fn3('123') }, /TypeError: Unexpected type of argument in function unnamed \(expected: number or Date, actual: string, index: 0\)/);
+  });
+
   it('should allow merging duplicate signatures when pointing to the same function', function () {
     var typed1 = typed({'boolean': function (value) { return 'boolean:' + value; }});
 

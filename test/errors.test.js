@@ -16,13 +16,13 @@ describe('errors', function () {
     assert.throws(function () {fn('foo')}, /TypeError: Too few arguments in function unnamed \(expected: boolean, index: 1\)/);
   });
 
-  it('should give correct error in case of too few arguments (varArgs)', function() {
+  it('should give correct error in case of too few arguments (rest params)', function() {
     var fn = typed({'...string': function () {}});
 
     assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: string, index: 0\)/);
   });
 
-  it('should give correct error in case of too few arguments (varArgs) (2)', function() {
+  it('should give correct error in case of too few arguments (rest params) (2)', function() {
     var fn = typed({'boolean, ...string': function () {}});
 
     assert.throws(function () {fn()}, /TypeError: Too few arguments in function unnamed \(expected: boolean, index: 0\)/);
@@ -67,7 +67,7 @@ describe('errors', function () {
         'string | number': function () {},
         'string': function () {}
       });
-    }, /Error: Signature "string" is defined twice/);
+    }, /TypeError: Conflicting signatures "string\|number" and "string"/);
   });
 
   it('should give correct error in case of conflicting union arguments (2)', function() {
@@ -76,19 +76,43 @@ describe('errors', function () {
         '...string | number': function () {},
         '...string': function () {}
       });
-    }, /Error: Conflicting types "...string|number" and "...string"/);
+    }, /TypeError: Conflicting signatures "...string\|number" and "...string"/);
   });
 
-  it('should give correct error in case of conflicting variable args', function() {
+  it('should give correct error in case of conflicting rest params (1)', function() {
     assert.throws(function () {
       var fn = typed({
         '...string': function () {},
         'string': function () {}
       });
-    }, /Error: Conflicting types "...string" and "string"/);
+    }, /TypeError: Conflicting signatures "...string" and "string"/);
   });
 
-  it('should give correct error in case of wrong type of argument (varArgs)', function() {
+  it('should give correct error in case of conflicting rest params (2)', function() {
+    // should not throw
+    var fn = typed({
+      '...string': function () {},
+      'string, number': function () {}
+    });
+
+    assert.throws(function () {
+      var fn = typed({
+        '...string': function () {},
+        'string, string': function () {}
+      });
+    }, /TypeError: Conflicting signatures "...string" and "string,string"/);
+  });
+
+  it('should give correct error in case of conflicting rest params (3)', function() {
+    assert.throws(function () {
+      var fn = typed({
+        '...number|string': function () {},
+        'number, string': function () {}
+      });
+    }, /TypeError: Conflicting signatures "...number\|string" and "number,string"/);
+  });
+
+  it('should give correct error in case of wrong type of argument (rest params)', function() {
     var fn = typed({'...number': function () {}});
 
     assert.throws(function () {fn(true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: boolean, index: 0\)/);
@@ -96,7 +120,7 @@ describe('errors', function () {
     assert.throws(function () {fn(2, 3, true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: boolean, index: 2\)/);
   });
 
-  it('should give correct error in case of wrong type of argument (nested varArgs)', function() {
+  it('should give correct error in case of wrong type of argument (nested rest params)', function() {
     var fn = typed({'string, ...number': function () {}});
 
     assert.throws(function () {fn(true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: boolean, index: 0\)/);
@@ -105,7 +129,7 @@ describe('errors', function () {
     assert.throws(function () {fn('foo', 2, 3, true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: number, actual: boolean, index: 3\)/);
   });
 
-  it('should give correct error in case of wrong type of argument (union and varArgs)', function() {
+  it('should give correct error in case of wrong type of argument (union and rest params)', function() {
     var fn = typed({'...number|boolean': function () {}});
 
     assert.throws(function () {fn('foo')}, /TypeError: Unexpected type of argument in function unnamed \(expected: number or boolean, actual: string, index: 0\)/);
@@ -113,7 +137,7 @@ describe('errors', function () {
     assert.throws(function () {fn(2, true, 'foo')}, /TypeError: Unexpected type of argument in function unnamed \(expected: number or boolean, actual: string, index: 2\)/);
   });
 
-  it('should only list exact matches in expected types (not conversions)', function() {
+  it('should only list matches of exact and convertable types', function() {
     var typed2 = typed.create();
     typed2.conversions.push({
       from: 'number',
@@ -126,8 +150,8 @@ describe('errors', function () {
     var fn1 = typed2({'string': function () {}});
     var fn2 = typed2({'...string': function () {}});
 
-    assert.throws(function () {fn1(true)},    /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: boolean, index: 0\)/);
-    assert.throws(function () {fn2(true)},    /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: boolean, index: 0\)/);
-    assert.throws(function () {fn2(2, true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string, actual: boolean, index: 1\)/);
+    assert.throws(function () {fn1(true)},    /TypeError: Unexpected type of argument in function unnamed \(expected: string or number, actual: boolean, index: 0\)/);
+    assert.throws(function () {fn2(true)},    /TypeError: Unexpected type of argument in function unnamed \(expected: string or number, actual: boolean, index: 0\)/);
+    assert.throws(function () {fn2(2, true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string or number, actual: boolean, index: 1\)/);
   });
 });
