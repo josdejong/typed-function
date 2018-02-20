@@ -631,22 +631,24 @@
      *                  or zero when both are equal
      */
     function compareParams (param1, param2) {
+      var c;
+
       // compare having a rest parameter or not
-      var hasRestParam = param1.restParam - param2.restParam;
-      if (hasRestParam !== 0) {
-        return hasRestParam;
+      c = param1.restParam - param2.restParam;
+      if (c !== 0) {
+        return c;
       }
 
       // compare having conversions or not
-      var haveConversions = hasConversions(param1) - hasConversions(param2);
-      if (haveConversions !== 0) {
-        return haveConversions;
+      c = hasConversions(param1) - hasConversions(param2);
+      if (c !== 0) {
+        return c;
       }
 
       // compare the index of the types
-      var typeIndexDiff = getLowestTypeIndex(param1) - getLowestTypeIndex(param2);
-      if (typeIndexDiff !== 0) {
-        return typeIndexDiff;
+      c = getLowestTypeIndex(param1) - getLowestTypeIndex(param2);
+      if (c !== 0) {
+        return c;
       }
 
       // compare the index of any conversion
@@ -666,7 +668,13 @@
       var i;
       var c;
 
-      // compare whether the params have conversions one by one
+      // compare whether the params have conversions at all or not
+      c = signature1.params.some(hasConversions) - signature2.params.some(hasConversions)
+      if (c !== 0) {
+        return c;
+      }
+
+      // next compare whether the params have conversions one by one
       for (i = 0; i < len; i++) {
         c = hasConversions(signature1.params[i]) - hasConversions(signature2.params[i]);
         if (c !== 0) {
