@@ -82,9 +82,13 @@
         return typeof x === 'object' && x.constructor === Object
       }},
       { name: 'null',      test: function (x) { return x === null } },
-      { name: 'undefined', test: function (x) { return x === undefined } },
-      { name: 'any',       test: ok}
+      { name: 'undefined', test: function (x) { return x === undefined } }
     ];
+
+    var anyType = {
+      name: 'any',
+      test: ok
+    }
 
     // types which need to be ignored
     var _ignore = [];
@@ -114,12 +118,29 @@
         return entry;
       }
 
+      if (typeName === 'any') { // special baked-in case 'any'
+        return anyType;
+      }
+
       var hint = typed.types.find(function (entry) {
         return entry.name.toLowerCase() === typeName.toLowerCase();
       });
 
       throw new TypeError('Unknown type "' + typeName + '"' +
           (hint ? ('. Did you mean "' + hint.name + '"?') : ''));
+    }
+
+    /**
+     * Find the index of a type definition. Handles special case 'any'
+     * @param {TypeDef} type
+     * @return {number}
+     */
+    function findTypeIndex(type) {
+      if (type === anyType) {
+        return 999;
+      }
+
+      return typed.types.indexOf(type);
     }
 
     // TODO: comment
@@ -247,7 +268,7 @@
 
         return {
           name: typeName,
-          typeIndex: typed.types.indexOf(type),
+          typeIndex: findTypeIndex(type),
           test: type.test,
           conversion: null,
           conversionIndex: -1
@@ -259,7 +280,7 @@
 
         return {
           name: conversion.from,
-          typeIndex: typed.types.indexOf(type),
+          typeIndex: findTypeIndex(type),
           test: type.test,
           conversion: conversion,
           conversionIndex: conversions.indexOf(conversion)
@@ -570,7 +591,7 @@
      */
     function getLowestTypeIndex (param) {
       var exactTypes = param.types.filter(isExactType);
-      var min = 999999;
+      var min = 999;
 
       for (var i = 0; i < exactTypes.length; i++) {
         if (!exactTypes[i].conversion) {
@@ -590,7 +611,7 @@
       var filteredTypes = param.types.filter(function (type) {
         return type.conversion !== null;
       })
-      var min = 999999;
+      var min = 999;
 
       for (var i = 0; i < filteredTypes.length; i++) {
         if (filteredTypes[i].conversion) {
