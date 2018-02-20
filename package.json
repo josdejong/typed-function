@@ -18,14 +18,13 @@
     "compose",
     "types"
   ],
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "benchmark": "2.1.4",
     "istanbul": "0.4.5",
-    "mocha": "5.0.0",
+    "mocha": "5.0.1",
     "pad-right": "0.2.2",
-    "uglify-js": "3.3.10"
+    "uglify-js": "3.3.11"
   },
   "main": "./typed-function",
   "scripts": {
