@@ -78,7 +78,9 @@
       { name: 'Array',     test: Array.isArray },
       { name: 'Date',      test: function (x) { return x instanceof Date } },
       { name: 'RegExp',    test: function (x) { return x instanceof RegExp } },
-      { name: 'Object',    test: function (x) { return typeof x === 'object' } },
+      { name: 'Object',    test: function (x) {
+        return typeof x === 'object' && x.constructor === Object
+      }},
       { name: 'null',      test: function (x) { return x === null } },
       { name: 'undefined', test: function (x) { return x === undefined } },
       { name: 'any',       test: ok}
@@ -562,31 +564,6 @@
     }
 
     /**
-     * Create a map with the name of a type as key and the index as value.
-     * Used for sorting
-     * @param {Array} types
-     * @return {Object}
-     */
-    function createTypesIndexMap (types) {  // TODO: cleanup. But first fix the ordering of object and any
-      var typesIndexMap = {};
-
-      types.forEach(function (type, index) {
-        if (type.name in typesIndexMap) {
-          throw new TypeError('Type "' + type.name + '" is defined twice. ' +
-              'Check the definitions in typed.types');
-        }
-
-        typesIndexMap[type.name] = index;
-      });
-
-      // Object and any should always be ordered last
-      typesIndexMap['Object'] = types.length;
-      typesIndexMap['any'] = types.length + 1;
-
-      return typesIndexMap;
-    }
-
-    /**
      * TODO: comment
      * @param {Param} param
      * @return {number}
@@ -633,11 +610,25 @@
      *                  or zero when both are equal
      */
     function compareParams (param1, param2) {
+      // compare having a rest parameter or not
+      var hasRestParam = param1.restParam - param2.restParam;
+      if (hasRestParam !== 0) {
+        return hasRestParam;
+      }
+
+      // compare having conversions or not
+      var haveConversions = hasConversions(param1) - hasConversions(param2);
+      if (haveConversions !== 0) {
+        return haveConversions;
+      }
+
+      // compare the index of the types
       var typeIndexDiff = getLowestTypeIndex(param1) - getLowestTypeIndex(param2);
       if (typeIndexDiff !== 0) {
         return typeIndexDiff;
       }
 
+      // compare the index of any conversion
       return getLowestConversionIndex(param1) - getLowestConversionIndex(param2);
     }
 
@@ -660,12 +651,6 @@
         if (c !== 0) {
           return c;
         }
-      }
-
-      // compare having a rest operator
-      var restParam = (hasRestParam(signature1.params) - hasRestParam(signature2.params));
-      if (restParam !== 0) {
-        return restParam;
       }
 
       // compare the types of the params one by one
@@ -899,9 +884,14 @@
       signatures.sort(compareSignatures);
 
       // TODO: cleanup, or put behind a "debug" flag
-      // console.log()
-      // console.log('---- after sort ----')
-      // signatures.map(stringifySignature).forEach(function (str) {console.log(str)})
+      // if (name === 'compare') {
+      //   console.log()
+      //   console.log('FUNCTION: ' + name)
+      //   console.log('---- after sort ----')
+      //   signatures.map(stringifySignature).forEach(function (str) {
+      //     console.log(str)
+      //   })
+      // }
 
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
       var ok0 = signatures[0] && signatures[0].params.length <= 2 && !hasRestParam(signatures[0].params);
@@ -1048,6 +1038,10 @@
 
     function slice(arr, start, end) {
       return Array.prototype.slice.call(arr, start, end);
+    }
+
+    function contains(arr, item) {
+      return arr.indexOf(item) !== -1;
     }
 
     function uniq(arr) {

@@ -197,6 +197,26 @@ describe('conversion', function () {
     assert.throws(function () {fn(new Date(), '2')}, /TypeError: Unexpected type of argument in function unnamed \(expected: string or number or boolean, actual: Date, index: 0\)/)
   });
 
+  it('should order conversions and type Object correctly ', function() {
+    var typed2 = typed.create();
+    typed2.conversions = [
+      {from: 'Date', to: 'string', convert: function (x) {return x.toISOString()}}
+    ];
+
+    var fn = typed2({
+      'string': function () {
+        return 'string';
+      },
+      'Object': function () {
+        return 'object';
+      }
+    });
+
+    assert.equal(fn('foo'), 'string');
+    assert.equal(fn(new Date(2018, 1, 20)), 'string');
+    assert.equal(fn({a: 2}), 'object');
+  });
+
   it('should add non-conflicting conversions to a function with one argument', function() {
     var fn = typed({
       'number': function (a) {
