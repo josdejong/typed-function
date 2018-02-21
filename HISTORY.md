@@ -1,5 +1,10 @@
 # History
 
+## 2018-02-21, version 1.0.1
+
+- Upgraded dev dependencies.
+
+
 ## 2018-02-20, version 1.0.0
 
 Version 1.0.0 is rewritten from scratch. The API is the same,
