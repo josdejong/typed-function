@@ -1,5 +1,11 @@
 # History
 
+## 2018-03-17, version 1.0.2
+
+- Fixed typed-function not working on browsers that don't allow
+  setting the `name` property of a function.
+
+
 ## 2018-02-21, version 1.0.1
 
 - Upgraded dev dependencies.

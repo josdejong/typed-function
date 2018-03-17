@@ -1092,8 +1092,17 @@
         return generic.apply(null, arguments);
       }
 
-      // attach name and signatures to the typed function
-      Object.defineProperty(fn, 'name', {value: name});
+      // attach name the typed function
+      try {
+        Object.defineProperty(fn, 'name', {value: name});
+      }
+      catch (err) {
+        // old browsers do not support Object.defineProperty and some don't support setting the name property
+        // the function name is not essential for the functioning, it's mostly useful for debugging,
+        // so it's fine to have unnamed functions.
+      }
+
+      // attach signatures to the function
       fn.signatures = createSignaturesMap(signatures);
 
       return fn;
