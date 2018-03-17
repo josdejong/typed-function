@@ -108,7 +108,7 @@
      *                    Throws a TypeError otherwise
      */
     function findTypeByName (typeName) {
-      var entry = typed.types.find(function (entry) {
+      var entry = findInArray(typed.types, function (entry) {
         return entry.name === typeName;
       });
 
@@ -120,7 +120,7 @@
         return anyType;
       }
 
-      var hint = typed.types.find(function (entry) {
+      var hint = findInArray(typed.types, function (entry) {
         return entry.name.toLowerCase() === typeName.toLowerCase();
       });
 
@@ -148,7 +148,7 @@
      *                  the type test matches the value.
      */
     function findTypeName(value) {
-      var entry = typed.types.find(function (entry) {
+      var entry = findInArray(typed.types, function (entry) {
         return entry.test(value);
       });
 
@@ -989,7 +989,7 @@
           .filter(notNull)
           .forEach(function (parsedSignature) {
             // check whether this parameter conflicts with already parsed signatures
-            var conflictingSignature = parsedSignatures.find(function (s) {
+            var conflictingSignature = findInArray(parsedSignatures, function (s) {
               return hasConflictingParams(s, parsedSignature)
             });
             if (conflictingSignature) {
@@ -1206,6 +1206,22 @@
       }
 
       return false;
+    }
+
+    /**
+     * Return the first item from an array for which test(arr[i]) returns true
+     * @param {Array} arr
+     * @param {function} test
+     * @return {* | undefined} Returns the first matching item
+     *                         or undefined when there is no match
+     */
+    function findInArray(arr, test) {
+      for (var i = 0; i < arr.length; i++) {
+        if (test(arr[i])) {
+          return arr[i];
+        }
+      }
+      return undefined;
     }
 
     /**

@@ -1,5 +1,11 @@
 # History
 
+## 2018-03-17, version 1.0.3
+
+- Dropped usage of ES6 feature `Array.find`, so typed-function is
+  directly usable on any ES5 compatible JavaScript engine (like IE11).
+
+
 ## 2018-03-17, version 1.0.2
 
 - Fixed typed-function not working on browsers that don't allow
