@@ -24,6 +24,9 @@ Type `Object` is no longer treated specially from other types. This
 means that the test for `Object` must not give false positives for
 types like `Array`, `Date`, or class instances.
 
+In version 1.0.0, support for browsers like IE9, IE10 is dropped,
+though typed-function can still work when using es5 and es6 polyfills.
+
 
 ## 2018-01-24, version 0.10.7
 

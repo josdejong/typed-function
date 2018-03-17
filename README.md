@@ -15,7 +15,7 @@ typed-function has the following features:
 - Supports union types, any type, and variable arguments.
 - Detailed error messaging.
 
-Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE9+.
+Supported environments: node.js, Chrome, Firefox, Safari, Opera, IE11+.
 
 
 ## Why?
@@ -320,7 +320,7 @@ The functions generated with `typed({...})` have:
 
 ## Roadmap
 
-### Version 1
+### Version 2
 
 - Be able to turn off exception throwing.
 - Extend function signatures:
@@ -330,7 +330,7 @@ The functions generated with `typed({...})` have:
 - Allow conversions to fail (for example string to number is not always
   possible). Call this `fallible` or `optional`?
 
-### Version 2
+### Version 3
 
 - Extend function signatures:
   - Constants like `'"linear" | "cubic"'`, `'0..10'`, etc.
