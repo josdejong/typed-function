@@ -1,6 +1,7 @@
 # History
 
-## not yet released, version 1.0.4
+
+## 2018-07-04, version 1.0.4
 
 - By default, `addType` will insert new types before the `Object` test
   since the `Object` test also matches arrays and classes.
