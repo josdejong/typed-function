@@ -1335,10 +1335,26 @@
     typed.convert = convert;
     typed.find = find;
 
-    // add a type
-    typed.addType = function (type) {
+    /**
+     * add a type
+     * @param {{name: string, test: function}} type
+     * @param {boolean} [beforeObjectTest=true]
+     *                          If true, the new test will be inserted before
+     *                          the test with name 'Object' (if any), since
+     *                          tests for Object match Array and classes too.
+     */
+    typed.addType = function (type, beforeObjectTest) {
       if (!type || typeof type.name !== 'string' || typeof type.test !== 'function') {
         throw new TypeError('Object with properties {name: string, test: function} expected');
+      }
+
+      if (beforeObjectTest !== false) {
+        for (var i = 0; i < typed.types.length; i++) {
+          if (typed.types[i].name === 'Object') {
+            typed.types.splice(i, 0, type);
+            return
+          }
+        }
       }
 
       typed.types.push(type);

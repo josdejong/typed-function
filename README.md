@@ -211,7 +211,7 @@ A typed function can be constructed in two ways:
     var f = typed.find(fn, 'number, string');
     ```
 
--   `typed.addType(type: {name: string, test: function})`
+-   `typed.addType(type: {name: string, test: function} [, beforeObjectTest=true])`
 
     Add a new type. A type object contains a name and a test function.
     The order of the types determines in which order function arguments are 
@@ -234,6 +234,12 @@ A typed function can be constructed in two ways:
       }
     });
     ```
+
+    By default, the new type will be inserted before the `Object` test
+    because the `Object` test also matches arrays and classes and hence
+    `typed-function` would never reach the new type. When `beforeObjectTest`
+    is `false`, the new type will be added at the end of all tests.
+
     
 -   `typed.addConversion(conversion: {from: string, to: string, convert: function}`
 

@@ -153,7 +153,7 @@ describe('construction', function() {
     }, /Error: Unknown type "Person"/)
   });
 
-  it('should add a type using addType', function() {
+  it('should add a type using addType (before object)', function() {
     var typed2 = typed.create();
     function Person() {}
 
@@ -164,9 +164,30 @@ describe('construction', function() {
       }
     };
 
-    typed.addType(newType);
+    var objectEntry = typed2.types.find(function (entry) {
+      return entry.name === 'Object';
+    });
+    var objectIndex = typed2.types.indexOf(objectEntry);
 
-    assert.strictEqual(typed.types[typed.types.length - 1], newType);
+    typed2.addType(newType);
+
+    assert.strictEqual(typed2.types[objectIndex], newType);
+  });
+
+  it('should add a type using addType at the end (after Object)', function() {
+    var typed2 = typed.create();
+    function Person() {}
+
+    var newType = {
+      name: 'Person',
+      test: function (x) {
+        return x instanceof Person;
+      }
+    };
+
+    typed2.addType(newType, false);
+
+    assert.strictEqual(typed2.types[typed2.types.length - 1], newType);
   });
 
   it('should throw an error when passing an invalid type to addType', function() {

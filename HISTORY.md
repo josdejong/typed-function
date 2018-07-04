@@ -1,5 +1,11 @@
 # History
 
+## not yet released, version 1.0.4
+
+- By default, `addType` will insert new types before the `Object` test
+  since the `Object` test also matches arrays and classes.
+
+
 ## 2018-03-17, version 1.0.3
 
 - Dropped usage of ES6 feature `Array.find`, so typed-function is
