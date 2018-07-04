@@ -5,6 +5,7 @@
 
 - By default, `addType` will insert new types before the `Object` test
   since the `Object` test also matches arrays and classes.
+- Upgraded `devDependencies`.
 
 
 ## 2018-03-17, version 1.0.3
