@@ -1260,7 +1260,7 @@
         var fn = fns[i];
 
         // check whether the names are the same when defined
-        if (fn.signatures && fn.name !== '') {
+        if ((typeof fn.signatures === 'object' || typeof fn.signature === 'string') && fn.name !== '') {
           if (name === '') {
             name = fn.name;
           }
@@ -1278,6 +1278,47 @@
       return name;
     }
 
+    // extract and merge all signatures of a list with typed functions
+    function extractSignatures(fns) {
+      var err;
+      var signaturesMap = {};
+
+      function validateUnique(_signature, _fn) {
+        if (signaturesMap.hasOwnProperty(_signature) && _fn !== signaturesMap[_signature]) {
+          err = new Error('Signature "' + _signature + '" is defined twice');
+          err.data = {signature: _signature};
+          throw err;
+          // else: both signatures point to the same function, that's fine
+        }
+      }
+
+      for (var i = 0; i < fns.length; i++) {
+        var fn = fns[i];
+
+        // test whether this is a typed-function
+        if (typeof fn.signatures === 'object') {
+          // merge the signatures
+          for (var signature in fn.signatures) {
+            if (fn.signatures.hasOwnProperty(signature)) {
+              validateUnique(signature, fn.signatures[signature]);
+              signaturesMap[signature] = fn.signatures[signature];
+            }
+          }
+        }
+        else if (typeof fn.signature === 'string') {
+          validateUnique(fn.signature, fn);
+          signaturesMap[fn.signature] = fn;
+        }
+        else {
+          err = new TypeError('Function is no typed-function (index: ' + i + ')');
+          err.data = {index: i};
+          throw err;
+        }
+      }
+
+      return signaturesMap;
+    }
+
     typed = createTypedFunction('typed', {
       'string, Object': createTypedFunction,
       'Object': function (signaturesMap) {
@@ -1292,39 +1333,10 @@
         return createTypedFunction(name, signaturesMap);
       },
       '...Function': function (fns) {
-        var err;
-        var name = getName(fns);
-        var signaturesMap = {};
-
-        for (var i = 0; i < fns.length; i++) {
-          var fn = fns[i];
-
-          // test whether this is a typed-function
-          if (!(typeof fn.signatures === 'object')) {
-            err = new TypeError('Function is no typed-function (index: ' + i + ')');
-            err.data = {index: i};
-            throw err;
-          }
-
-          // merge the signatures
-          for (var signature in fn.signatures) {
-            if (fn.signatures.hasOwnProperty(signature)) {
-              if (signaturesMap.hasOwnProperty(signature)) {
-                if (fn.signatures[signature] !== signaturesMap[signature]) {
-                  err = new Error('Signature "' + signature + '" is defined twice');
-                  err.data = {signature: signature};
-                  throw err;
-                }
-                // else: both signatures point to the same function, that's fine
-              }
-              else {
-                signaturesMap[signature] = fn.signatures[signature];
-              }
-            }
-          }
-        }
-
-        return createTypedFunction(name, signaturesMap);
+        return createTypedFunction(getName(fns), extractSignatures(fns));
+      },
+      'string, ...Function': function (name, fns) {
+        return createTypedFunction(name, extractSignatures(fns));
       }
     });
 

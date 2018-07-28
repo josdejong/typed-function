@@ -30,6 +30,15 @@ describe('merge', function () {
     assert.throws(function () {typed4(new Date())}, /TypeError: Unexpected type of argument in function unnamed \(expected: number or string or boolean, actual: Date, index: 0\)/);
   });
 
+  it('should merge two typed-functions with a custom name', function () {
+    var typed1 = typed('typed1', {'boolean': function (value) { return 'boolean:' + value; }});
+    var typed2 = typed('typed2', {'number':  function (value) { return 'number:' + value;  }});
+
+    var typed3 = typed('typed3', typed1, typed2);
+
+    assert.equal(typed3.name, 'typed3');
+  });
+
   it('should not copy conversions as exact signatures', function () {
     var typed2 = typed.create();
     typed2.conversions = [
