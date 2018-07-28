@@ -112,6 +112,13 @@ var fn4 = typed({
   }
 });
 
+// create a typed function from a plain function with signature
+function fnPlain(a, b) {
+  return 'a is a number, b is a string';
+}
+fnPlain.signature = 'number, string';
+var fn5 = typed(fnPlain);
+
 // use the functions
 console.log(fn1(2, 'foo'));      // outputs 'a is a number, b is a string'
 console.log(fn4(2));             // outputs 'a is a number'
@@ -167,7 +174,11 @@ A typed function can be constructed in two ways:
 
     ```
     typed(functions: ...function) : function
+    typed(name: string, functions: ...function) : function
     ```
+
+    Each function in `functions` can be either a typed function created before,
+    or a plain function having a `signature` property.
 
 
 ### Methods
@@ -253,7 +264,7 @@ A typed function can be constructed in two ways:
         return +x;
     });
     ```
-    
+
 
 ### Properties
 

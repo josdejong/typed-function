@@ -1,6 +1,13 @@
 # History
 
 
+## 2018-07-28, version 1.1.0
+
+- Implemented support for creating typed functions from a plain function
+  having a property `signature`.
+- Implemented providing a name when merging multiple typed functions.
+
+
 ## 2018-07-04, version 1.0.4
 
 - By default, `addType` will insert new types before the `Object` test
