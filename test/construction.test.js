@@ -323,4 +323,22 @@ describe('construction', function() {
         ['number', 'string', 'boolean']);
   });
 
+  it('should correctly handle null', function () {
+    var fn = typed({
+      'Object': function (a) {
+        return 'Object';
+      },
+      'null': function (a) {
+        return 'null';
+      },
+      'undefined': function (a) {
+        return 'undefined';
+      },
+    });
+
+    assert.equal(fn(new Object(null)), 'Object');
+    assert.equal(fn(null), 'null');
+    assert.equal(fn(undefined), 'undefined');
+  });
+
 });
