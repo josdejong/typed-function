@@ -1092,9 +1092,15 @@
         return generic.apply(null, arguments);
       }
 
+      var lengths = signatures.map(function (signature) {
+        return hasRestParam(signature.params) ? Infinity : signature.params.length;
+      });
+      var maxLength = Math.max.apply(null, lengths);
+
       // attach name the typed function
       try {
         Object.defineProperty(fn, 'name', {value: name});
+        Object.defineProperty(fn, 'length', {value: maxLength});
       }
       catch (err) {
         // old browsers do not support Object.defineProperty and some don't support setting the name property

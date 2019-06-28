@@ -19,6 +19,7 @@ describe('construction', function() {
 
     assert.equal(fn('bar'), 'foo');
     assert.equal(fn.name, 'myFunction');
+    assert.equal(fn.length, 1);
   });
 
   it('should create a typed function from a regular function with a signature', function() {
@@ -101,6 +102,7 @@ describe('construction', function() {
     });
 
     assert.equal(fn('hi', true), 'foo');
+    assert.equal(fn.length, 2);
   });
 
   it('should create a named, typed function', function() {
@@ -129,6 +131,7 @@ describe('construction', function() {
 
     assert.equal(fn({foo: 'bar'}), 'Object');
     assert.equal(fn(new Date()), 'Date');
+    assert.equal(fn.length, 1);
   });
 
   it('should create a new, isolated instance of typed-function', function() {
@@ -258,6 +261,7 @@ describe('construction', function() {
     });
 
     assert.deepEqual(Object.keys(fn.signatures).sort(), ['boolean,boolean', 'number', 'number,number']);
+    assert.deepEqual(fn.length, 2);
   });
 
   it('should give a hint when composing with a wrongly cased type', function() {
