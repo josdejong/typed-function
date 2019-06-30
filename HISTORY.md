@@ -1,6 +1,11 @@
 # History
 
 
+## not yet published, version 1.1.1
+
+- Fix #15: passing `null` to an `Object` parameter throws wrong error.
+
+
 ## 2018-07-28, version 1.1.0
 
 - Implemented support for creating typed functions from a plain function

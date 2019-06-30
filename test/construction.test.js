@@ -131,6 +131,20 @@ describe('construction', function() {
     assert.equal(fn(new Date()), 'Date');
   });
 
+  it('should correctly recognize null from Object (both have typeof === \'object\')', function() {
+    var signatures = {
+      'Object': function (value) {
+        assert(value instanceof Object);
+        return 'Object';
+      }
+    };
+    var fn = typed(signatures);
+
+    assert.equal(fn({}), 'Object');
+    assert.throws(function () { fn(null) },
+        /TypeError: Unexpected type of argument in function unnamed \(expected: Object, actual: null, index: 0\)/);
+  });
+
   it('should create a new, isolated instance of typed-function', function() {
     var typed1 = typed.create();
     var typed2 = typed.create();
