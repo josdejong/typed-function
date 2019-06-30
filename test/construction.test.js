@@ -131,7 +131,25 @@ describe('construction', function() {
     assert.equal(fn(new Date()), 'Date');
   });
 
-  it('should correctly recognize null from Object (both have typeof === \'object\')', function() {
+  it('should correctly handle null', function () {
+    var fn = typed({
+      'Object': function (a) {
+        return 'Object';
+      },
+      'null': function (a) {
+        return 'null';
+      },
+      'undefined': function (a) {
+        return 'undefined';
+      }
+    });
+
+    assert.equal(fn(new Object(null)), 'Object');
+    assert.equal(fn(null), 'null');
+    assert.equal(fn(undefined), 'undefined');
+  });
+
+  it('should throw correct error message when passing null from an Object', function() {
     var signatures = {
       'Object': function (value) {
         assert(value instanceof Object);
