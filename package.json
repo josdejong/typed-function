@@ -1,6 +1,6 @@
 {
   "name": "typed-function",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Type checking for JavaScript functions",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
   "contributors": [
@@ -28,7 +28,7 @@
     "brace-expansion": "1.1.11"
   },
   "comment": "brace-expansion is installed because an old insecure version is used by one of the dev depencencies (under istanbul)",
-  "main": "./typed-function",
+  "main": "typed-function.js",
   "scripts": {
     "build": "uglifyjs typed-function.js -o typed-function.min.js -c -m",
     "test": "mocha test --recursive",
@@ -36,6 +36,6 @@
     "prepublishOnly": "npm test && npm run build"
   },
   "engines": {
-    "node": ">= 6"
+    "node": ">= 8"
   }
 }

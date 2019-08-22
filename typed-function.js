@@ -77,7 +77,7 @@
       { name: 'Date',      test: function (x) { return x instanceof Date } },
       { name: 'RegExp',    test: function (x) { return x instanceof RegExp } },
       { name: 'Object',    test: function (x) {
-        return typeof x === 'object' && x.constructor === Object
+        return typeof x === 'object' && x !== null && x.constructor === Object
       }},
       { name: 'null',      test: function (x) { return x === null } },
       { name: 'undefined', test: function (x) { return x === undefined } }
