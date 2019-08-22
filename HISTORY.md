@@ -1,6 +1,11 @@
 # History
 
 
+## not yet published, version 1.1.2
+
+- Officially dropped support for node.js 6.
+
+
 ## 2019-08-22, version 1.1.1
 
 - Fix #15: passing `null` to an `Object` parameter throws wrong error.
