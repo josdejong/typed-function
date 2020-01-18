@@ -3,7 +3,7 @@
 
 ## not yet published, version 1.1.2
 
-- Officially dropped support for node.js 6.
+- Drop official support for node.js 6 and 8.
 
 
 ## 2019-08-22, version 1.1.1
