@@ -22,9 +22,9 @@
   "devDependencies": {
     "benchmark": "2.1.4",
     "istanbul": "0.4.5",
-    "mocha": "7.0.0",
+    "mocha": "7.0.1",
     "pad-right": "0.2.2",
-    "uglify-js": "3.7.5",
+    "uglify-js": "3.7.6",
     "brace-expansion": "1.1.11"
   },
   "comment": "brace-expansion is installed because an old insecure version is used by one of the dev depencencies (under istanbul)",
