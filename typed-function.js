@@ -34,6 +34,10 @@
     return undefined;
   }
 
+  function toPromise (x) {
+    return Promise.resolve(x)
+  }
+
   /**
    * @typedef {{
    *   params: Param[],
@@ -989,23 +993,33 @@
       return parsedSignatures.map(function (parsedSignature) {
         // async resolver
         var fn = hasRestParam(parsedSignature.params)
-          ? function () {
+          ? function resolver () {
             var args = slice(arguments, 0, arguments.length - 1)
             args.push(Promise.all(arguments[arguments.length - 1])) // resolve restParam
             return Promise.all(args).then(function (resolvedArguments) {
               return parsedSignature.fn.apply(parsedSignature.fn, resolvedArguments);
             });
           }
-          : function () {
+          : function resolver () {
             return Promise.all(arguments).then(function (resolvedArguments) {
               return parsedSignature.fn.apply(parsedSignature.fn, resolvedArguments);
             });
           };
 
         var params = parsedSignature.params.map(function (param) {
-          // TODO: stringifying and then parsing again is inefficient. Optimize this
-          return parseParam(stringifyParam(param) + '|Promise', conversions)
+          const extendedConversions = conversions.concat(param.types.map(function (type) {
+            return {
+              from: type.name,
+              to: 'Promise',
+              convert: toPromise
+            }
+          }))
+
+          // TODO: can we directly create the param instead of via parseParam? (faster)
+          return parseParam(param.restParam ? '...Promise' : 'Promise', extendedConversions)
         });
+
+        // TODO: filter away duplicates, overlapping with the real signatures
 
         return {
           params: params,
@@ -1051,8 +1065,23 @@
             parsedSignatures.push(parsedSignature);
           });
 
+      // FIXME: cleanup logging
+      // console.log('parsed signatures:')
+      // console.table(parsedSignatures.map(signature => ({
+      //   params: stringifyParams(signature.params),
+      //   fn: signature.fn.toString().replace(/\n/g, ' ').replace(/ +/g, ' ')
+      // })))
+
       if (options && options.createAsync === true) {
         var asyncSignatures = createAsyncSignatures(parsedSignatures, typed.conversions);
+
+        // FIXME: cleanup logging
+      //   console.log('asyncSignatures:')
+      //   console.table(asyncSignatures.map(signature => ({
+      //     params: stringifyParams(signature.params),
+      //     fn: signature.fn.toString().replace(/\n/g, ' ').replace(/ +/g, ' ')
+      //   })))
+
         parsedSignatures = parsedSignatures.concat(asyncSignatures);
       }
 
@@ -1069,6 +1098,13 @@
       }).filter(notNull);
 
       signatures.sort(compareSignatures);
+
+      // FIXME: cleanup logging
+      // console.log('sorted signatures:')
+      // console.table(signatures.map(signature => ({
+      //   params: stringifyParams(signature.params),
+      //   fn: signature.fn.toString().replace(/\n/g, ' ').replace(/ +/g, ' ')
+      // })))
 
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
       var ok0 = signatures[0] && signatures[0].params.length <= 2 && !hasRestParam(signatures[0].params);
