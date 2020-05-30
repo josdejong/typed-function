@@ -1007,7 +1007,7 @@
           };
 
         var params = parsedSignature.params.map(function (param) {
-          const extendedConversions = conversions.concat(param.types.map(function (type) {
+          var extendedConversions = conversions.concat(param.types.map(function (type) {
             return {
               from: type.name,
               to: 'Promise',
