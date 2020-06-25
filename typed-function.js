@@ -750,8 +750,23 @@
      * @param {function} fn
      * @return {function} Returns a wrapped function
      */
-    function compileArgsPreprocessing(params, fn) {
-      var fnConvert = fn;
+    function compileArgsPreprocessing(params, fn, resolveSelf) {
+      var baseFn = function() {
+        var self = resolveSelf();
+
+        var proxy = {
+          call: function() {
+            return self.apply(null, arguments);
+          },
+          apply: function(args) {
+            return self.apply(null, arguments[0]);
+          }
+        }
+
+        return fn.apply(proxy, arguments);
+      }
+
+      var fnConvert = baseFn;
 
       // TODO: can we make this wrapper function smarter/simpler?
 
@@ -769,7 +784,7 @@
             args[last] = arguments[last].map(compiledConversions[last]);
           }
 
-          return fn.apply(null, args);
+          return baseFn.apply(null, args);
         }
       }
 
@@ -1043,9 +1058,15 @@
       var test41 = ok4 ? compileTest(signatures[4].params[1]) : notOk;
       var test51 = ok5 ? compileTest(signatures[5].params[1]) : notOk;
 
+      var fn
+
+      function resolveSelf() {
+        return fn
+      }
+
       // compile the functions
       var fns = signatures.map(function(signature) {
-        return compileArgsPreprocessing(signature.params, signature.fn)
+        return compileArgsPreprocessing(signature.params, signature.fn, resolveSelf)
       });
 
       var fn0 = ok0 ? fns[0] : undef;
@@ -1079,7 +1100,7 @@
 
       // create the typed function
       // fast, specialized version. Falls back to the slower, generic one if needed
-      var fn = function fn(arg0, arg1) {
+      fn = function fn(arg0, arg1) {
         'use strict';
 
         if (arguments.length === len0 && test00(arg0) && test01(arg1)) { return fn0.apply(null, arguments); }
