@@ -361,11 +361,11 @@ describe('construction', function() {
         return 'number:' + value;
       },
       'string': function (value) {
-        return this.call(parseInt(value, 10));
+        return this(parseInt(value, 10));
       }
     });
 
-    assert.equal(fn('2'), 'number:2')
+    assert.equal(fn('2'), 'number:2');
   })
 
 });

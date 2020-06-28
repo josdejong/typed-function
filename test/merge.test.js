@@ -106,7 +106,7 @@ describe('merge', function () {
         for (var i = 0; i < values.length; i++) {
           newValues[i] = parseInt(values[i], 10);
         }
-        return this.apply(newValues);
+        return this.apply(null, newValues);
       }
     });
 

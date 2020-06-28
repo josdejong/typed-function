@@ -751,22 +751,11 @@
      * @return {function} Returns a wrapped function
      */
     function compileArgsPreprocessing(params, fn, resolveSelf) {
-      var baseFn = function() {
-        var self = resolveSelf();
-
-        var proxy = {
-          call: function() {
-            return self.apply(null, arguments);
-          },
-          apply: function(args) {
-            return self.apply(null, arguments[0]);
-          }
-        }
-
-        return fn.apply(proxy, arguments);
+      function fnResolveSelf() {
+        return fn.apply(resolveSelf(), arguments);
       }
 
-      var fnConvert = baseFn;
+      var fnConvert = fnResolveSelf;
 
       // TODO: can we make this wrapper function smarter/simpler?
 
@@ -784,7 +773,7 @@
             args[last] = arguments[last].map(compiledConversions[last]);
           }
 
-          return baseFn.apply(null, args);
+          return fnResolveSelf.apply(null, args);
         }
       }
 
@@ -1058,15 +1047,15 @@
       var test41 = ok4 ? compileTest(signatures[4].params[1]) : notOk;
       var test51 = ok5 ? compileTest(signatures[5].params[1]) : notOk;
 
-      var fn
+      var fn;
 
       function resolveSelf() {
-        return fn
+        return fn;
       }
 
       // compile the functions
       var fns = signatures.map(function(signature) {
-        return compileArgsPreprocessing(signature.params, signature.fn, resolveSelf)
+        return compileArgsPreprocessing(signature.params, signature.fn, resolveSelf);
       });
 
       var fn0 = ok0 ? fns[0] : undef;

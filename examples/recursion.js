@@ -6,9 +6,9 @@ var sqrt = typed({
     return Math.sqrt(value);
   },
   'string': function (value) {
-    return this.call(parseInt(value, 10));
+    return this(parseInt(value, 10));
   }
 });
 
 // use the typed function
-console.log(sqrt(9));         // output: 3
+console.log(sqrt("9"));         // output: 3
