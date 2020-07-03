@@ -1,9 +1,11 @@
 # History
 
 
-## not yet published, version 1.1.2
+## 2020-07-03, version 2.0.0
 
-- Drop official support for node.js 6 and 8.
+- Drop official support for node.js 6 and 8, though no breaking changes 
+  at this point.
+- Implemented support for recursion using the `this` keyword. Thanks @nickewing. 
 
 
 ## 2019-08-22, version 1.1.1

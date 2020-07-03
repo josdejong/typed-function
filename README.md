@@ -326,6 +326,26 @@ A typed function can be constructed in two ways:
     ```
 
 
+### Recursion
+
+The `this` keyword can be used to self-reference the typed-function:
+
+```js
+var sqrt = typed({
+  'number': function (value) {
+    return Math.sqrt(value);
+  },
+  'string': function (value) {
+    // on the following line we self reference the typed-function using "this"
+    return this(parseInt(value, 10));
+  }
+});
+
+// use the typed function
+console.log(sqrt('9')); // output: 3
+``` 
+
+
 ### Output
 
 The functions generated with `typed({...})` have:
