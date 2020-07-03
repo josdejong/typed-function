@@ -36,6 +36,6 @@
     "prepublishOnly": "npm test && npm run build"
   },
   "engines": {
-    "node": ">= 8"
+    "node": ">= 10"
   }
 }
