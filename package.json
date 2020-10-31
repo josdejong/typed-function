@@ -1,6 +1,6 @@
 {
   "name": "typed-function",
-  "version": "1.1.1",
+  "version": "2.0.0",
   "description": "Type checking for JavaScript functions",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
   "contributors": [
@@ -21,11 +21,11 @@
   "dependencies": {},
   "devDependencies": {
     "benchmark": "2.1.4",
+    "brace-expansion": "2.0.0",
     "istanbul": "0.4.5",
-    "mocha": "7.0.0",
+    "mocha": "8.2.0",
     "pad-right": "0.2.2",
-    "uglify-js": "3.7.5",
-    "brace-expansion": "1.1.11"
+    "uglify-js": "3.11.4"
   },
   "comment": "brace-expansion is installed because an old insecure version is used by one of the dev depencencies (under istanbul)",
   "main": "typed-function.js",
@@ -36,6 +36,6 @@
     "prepublishOnly": "npm test && npm run build"
   },
   "engines": {
-    "node": ">= 8"
+    "node": ">= 10"
   }
 }

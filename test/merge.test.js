@@ -88,4 +88,31 @@ describe('merge', function () {
     var typed4 = typed(typed2, typed3);
     assert.equal(typed4.name, 'fn2');
   });
+
+  it('should allow recursive across merged signatures', function () {
+    var fn1 = typed({
+      '...number': function (values) {
+        var sum = 0;
+        for (var i = 0; i < values.length; i++) {
+          sum += values[i];
+        }
+        return sum;
+      }
+    });
+
+    var fn2 = typed({
+      '...string': function (values) {
+        var newValues = [];
+        for (var i = 0; i < values.length; i++) {
+          newValues[i] = parseInt(values[i], 10);
+        }
+        return this.apply(null, newValues);
+      }
+    });
+
+    var fn3 = typed(fn1, fn2);
+
+    assert.equal(fn3('1', '2', '3'), '6');
+    assert.equal(fn3(1, 2, 3), 6);
+  })
 });

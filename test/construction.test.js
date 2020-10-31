@@ -355,4 +355,17 @@ describe('construction', function() {
         ['number', 'string', 'boolean']);
   });
 
+  it('should allow a function to be defined recursively', function () {
+    var fn = typed({
+      'number': function (value) {
+        return 'number:' + value;
+      },
+      'string': function (value) {
+        return this(parseInt(value, 10));
+      }
+    });
+
+    assert.equal(fn('2'), 'number:2');
+  })
+
 });

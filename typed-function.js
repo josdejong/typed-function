@@ -788,7 +788,7 @@
             args[last] = arguments[last].map(compiledConversions[last]);
           }
 
-          return fn.apply(null, args);
+          return fn.apply(this, args);
         }
       }
 
@@ -797,7 +797,7 @@
         var offset = params.length - 1;
 
         fnPreprocess = function preprocessRestParams () {
-          return fnConvert.apply(null,
+          return fnConvert.apply(this,
               slice(arguments, 0, offset).concat([slice(arguments, offset)]));
         }
       }
@@ -1136,7 +1136,7 @@
 
       // compile the functions
       var fns = signatures.map(function(signature) {
-        return compileArgsPreprocessing(signature.params, signature.fn)
+        return compileArgsPreprocessing(signature.params, signature.fn);
       });
 
       var fn0 = ok0 ? fns[0] : undef;
@@ -1161,7 +1161,7 @@
 
         for (var i = iStart; i < iEnd; i++) {
           if (tests[i](arguments)) {
-            return fns[i].apply(null, arguments);
+            return fns[i].apply(this, arguments);
           }
         }
 
@@ -1173,14 +1173,14 @@
       var fn = function fn(arg0, arg1) {
         'use strict';
 
-        if (arguments.length === len0 && test00(arg0) && test01(arg1)) { return fn0.apply(null, arguments); }
-        if (arguments.length === len1 && test10(arg0) && test11(arg1)) { return fn1.apply(null, arguments); }
-        if (arguments.length === len2 && test20(arg0) && test21(arg1)) { return fn2.apply(null, arguments); }
-        if (arguments.length === len3 && test30(arg0) && test31(arg1)) { return fn3.apply(null, arguments); }
-        if (arguments.length === len4 && test40(arg0) && test41(arg1)) { return fn4.apply(null, arguments); }
-        if (arguments.length === len5 && test50(arg0) && test51(arg1)) { return fn5.apply(null, arguments); }
+        if (arguments.length === len0 && test00(arg0) && test01(arg1)) { return fn0.apply(fn, arguments); }
+        if (arguments.length === len1 && test10(arg0) && test11(arg1)) { return fn1.apply(fn, arguments); }
+        if (arguments.length === len2 && test20(arg0) && test21(arg1)) { return fn2.apply(fn, arguments); }
+        if (arguments.length === len3 && test30(arg0) && test31(arg1)) { return fn3.apply(fn, arguments); }
+        if (arguments.length === len4 && test40(arg0) && test41(arg1)) { return fn4.apply(fn, arguments); }
+        if (arguments.length === len5 && test50(arg0) && test51(arg1)) { return fn5.apply(fn, arguments); }
 
-        return generic.apply(null, arguments);
+        return generic.apply(fn, arguments);
       }
 
       // attach name the typed function
