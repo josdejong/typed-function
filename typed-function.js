@@ -34,6 +34,10 @@
     return undefined;
   }
 
+  function toPromise (x) {
+    return Promise.resolve(x)
+  }
+
   /**
    * @typedef {{
    *   params: Param[],
@@ -65,6 +69,15 @@
    * }} TypeDef
    */
 
+  function isPromise (x) {
+    return x
+      ? (x.constructor &&
+        x.constructor.prototype &&
+        typeof x.constructor.prototype.then === 'function' &&
+        typeof x.constructor.prototype.catch === 'function')
+      : false
+  }
+
   // create a new instance of typed-function
   function create () {
     // data type tests
@@ -76,6 +89,7 @@
       { name: 'Array',     test: Array.isArray },
       { name: 'Date',      test: function (x) { return x instanceof Date } },
       { name: 'RegExp',    test: function (x) { return x instanceof RegExp } },
+      { name: 'Promise',   test: isPromise },
       { name: 'Object',    test: function (x) {
         return typeof x === 'object' && x !== null && x.constructor === Object
       }},
@@ -236,13 +250,18 @@
      * @return {string}
      */
     function stringifyParams (params) {
-      return params
-          .map(function (param) {
-            var typeNames = param.types.map(getTypeName);
+      return params.map(stringifyParam).join(',');
+    }
 
-            return (param.restParam ? '...' : '') + typeNames.join('|');
-          })
-          .join(',');
+    /**
+     * Stringify a parameter in a normalized way
+     * @param {Param} param
+     * @return {string}
+     */
+    function stringifyParam(param) {
+      var typeNames = param.types.map(getTypeName);
+
+      return (param.restParam ? '...' : '') + typeNames.join('|');
     }
 
     /**
@@ -966,6 +985,50 @@
     }
 
     /**
+     * @param {Signature[]} parsedSignatures
+     * @param {ConversionDef[]} conversions
+     * @return {Signature[]} asyncSignatures
+     */
+    function createAsyncSignatures (parsedSignatures, conversions) {
+      return parsedSignatures.map(function (parsedSignature) {
+        // async resolver
+        var fn = hasRestParam(parsedSignature.params)
+          ? function resolver () {
+            var args = slice(arguments, 0, arguments.length - 1)
+            args.push(Promise.all(arguments[arguments.length - 1])) // resolve restParam
+            return Promise.all(args).then(function (resolvedArguments) {
+              return parsedSignature.fn.apply(parsedSignature.fn, resolvedArguments);
+            });
+          }
+          : function resolver () {
+            return Promise.all(arguments).then(function (resolvedArguments) {
+              return parsedSignature.fn.apply(parsedSignature.fn, resolvedArguments);
+            });
+          };
+
+        var params = parsedSignature.params.map(function (param) {
+          var extendedConversions = conversions.concat(param.types.map(function (type) {
+            return {
+              from: type.name,
+              to: 'Promise',
+              convert: toPromise
+            }
+          }))
+
+          // TODO: can we directly create the param instead of via parseParam? (faster)
+          return parseParam(param.restParam ? '...Promise' : 'Promise', extendedConversions)
+        });
+
+        // TODO: filter away duplicates, overlapping with the real signatures
+
+        return {
+          params: params,
+          fn: fn
+        };
+      });
+    }
+
+    /**
      * Create a typed function
      * @param {String} name               The name for the typed function
      * @param {Object.<string, function>} signaturesMap
@@ -973,9 +1036,10 @@
      *                                    multiple signatures as key, and the
      *                                    function corresponding to the
      *                                    signature as value.
+     * @param {{ createAsync: boolean }} [options]
      * @return {function}  Returns the created typed function.
      */
-    function createTypedFunction(name, signaturesMap) {
+    function createTypedFunction(name, signaturesMap, options) {
       if (Object.keys(signaturesMap).length === 0) {
         throw new SyntaxError('No signatures provided');
       }
@@ -1001,6 +1065,26 @@
             parsedSignatures.push(parsedSignature);
           });
 
+      // FIXME: cleanup logging
+      // console.log('parsed signatures:')
+      // console.table(parsedSignatures.map(signature => ({
+      //   params: stringifyParams(signature.params),
+      //   fn: signature.fn.toString().replace(/\n/g, ' ').replace(/ +/g, ' ')
+      // })))
+
+      if (options && options.createAsync === true) {
+        var asyncSignatures = createAsyncSignatures(parsedSignatures, typed.conversions);
+
+        // FIXME: cleanup logging
+      //   console.log('asyncSignatures:')
+      //   console.table(asyncSignatures.map(signature => ({
+      //     params: stringifyParams(signature.params),
+      //     fn: signature.fn.toString().replace(/\n/g, ' ').replace(/ +/g, ' ')
+      //   })))
+
+        parsedSignatures = parsedSignatures.concat(asyncSignatures);
+      }
+
       // split and filter the types of the signatures, and then order them
       var signatures = flatMap(parsedSignatures, function (parsedSignature) {
         var params = parsedSignature ? splitParams(parsedSignature.params, false) : []
@@ -1014,6 +1098,13 @@
       }).filter(notNull);
 
       signatures.sort(compareSignatures);
+
+      // FIXME: cleanup logging
+      // console.log('sorted signatures:')
+      // console.table(signatures.map(signature => ({
+      //   params: stringifyParams(signature.params),
+      //   fn: signature.fn.toString().replace(/\n/g, ' ').replace(/ +/g, ' ')
+      // })))
 
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
       var ok0 = signatures[0] && signatures[0].params.length <= 2 && !hasRestParam(signatures[0].params);
@@ -1278,6 +1369,22 @@
       return name;
     }
 
+    /**
+     * Find the existing name of a typed function from it's signatures
+     * @param {Object.<string, Signature>} signaturesMap
+     * @return {string}
+     */
+    function findExistingName (signaturesMap) {
+      // find existing name
+      var fns = [];
+      for (var signature in signaturesMap) {
+        if (signaturesMap.hasOwnProperty(signature)) {
+          fns.push(signaturesMap[signature]);
+        }
+      }
+      return getName(fns);
+    }
+
     // extract and merge all signatures of a list with typed functions
     function extractSignatures(fns) {
       var err;
@@ -1321,16 +1428,14 @@
 
     typed = createTypedFunction('typed', {
       'string, Object': createTypedFunction,
+      'string, Object, Object': createTypedFunction,
       'Object': function (signaturesMap) {
-        // find existing name
-        var fns = [];
-        for (var signature in signaturesMap) {
-          if (signaturesMap.hasOwnProperty(signature)) {
-            fns.push(signaturesMap[signature]);
-          }
-        }
-        var name = getName(fns);
+        var name = findExistingName(signaturesMap);
         return createTypedFunction(name, signaturesMap);
+      },
+      'Object, Object': function (signaturesMap, options) {
+        var name = findExistingName(signaturesMap);
+        return createTypedFunction(name, signaturesMap, options);
       },
       '...Function': function (fns) {
         return createTypedFunction(getName(fns), extractSignatures(fns));
