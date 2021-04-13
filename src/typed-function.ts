@@ -37,7 +37,7 @@ interface Type {
     name: string;
     typeIndex: number;
     test: Test;
-    conversion?: ConversionDef;
+    conversion: ConversionDef | null;
     conversionIndex: number;
 }
 
@@ -304,7 +304,7 @@ function create() {
 
         const matchingConversions = filterConversions(conversions, typeNames);
 
-        const exactTypes = typeNames.map(function (typeName) {
+        const exactTypes = typeNames.map(function (typeName): Type {
             const type = findTypeByName(typeName);
 
             return {
@@ -316,7 +316,7 @@ function create() {
             };
         });
 
-        const convertibleTypes = matchingConversions.map(function (conversion) {
+        const convertibleTypes = matchingConversions.map(function (conversion): Type {
             const type = findTypeByName(conversion.from);
 
             return {
@@ -443,7 +443,7 @@ function create() {
             const varIndex = tests.length;
             const lastTest = compileTest(last(params));
 
-            function testRestParam (args) {
+            const testRestParam = function(args: any[]) {
                 for (let i = varIndex; i < args.length; i++) {
                     if (!lastTest(args[i])) {
                         return false;
@@ -577,7 +577,7 @@ function create() {
         let index: number;
         for (index = 0; index < args.length; index++) {
             var nextMatchingDefs = matchingSignatures.filter(function (signature) {
-            var test = compileTest(getParamAtIndex(signature, index));
+            var test = compileTest(getParamAtIndex(signature, index)!);
             return (index < signature.params.length || hasRestParam(signature.params)) &&
                 test(args[index]);
             });
@@ -771,7 +771,7 @@ function create() {
      *                        for every type (if any)
      */
     function filterConversions(conversions: ConversionDef[], typeNames: string[]): ConversionDef[] {
-        let matches = {};
+        let matches: { [s: string]: ConversionDef } = {};
 
         conversions.forEach(function (conversion) {
             if (typeNames.indexOf(conversion.from) === -1 &&
@@ -802,7 +802,7 @@ function create() {
             const restParam = hasRestParam(params);
             const compiledConversions = params.map(compileArgConversion);
 
-            fnConvert = function convertArgs() {
+            fnConvert = function convertArgs(this: any) {
                 const args = [];
                 const last = restParam ? arguments.length - 1 : arguments.length;
 
@@ -822,7 +822,7 @@ function create() {
         if (hasRestParam(params)) {
             var offset = params.length - 1;
 
-            fnPreprocess = function preprocessRestParams () {
+            fnPreprocess = function preprocessRestParams(this: any) {
                 return fnConvert.apply(
                     this,
                     slice(arguments, 0, offset).concat([slice(arguments, offset)])
@@ -855,7 +855,7 @@ function create() {
         // create optimized conversion functions depending on the number of conversions
         switch (conversions.length) {
             case 0:
-                return function convertArg(arg) {
+                return function convertArg(arg: any) {
                     return arg;
                 }
 
@@ -863,7 +863,7 @@ function create() {
                 test0 = tests[0];
                 conversion0 = conversions[0];
 
-                return function convertArg(arg) {
+                return function convertArg(arg: any) {
                     if (test0(arg)) {
                         return conversion0(arg)
                     }
@@ -876,7 +876,7 @@ function create() {
                 conversion0 = conversions[0];
                 conversion1 = conversions[1];
 
-                return function convertArg(arg) {
+                return function convertArg(arg: any) {
                     if (test0(arg)) {
                         return conversion0(arg)
                     }
@@ -887,7 +887,7 @@ function create() {
                 }
 
             default:
-                return function convertArg(arg) {
+                return function convertArg(arg: any) {
                     for (let i = 0; i < conversions.length; i++) {
                         if (tests[i](arg)) {
                             return conversions[i](arg);
@@ -942,7 +942,7 @@ function create() {
      * @return {Param[][]}
      */
     function splitParams(params: Param[], ignoreConversionTypes: boolean): Param[][] {
-        function _splitParams(params: Param[], index: number, types: Type[][]) {
+        function _splitParams(params: Param[], index: number, types: Type[][]): Param[][] {
             if (index < params.length) {
                 const param = params[index]
                 const filteredTypes = ignoreConversionTypes
@@ -1028,7 +1028,7 @@ function create() {
         }
 
         // parse the signatures, and check for conflicts
-        const parsedSignatures = [];
+        const parsedSignatures: Signature[] = [];
         Object.keys(signaturesMap)
             .map(function (signature) {
                 return parseSignature(signature, signaturesMap[signature], typed.conversions);
@@ -1037,15 +1037,15 @@ function create() {
             .forEach(function (parsedSignature) {
                 // check whether this parameter conflicts with already parsed signatures
                 const conflictingSignature = findInArray(parsedSignatures,
-                    s =>  hasConflictingParams(s, parsedSignature)
+                    s =>  hasConflictingParams(s, parsedSignature!)
                 );
                 if (conflictingSignature) {
                     throw new TypeError('Conflicting signatures "' +
                         stringifyParams(conflictingSignature.params) + '" and "' +
-                        stringifyParams(parsedSignature.params) + '".');
+                        stringifyParams(parsedSignature!.params) + '".');
                 }
 
-                parsedSignatures.push(parsedSignature);
+                parsedSignatures.push(parsedSignature!);
             });
 
         // split and filter the types of the signatures, and then order them
@@ -1112,7 +1112,7 @@ function create() {
         // simple and generic, but also slow
         const iStart = allOk ? 6 : 0;
         const iEnd = signatures.length;
-        var generic = function generic() {
+        var generic = function generic(this: any, ...args: any[]) {
 
             for (var i = iStart; i < iEnd; i++) {
                 if (tests[i](arguments)) {
@@ -1134,7 +1134,7 @@ function create() {
             if (arguments.length === len4 && test40(arg0) && test41(arg1)) { return fn4.apply(fn, arguments); }
             if (arguments.length === len5 && test50(arg0) && test51(arg1)) { return fn5.apply(fn, arguments); }
 
-            return generic.apply(fn, arguments);
+            return generic.apply(fn, Array.from(arguments));
         }
 
         // attach name the typed function
@@ -1293,7 +1293,7 @@ function create() {
      * and check whether the name of all functions match (if given)
      * @param {function[]} fns
      */
-    function getName (fns: (TypedFunction | LegacyTypedFunction)[]) {
+    function getName (fns: (Function | TypedFunction | LegacyTypedFunction)[]) {
         let name = '';
 
         for (var i = 0; i < fns.length; i++) {
@@ -1400,21 +1400,21 @@ function create() {
 
     typed = createTypedFunction('typed', {
         'string, Object': createTypedFunction,
-        'Object': function (signaturesMap) {
+        'Object': function (signaturesMap: SignatureMap) {
             // find existing name
             var fns = [];
             for (var signature in signaturesMap) {
-            if (signaturesMap.hasOwnProperty(signature)) {
-                fns.push(signaturesMap[signature]);
-            }
+                if (signaturesMap.hasOwnProperty(signature)) {
+                    fns.push(signaturesMap[signature]);
+                }
             }
             var name = getName(fns);
             return createTypedFunction(name, signaturesMap);
         },
-        '...Function': function (fns) {
+        '...Function': function (fns: Array<TypedFunction | LegacyTypedFunction>) {
             return createTypedFunction(getName(fns), extractSignatures(fns));
         },
-        'string, ...Function': function (name, fns) {
+        'string, ...Function': function (name: string, fns: Array<TypedFunction | LegacyTypedFunction>) {
             return createTypedFunction(name, extractSignatures(fns));
         }
     }) as _typed;
