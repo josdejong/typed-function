@@ -1,0 +1,9 @@
+{
+    "include": ["./src/*"],
+    "compilerOptions": {
+        "strict": true,
+        "lib": [
+            "ES2015"
+        ]
+    }
+}
