@@ -1,4 +1,4 @@
-var typed = require('../typed-function');
+var typed = require('../dist/typed-function');
 
 // create a couple of plain functions with a signature
 function fn1 (a) {

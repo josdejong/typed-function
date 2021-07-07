@@ -1,4 +1,4 @@
-var typed = require('../typed-function');
+var typed = require('../dist/typed-function');
 
 // create a prototype
 function Person(params) {

@@ -1,5 +1,5 @@
 var assert = require('assert');
-var typed = require('../typed-function');
+var typed = require('../dist/typed-function');
 var strictEqualArray = require('./strictEqualArray');
 
 describe('rest parameters', function () {

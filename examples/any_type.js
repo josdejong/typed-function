@@ -1,4 +1,4 @@
-var typed = require('../typed-function');
+var typed = require('../dist/typed-function');
 
 // create a typed function with an any type argument
 var log = typed({

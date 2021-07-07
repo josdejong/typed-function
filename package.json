@@ -28,12 +28,13 @@
     "uglify-js": "3.13.3"
   },
   "comment": "brace-expansion is installed because an old insecure version is used by one of the dev depencencies (under istanbul)",
-  "main": "typed-function.js",
+  "main": "./dist/typed-function.js",
+  "module": "./dist/typed-function.esm.js",
   "scripts": {
-    "build": "uglifyjs typed-function.js -o typed-function.min.js -c -m",
-    "test": "mocha test --recursive",
-    "coverage": "istanbul cover _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\"",
-    "prepublishOnly": "npm test && npm run build"
+    "build": "mkdir -p dist && rm -f dist/* && cat typed-function.js | tee dist/typed-function.esm.js | node toUmd.js typedFunction | tee ./dist/typed-function.js | uglifyjs -o dist/typed-function.min.js -c -m",
+    "test": "npm run build && mocha test --recursive",
+    "coverage": "npm run build && istanbul cover _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\"",
+    "prepublishOnly": "npm run build && npm test"
   },
   "engines": {
     "node": ">= 10"

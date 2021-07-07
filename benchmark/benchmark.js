@@ -19,7 +19,7 @@
 var assert = require('assert');
 var Benchmark = require('benchmark');
 var padRight = require('pad-right');
-var typed = require('../typed-function');
+var typed = require('../dist/typed-function');
 
 // expose on window when using bundled in a browser
 if (typeof window !== 'undefined') {

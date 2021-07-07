@@ -32,3 +32,5 @@ node_modules
 
 # Cloud9 settings
 .c9
+
+/dist
