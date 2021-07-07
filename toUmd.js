@@ -17,17 +17,22 @@ process.stdout.write(`(function (root, factory) {
     // like OldNode.
     module.exports = factory();
   } else {
-    // Browser globals (root is window)
-    var g
+    var g;
     if (typeof globalThis !== 'undefined') {
+      // globalThis is the newish variable that points to the correct global in node, browsers or web workers
       g = globalThis;
     } else if (typeof window !== 'undefined') {
+      // otherwise we might be in an older browser
       g = window;
     } else if (typeof global !== 'undefined') {
+      // otherwise we might be in an older node
       g = global;
     } else if (typeof self !== 'undefined') {
+      // otherwise we might be in a web worker 
       g = self;
     } else {
+      // otherwise we took care to not enable strict mode, 
+      // so root might point to the global object
       g = root;
     }
     g[${JSON.stringify(process.argv[2])}] = factory();
