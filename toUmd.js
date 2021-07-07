@@ -38,6 +38,7 @@ process.stdout.write(`(function (root, factory) {
     g[${JSON.stringify(process.argv[2])}] = factory();
   }
 }(this, function () {
+'use strict';
 `);
 process.stdin.setEncoding('utf8');
 

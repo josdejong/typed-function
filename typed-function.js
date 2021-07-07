@@ -5,7 +5,6 @@
  *
  * https://github.com/josdejong/typed-function
  */
-'use strict';
 function ok () {
   return true;
 }
