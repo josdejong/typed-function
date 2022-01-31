@@ -25,7 +25,7 @@
     "istanbul": "0.4.5",
     "mocha": "8.3.2",
     "pad-right": "0.2.2",
-    "uglify-js": "3.13.3"
+    "uglify-js": "3.15.0"
   },
   "comment": "brace-expansion is installed because an old insecure version is used by one of the dev depencencies (under istanbul)",
   "main": "typed-function.js",
