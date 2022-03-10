@@ -1355,6 +1355,8 @@
     typed.conversions = _conversions;
     typed.ignore = _ignore;
     typed.onMismatch = _onMismatch;
+    typed.throwMismatchError = _onMismatch;
+    typed.createError = createError;
     typed.convert = convert;
     typed.find = find;
 
