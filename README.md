@@ -1,5 +1,9 @@
 # typed-function
 
+[![Version](https://img.shields.io/npm/v/typed-function.svg)](https://www.npmjs.com/package/typed-function)
+[![Downloads](https://img.shields.io/npm/dm/typed-function.svg)](https://www.npmjs.com/package/typed-function)
+[![Build Status](https://github.com/josdejong/typed-function/workflows/Node.js%20CI/badge.svg)](https://github.com/josdejong/typed-function/actions)
+
 Move type checking logic and type conversions outside of your function in a
 flexible, organized way. Automatically throw informative errors in case of
 wrong input arguments.
