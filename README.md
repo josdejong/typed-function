@@ -1,7 +1,5 @@
 # typed-function
 
-[![Greenkeeper badge](https://badges.greenkeeper.io/josdejong/typed-function.svg)](https://greenkeeper.io/)
-
 Move type checking logic and type conversions outside of your function in a
 flexible, organized way. Automatically throw informative errors in case of
 wrong input arguments.
