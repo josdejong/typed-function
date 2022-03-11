@@ -1,6 +1,12 @@
 # History
 
 
+## 2022-03-11, version 2.1.0
+
+- Implemented configurable callbacks `typed.createError` and `typed.onMismatch`. 
+  Thanks @gwhitney.
+
+
 ## 2020-07-03, version 2.0.0
 
 - Drop official support for node.js 6 and 8, though no breaking changes 

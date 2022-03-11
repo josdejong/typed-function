@@ -457,3 +457,24 @@ To test the library, run:
 To generate the minified version of the library, run:
 
     npm run minify
+
+
+## Publish
+
+1. Describe the changes in `HISTORY.md`
+2. Increase the version number in `package.json`
+3. Test and build:
+    ```
+    npm install
+    npm run build
+    npm test
+    ```
+4. Verify whether the bundle and minified bundle works correctly by opening
+   `./test/browser.html`  and `./test/browser.min.html` in your browser. 
+5. Commit the changes
+6. Merge `develop` into `master`, and push `master`
+7. Create a git tag, and pus this
+8. publish the library:
+    ```
+    npm publish
+    ```
