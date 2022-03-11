@@ -1074,7 +1074,7 @@
           }
         }
 
-        throw createError(name, arguments, signatures);
+        return typed.onMismatch(name, arguments, signatures);
       }
 
       // create the typed function
@@ -1106,6 +1106,16 @@
       fn.signatures = createSignaturesMap(signatures);
 
       return fn;
+    }
+
+    /**
+     * Action to take on mismatch
+     * @param {string} name      Name of function that was attempted to be called
+     * @param {Array} args       Actual arguments to the call
+     * @param {Array} signatures Known signatures of the named typed-function
+     */
+    function _onMismatch(name, args, signatures) {
+      throw createError(name, args, signatures);
     }
 
     /**
@@ -1344,6 +1354,9 @@
     typed.types = _types;
     typed.conversions = _conversions;
     typed.ignore = _ignore;
+    typed.onMismatch = _onMismatch;
+    typed.throwMismatchError = _onMismatch;
+    typed.createError = createError;
     typed.convert = convert;
     typed.find = find;
 

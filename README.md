@@ -53,8 +53,8 @@ logic, or functions facing a public API, it can be very useful to use the
 
 It's important however not to *overuse* type checking:
 
--   Locking down the type of input that a function accepts can unnecessary limit
-    it's flexibility. Keep functions as flexible and forgiving as possible,
+-   Locking down the type of input that a function accepts can unnecessarily
+    limit its flexibility. Keep functions as flexible and forgiving as possible,
     follow the
     [robustness principle](http://en.wikipedia.org/wiki/Robustness_principle)
     here: "be liberal in what you accept and conservative in what you send"
@@ -74,7 +74,7 @@ Install via npm:
 
 ## Usage
 
-Here some usage examples. More examples are available in the
+Here are some usage examples. More examples are available in the
 [/examples](/examples) folder.
 
 ```js
@@ -187,7 +187,7 @@ A typed function can be constructed in two ways:
 
 -   `typed.convert(value: *, type: string) : *`
 
-    Convert an value to another type. Only applicable when conversions have
+    Convert a value to another type. Only applicable when conversions have
     been defined in `typed.conversions` (see section [Properties](#properties)). 
     Example:
     
@@ -211,7 +211,10 @@ A typed function can be constructed in two ways:
     var typed2 = typed.create();            // a second instance
     ```
 
--   `typed.find(fn: function, signature: string | Array) : function | null`
+    This would allow you, for example, to have two different type hierarchies
+    for different purposes.
+
+-   `typed.find(fn: typed-function, signature: string | Array) : function | null`
 
     Find a specific signature from a typed function. The function currently
     only finds exact matching signatures.
@@ -224,7 +227,7 @@ A typed function can be constructed in two ways:
     var f = typed.find(fn, 'number, string');
     ```
 
--   `typed.addType(type: {name: string, test: function} [, beforeObjectTest=true])`
+-   `typed.addType(type: {name: string, test: function} [, beforeObjectTest=true]): void`
 
     Add a new type. A type object contains a name and a test function.
     The order of the types determines in which order function arguments are 
@@ -253,8 +256,7 @@ A typed function can be constructed in two ways:
     `typed-function` would never reach the new type. When `beforeObjectTest`
     is `false`, the new type will be added at the end of all tests.
 
-    
--   `typed.addConversion(conversion: {from: string, to: string, convert: function}`
+-   `typed.addConversion(conversion: {from: string, to: string, convert: function}) : void`
 
     Add a new conversion. Conversions are added to the Array `typed.conversions`.
     
@@ -267,6 +269,20 @@ A typed function can be constructed in two ways:
     });
     ```
 
+    Note that any typed functions created before this conversion is added will
+    not have their arguments undergo this new conversion automatically, so it is
+    best to add all of your desired automatic conversions before defining any
+    typed functions.
+
+-   `typed.createError(name: string, args: Array.<any>, signatures: Array.<Signature>): TypeError`
+
+    Generates a custom error object reporting the problem with calling
+    the typed function of the given `name` with the given `signatures` on the
+    actual arguments `args`. Note the error object has an extra property `data`
+    giving the details of the problem. This method is primarily useful in
+    writing your own handler for a type mismatch (see the `typed.onMismatch`
+    property below), in case you have tried to recover but end up deciding
+    you want to throw the error that the default handler would have.
 
 ### Properties
 
@@ -294,8 +310,8 @@ A typed function can be constructed in two ways:
 
 -   `typed.conversions: Array.<{from: string, to: string, convert: function}>`
 
-    An Array with built-in conversions. Empty by default. Can be used for example
-    to defined conversions from `boolean` to `number`. For example:
+    An Array with built-in conversions. Empty by default. Can be used to define
+    conversions from `boolean` to `number`. For example:
 
     ```js
     typed.conversions.push({
@@ -305,11 +321,15 @@ A typed function can be constructed in two ways:
         return +x;
     });
     ```
+
+    Also note the `addConversion()` method above for simply adding a single
+    conversion at a time.
     
 -   `typed.ignore: Array.<string>`
 
     An Array with names of types to be ignored when creating a typed function.
-    This can be useful filter signatures when creating a typed function. Example:
+    This can be useful to filter signatures when creating a typed function.
+    For example:
 
     ```js
     // a set with signatures maybe loaded from somewhere
@@ -325,6 +345,48 @@ A typed function can be constructed in two ways:
     var fn = typed('fn', signatures);
     ```
 
+-   `typed.onMismatch: function`
+
+    The handler called when a typed-function call fails to match with any
+    of its signatures. The handler is called with three arguments: the name
+    of the typed function being called, the actual argument list, and an array
+    of the signatures for the typed function being called. (Each signature is
+    an object with property 'signature' giving the actual signature and\
+    property 'fn' giving the raw function for that signature.) The default
+    value of `onMismatch` is `typed.throwMismatchError`.
+
+    This can be useful if you have a collection of functions and have common
+    behavior for any invalid call. For example, you might just want to log
+    the problem and continue:
+
+    ```
+    const myErrorLog = [];
+    typed.onMismatch = (name, args, signatures) => {
+      myErrorLog.push(`Invalid call of ${name} with ${args.length} arguments.`);
+      return null;
+    };
+    typed.sqrt(9); // assuming definition as above, will return 3
+    typed.sqrt([]); // no error will be thrown; will return null.
+    console.log(`There have been ${myErrorLog.length} invalid calls.`)
+    ```
+
+    Note that there is only one `onMismatch` handler at a time; assigning a
+    new value discards the previous handler. To restore the default behavior,
+    just assign `typed.onMismatch = typed.throwMismatchError`.
+
+    Finally note that this handler fires whenever _any_ typed function call
+    does not match any of its signatures. You can in effect define such a
+    "handler" for a single typed function by simply specifying an implementation
+    for the `...` signature:
+
+    ```
+    const lenOrNothing = typed({
+      string: s => s.length,
+      '...': () => 0
+    });
+    console.log(lenOrNothing('Hello, world!')) // Output: 13
+    console.log(lenOrNothing(57, 'varieties')) // Output: 0
+    ```
 
 ### Recursion
 
@@ -343,7 +405,7 @@ var sqrt = typed({
 
 // use the typed function
 console.log(sqrt('9')); // output: 3
-``` 
+```
 
 
 ### Output
@@ -354,7 +416,8 @@ The functions generated with `typed({...})` have:
   what the function exactly does. Mostly for debugging purposes.
 - A property `signatures`, which holds a map with the (normalized)
   signatures as key and the original sub-functions as value.
-- A property `name` containing name of the typed function or an empty string.
+- A property `name` containing the name of the typed function, if it was
+  assigned one at creation, or an empty string.
 
 
 ## Roadmap
