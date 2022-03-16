@@ -104,7 +104,8 @@
     var typed = {
       types: _types,
       conversions: _conversions,
-      ignore: _ignore
+      ignore: _ignore,
+      uniqueToken: {} // get a different empty object each call to create
     };
 
     /**
@@ -1131,6 +1132,9 @@
 
       // attach signatures to the function
       fn.signatures = createSignaturesMap(signatures);
+      // attach a unique property so that we can check if this
+      // is a typed function that this instance "owns"
+      fn.typedFunctionToken = typed.uniqueToken
 
       return fn;
     }
@@ -1352,6 +1356,7 @@
       }
     }
 
+    const saveTyped = typed
     /**
      * Originally the main function was a typed function itself, but then
      * it might not be able to generate error messages if the client
@@ -1422,6 +1427,7 @@
     typed.types = _types;
     typed.conversions = _conversions;
     typed.ignore = _ignore;
+    typed.uniqueToken = saveTyped.uniqueToken
     typed.onMismatch = _onMismatch;
     typed.throwMismatchError = _onMismatch;
     typed.createError = createError;
@@ -1453,7 +1459,12 @@
       typed.types.push(type);
     };
 
-    // add a conversion
+    /**
+     * Add a conversion
+     * @param {{from: string, to: string, convert: function}} conversion
+     * @returns {void}
+     * @throws {TypeError}
+     */
     typed.addConversion = function (conversion) {
       if (!conversion
           || typeof conversion.from !== 'string'
@@ -1464,6 +1475,14 @@
 
       typed.conversions.push(conversion);
     };
+
+    /**
+     * Check if an entity is a typed function created by this instance
+     * @param {any} entity
+     * @returns {boolean}
+     */
+    typed.isTypedFunction = entity => entity && typeof entity === 'function' &&
+      entity.typedFunctionToken === typed.uniqueToken
 
     return typed;
   }

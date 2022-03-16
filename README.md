@@ -265,6 +265,13 @@ once with different implementations, an error will be thrown.
     var f = typed.find(fn, 'number, string');
     ```
 
+-   `typed.isTypedFunction(entity: any): boolean`
+
+    Check if an entity is a typed function created by this instance of
+    typed-function. It returns false on typed functions created by other
+    isolated instances (as returned by `typed.create`) and on all other
+    entities.
+
 -   `typed.addType(type: {name: string, test: function} [, beforeObjectTest=true]): void`
 
     Add a new type. A type object contains a name and a test function.
