@@ -142,24 +142,6 @@
     }
 
     /**
-     * Find a type that matches a value.
-     * @param {*} value
-     * @return {string} Returns the name of the first type for which
-     *                  the type test matches the value.
-     */
-    function findTypeName(value) {
-      var entry = findInArray(typed.types, function (entry) {
-        return entry.test(value);
-      });
-
-      if (entry) {
-        return entry.name;
-      }
-
-      throw new TypeError('Value has unknown type. Value: ' + value);
-    }
-
-    /**
      * Find all types that match the value.
      * @param {*} value
      * @return {{[string]: boolean}} Returns a map with the names of the
@@ -570,16 +552,16 @@
           // no matching signatures anymore, throw error "wrong type"
           expected = mergeExpectedParams(matchingSignatures, index);
           if (expected.length > 0) {
-            var actualType = findTypeName(args[index]);
+            var actualTypes = Object.keys(findTypeNames(args[index]));
 
             err = new TypeError('Unexpected type of argument in function ' + _name +
                 ' (expected: ' + expected.join(' or ') +
-                ', actual: ' + actualType + ', index: ' + index + ')');
+                ', actual: ' + actualTypes.join(' or ') + ', index: ' + index + ')');
             err.data = {
               category: 'wrongType',
               fn: _name,
               index: index,
-              actual: actualType,
+              actual: actualTypes,
               expected: expected
             }
             return err;
@@ -626,7 +608,7 @@
           '" do not match any of the defined signatures of function ' + _name + '.');
       err.data = {
         category: 'mismatch',
-        actual: args.map(findTypeName)
+        actual: flatMap(args, arg => Object.keys(findTypeNames(arg)))
       }
       return err;
     }
