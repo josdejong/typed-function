@@ -160,6 +160,25 @@
     }
 
     /**
+     * Find all types that match the value.
+     * @param {*} value
+     * @return {{[string]: boolean}} Returns a map with the names of the
+     *                               matching types as key and true as value
+     */
+    function findTypeNames(value) {
+      const typeNames = {}
+
+      for (let i = 0; i < typed.types.length; i++) {
+        const entry = typed.types[i]
+        if (entry.test(value)) {
+          typeNames[entry.name] = true
+        }
+      }
+
+      return typeNames
+    }
+
+    /**
      * Find a specific signature from a (composed) typed function, for example:
      *
      *   typed.find(fn, ['number', 'string'])
@@ -213,23 +232,24 @@
      * @param {string} type
      */
     function convert (value, type) {
-      var from = findTypeName(value);
+      var valueTypesMap = findTypeNames(value);
 
-      // check conversion is needed
-      if (type === from) {
+      // check whether conversion is needed
+      if (valueTypesMap[type] === true) {
         return value;
       }
 
       for (var i = 0; i < typed.conversions.length; i++) {
         var conversion = typed.conversions[i];
-        if (conversion.from === from && conversion.to === type) {
+        if (valueTypesMap[conversion.from] === true && conversion.to === type) {
           return conversion.convert(value);
         }
       }
 
-      throw new Error('Cannot convert from ' + from + ' to ' + type);
+      throw new Error('Cannot convert from ' +
+        Object.keys(valueTypesMap).join(' or ') + ' to ' + type);
     }
-    
+
     /**
      * Stringify parameters in a normalized way
      * @param {Param[]} params
