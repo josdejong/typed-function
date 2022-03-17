@@ -608,7 +608,7 @@
           '" do not match any of the defined signatures of function ' + _name + '.');
       err.data = {
         category: 'mismatch',
-        actual: flatMap(args, arg => Object.keys(findTypeNames(arg)))
+        actual: args.map(arg => Object.keys(findTypeNames(arg)))
       }
       return err;
     }
