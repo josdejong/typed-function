@@ -556,7 +556,7 @@
 
             err = new TypeError('Unexpected type of argument in function ' + _name +
                 ' (expected: ' + expected.join(' or ') +
-                ', actual: ' + actualTypes.join(' or ') + ', index: ' + index + ')');
+                ', actual: ' + actualTypes.join(' & ') + ', index: ' + index + ')');
             err.data = {
               category: 'wrongType',
               fn: _name,
