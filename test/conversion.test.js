@@ -293,7 +293,7 @@ describe('conversion', function () {
     assert.equal(fn(2, 4, 5), 'numbers');
   });
 
-  it('should not apply conversions when having an any type argument', function() {
+  it('should prefer conversions to any type argument', function() {
     var fn = typed({
       'number': function (a) {
         return 'number';
@@ -304,7 +304,7 @@ describe('conversion', function () {
     });
 
     assert.equal(fn(2), 'number');
-    assert.equal(fn(true), 'any');
+    assert.equal(fn(true), 'number');
     assert.equal(fn('foo'), 'any');
     assert.equal(fn('{}'), 'any');
   });
