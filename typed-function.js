@@ -1130,9 +1130,19 @@
         // so it's fine to have unnamed functions.
       }
 
-      // attach signatures to the function
+      // attach signatures to the function.
+      // This first property is close to the original collection of signatures
+      // used to create the typed-function, just with unions split:
       fn.signatures = createSignaturesMap(signatures);
-      // attach a unique property so that we can check if this
+      // Whereas the signaturesArray property contains the exact list of
+      // tests and implementing functions with possible conversions compiled
+      // in, that are used in executing the typed-function
+      for (let i = 0; i < signatures.length; ++i) {
+        signatures[i].implementation = fns[i]
+        signatures[i].test = tests[i]
+      }
+      fn.signatureArray = signatures
+      // Also attach a unique property so that we can check if this
       // is a typed function that this instance "owns"
       fn.typedFunctionToken = typed.uniqueToken
 
@@ -1483,6 +1493,25 @@
      */
     typed.isTypedFunction = entity => entity && typeof entity === 'function' &&
       entity.typedFunctionToken === typed.uniqueToken
+
+    /**
+     * Return the specific signature that will be called by the given typed
+     * function on the given arguments. Here, a "signature" is an object with
+     * properties 'params', 'test', 'fn', and 'implementation' -- the latter
+     * converts params as necessary and then calls 'fn'. Returns null if
+     * the first argument is not a typed function, or if there is no matching
+     * signature.
+     * @param {TypedFunction} f
+     * @param {any[]} argList
+     * @returns {{params: string, test: function, fn: function, workingFn: function}}
+     */
+    typed.resolve = (f, argList) => {
+      if (!typed.isTypedFunction(f)) return null
+      for (const signature of f.signatureArray) {
+        if (signature.test(argList)) return signature
+      }
+      return null
+    }
 
     return typed;
   }

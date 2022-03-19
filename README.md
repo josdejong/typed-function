@@ -272,6 +272,25 @@ once with different implementations, an error will be thrown.
     isolated instances (as returned by `typed.create`) and on all other
     entities.
 
+-   `typed.resolve(f: typed-function, argList: Array<any>): signature-object`
+
+    Find the specific signature and implementation that a typed function `f`
+    would call if invoked on the argument list `argList`. Returns null if `f`
+    is not a typed function or if there is no matching signature. The returned
+    signature object has properties `params`, `test`, `fn`, and
+    `implementation`. The difference betweeen the last two properties is that
+    `fn` is the original function supplied at typed-function creation time,
+    whereas `implementation` is ready to be called on this specific argList,
+    in that it will first perform any necessary conversions and gather arguments
+    up into rest parameters as needed.
+
+    Thus, in the case when the arguments `a0`,`a1`,`a2` (say) do match one of
+    the signatures of `f`, then `f(a0, a1, a2)` does exactly the same thing as
+    `typed.resolve(f, [a0,a1,a2]).implementation.apply(f, [a0,a1,a2])`. But
+    `resolve` is useful if you want to interpose any other operation (such as
+    bookkeeping or additional custom error checking) between signature selection
+    and execution dispatch.
+
 -   `typed.addType(type: {name: string, test: function} [, beforeObjectTest=true]): void`
 
     Add a new type. A type object contains a name and a test function.
