@@ -16,7 +16,7 @@ describe('compose', function () {
     assert.equal(fn(false, 2), 'B');
     assert.equal(fn('str'), 'C');
     // FIXME: should return correct error message
-    assert.throws(function () {fn()},           /TypeError: Too few arguments in function unnamed \(expected: number or string or boolean, index: 0\)/);
+    assert.throws(function () {fn()},           /TypeError: Too few arguments in function unnamed \(expected: string or number or boolean, index: 0\)/);
     assert.throws(function () {fn(1,2,3)},      /TypeError: Unexpected type of argument in function unnamed \(expected: boolean, actual: number, index: 1\)/);
     assert.throws(function () {fn('str', 2)},   /TypeError: Unexpected type of argument in function unnamed \(expected: boolean, actual: number, index: 1\)/);
     assert.throws(function () {fn(true, 'str')},/TypeError: Unexpected type of argument in function unnamed \(expected: number or boolean, actual: string, index: 1\)/);
