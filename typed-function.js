@@ -655,6 +655,20 @@
       return min;
     }
 
+    // When we compare parameters for sorting signatures, we will judge them
+    // by a number of metrics in priority order. Here they are, in the
+    // order they will be checked. (The first matric that distinguishes the
+    // two parameters takes precedence, and the parameter with the lower
+    // value for that metric precedes the one with the higher value.)
+
+    const parameterMetrics = [
+      hasAny, // 'any' parameters are the least preferred
+      par => par.restParam, // prefer non-rest to rest parameters
+      hasConversions,
+      getLowestTypeIndex,
+      getLowestConversionIndex
+    ]
+
     /**
      * Compare two params
      * @param {Param} param1
@@ -665,15 +679,7 @@
      */
     function compareParams (param1, param2) {
       // We compare a number of metrics on a param in turn:
-      const metrics = [
-        hasAny,
-        par => par.restParam,
-        hasConversions,
-        getLowestTypeIndex,
-        getLowestConversionIndex
-      ]
-
-      for (const metric of metrics) {
+      for (const metric of parameterMetrics) {
         const c = metric(param1) - metric(param2)
         if (c !== 0) return c
       }
@@ -681,6 +687,19 @@
       // Don't have a basis for preference
       return 0
     }
+
+    // Similarly, when we compare two signatures for determining in what order
+    // they should be checked against an incoming argument list for dispatch,
+    // we compare them by a sequence of metrics in priority order.
+    const signatureMetrics = [
+      pars => hasRestParam(pars) && hasAny(last(pars)),
+      pars => summap(pars, hasAny), // minimize number of 'any' parameters
+      pars => hasRestParam(pars) && hasConversions(last(pars)),
+      pars => summap(pars, hasConversions), // minimize conversions used
+      hasRestParam,
+      // shorter first without rest param, longer first with rest:
+      pars => pars.length * (hasRestParam(pars) ? -1 : 1)
+    ]
 
     /**
      * Compare two signatures
@@ -691,23 +710,9 @@
      *                  or zero when both are equal
      */
     function compareSignatures (signature1, signature2) {
-      // We proceed by comparing a sequence of metrics on the signatures
-      // in prority order. Whenever the metric differs, the signature with
-      // the lower value precedes the one with a higher value
-      const metrics = [
-        pars => hasRestParam(pars) && hasAny(last(pars)),
-        pars => summap(pars, hasAny),
-        pars => hasRestParam(pars) && hasConversions(last(pars)),
-        pars => summap(pars, hasConversions),
-        hasRestParam,
-        // shorter first without rest param, longer first with rest:
-        pars => pars.length * (hasRestParam(pars) ? -1 : 1)
-      ]
-
       const pars1 = signature1.params
       const pars2 = signature2.params
-
-      for (const metric of metrics) {
+      for (const metric of signatureMetrics) {
         const c = metric(pars1) - metric(pars2)
         if (c !== 0) return c
       }
