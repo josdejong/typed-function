@@ -229,7 +229,7 @@
 
       throw new Error('Cannot convert from ' + from + ' to ' + type);
     }
-    
+
     /**
      * Stringify parameters in a normalized way
      * @param {Param[]} params
@@ -1082,14 +1082,18 @@
       var fn = function fn(arg0, arg1) {
         'use strict';
 
-        if (arguments.length === len0 && test00(arg0) && test01(arg1)) { return fn0.apply(fn, arguments); }
-        if (arguments.length === len1 && test10(arg0) && test11(arg1)) { return fn1.apply(fn, arguments); }
-        if (arguments.length === len2 && test20(arg0) && test21(arg1)) { return fn2.apply(fn, arguments); }
-        if (arguments.length === len3 && test30(arg0) && test31(arg1)) { return fn3.apply(fn, arguments); }
-        if (arguments.length === len4 && test40(arg0) && test41(arg1)) { return fn4.apply(fn, arguments); }
-        if (arguments.length === len5 && test50(arg0) && test51(arg1)) { return fn5.apply(fn, arguments); }
+        // self contains the latest called function
+        // this is a bit dirty (should be cleaned up afterwards)
+        typed.self = fn;
 
-        return generic.apply(fn, arguments);
+        if (arguments.length === len0 && test00(arg0) && test01(arg1)) { return fn0.apply(this, arguments); }
+        if (arguments.length === len1 && test10(arg0) && test11(arg1)) { return fn1.apply(this, arguments); }
+        if (arguments.length === len2 && test20(arg0) && test21(arg1)) { return fn2.apply(this, arguments); }
+        if (arguments.length === len3 && test30(arg0) && test31(arg1)) { return fn3.apply(this, arguments); }
+        if (arguments.length === len4 && test40(arg0) && test41(arg1)) { return fn4.apply(this, arguments); }
+        if (arguments.length === len5 && test50(arg0) && test51(arg1)) { return fn5.apply(this, arguments); }
+
+        return generic.apply(this, arguments);
       }
 
       // attach name the typed function

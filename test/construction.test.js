@@ -361,11 +361,27 @@ describe('construction', function() {
         return 'number:' + value;
       },
       'string': function (value) {
-        return this(parseInt(value, 10));
+        return typed.self(parseInt(value, 10));
       }
     });
 
     assert.equal(fn('2'), 'number:2');
-  })
+  });
 
+  it('should pass this function context', () => {
+    var getProperty = typed('getProperty', {
+      'string': function (key) {
+        return this[key]
+      }
+    })
+
+    assert.equal(getProperty('value'), undefined)
+
+    var obj = {
+      value: 42,
+      getProperty
+    }
+
+    assert.equal(obj.getProperty('value'), 42)
+  })
 });
