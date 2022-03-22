@@ -101,13 +101,15 @@ describe('merge', function () {
     });
 
     var fn2 = typed({
-      '...string': function (values) {
-        var newValues = [];
-        for (var i = 0; i < values.length; i++) {
-          newValues[i] = parseInt(values[i], 10);
+      '...string': typed.reference((self) => {
+        return function (values) {
+          var newValues = [];
+          for (var i = 0; i < values.length; i++) {
+            newValues[i] = parseInt(values[i], 10);
+          }
+          return self.apply(null, newValues);
         }
-        return typed.self.apply(null, newValues);
-      }
+      })
     });
 
     var fn3 = typed(fn1, fn2);

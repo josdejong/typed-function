@@ -392,26 +392,24 @@ A typed function can be constructed in two ways:
 
 ### Recursion
 
-The `typed.self` keyword can be used to self-reference the currently invoked typed-function:
+The `typed.reference` function can be used to self-reference the typed-function itself:
 
 ```js
 var sqrt = typed({
   'number': function (value) {
     return Math.sqrt(value);
   },
-  'string': function (value) {
-    // on the following line we self reference the typed-function using "this"
-    return typed.self(parseInt(value, 10));
-  }
+  'string': typed.reference(self => {
+    return function (value) {
+      // on the following line we self reference the typed-function
+      return self(parseInt(value, 10));
+    }
+  })
 });
 
 // use the typed function
 console.log(sqrt('9')); // output: 3
 ```
-
-> Note that for performance reasons, `typed.self` is not cleaned up after the 
-function call. So when used from outside a function call, it contains the last
-invoked function. This shouldn't be used though.
 
 
 ### Output

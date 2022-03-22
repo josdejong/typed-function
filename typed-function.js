@@ -965,20 +965,62 @@
           : restParam2 ? (len1 >= len2)  : (len1 === len2)
     }
 
+    function shallowClone (object) {
+      // we cannot use destructuring {...object} because we still want to support IE11
+      var clone = {}
+
+      Object.keys(object).forEach(key => {
+        clone[key] = object[key];
+      })
+
+      return clone
+    }
+
+    function resolveReferences(rawSignaturesMap, self) {
+      var signaturesMap = rawSignaturesMap;
+
+      // resolve references, providing "self"
+      for (var signature in signaturesMap) {
+        if (signaturesMap.hasOwnProperty(signature)) {
+          var callback = signaturesMap[signature];
+
+          if (isReference(callback)) {
+            // shallow clone, do not adjust the original input
+            if (signaturesMap === rawSignaturesMap) {
+              signaturesMap = shallowClone(signaturesMap);
+            }
+
+            // we need to keep .reference to be able to merge typed-functions
+            // later on: then we need to resolve the new `self` again.
+            var reference = signaturesMap[signature].reference;
+            var resolved = reference.call(null, self);
+            resolved.reference = reference;
+
+            signaturesMap[signature] = resolved;
+          }
+        }
+      }
+
+      return signaturesMap;
+    }
+
     /**
      * Create a typed function
      * @param {String} name               The name for the typed function
-     * @param {Object.<string, function>} signaturesMap
+     * @param {Object.<string, function>} rawSignaturesMap
      *                                    An object with one or
      *                                    multiple signatures as key, and the
      *                                    function corresponding to the
      *                                    signature as value.
      * @return {function}  Returns the created typed function.
      */
-    function createTypedFunction(name, signaturesMap) {
-      if (Object.keys(signaturesMap).length === 0) {
+    function createTypedFunction(name, rawSignaturesMap) {
+      if (Object.keys(rawSignaturesMap).length === 0) {
         throw new SyntaxError('No signatures provided');
       }
+
+      // resolve references, providing "self"
+      var signaturesMap = resolveReferences(rawSignaturesMap, fn);
 
       // parse the signatures, and check for conflicts
       var parsedSignatures = [];
@@ -1079,12 +1121,8 @@
 
       // create the typed function
       // fast, specialized version. Falls back to the slower, generic one if needed
-      var fn = function fn(arg0, arg1) {
+      function fn(arg0, arg1) {
         'use strict';
-
-        // self contains the latest called function
-        // this is a bit dirty (should be cleaned up afterwards)
-        typed.self = fn;
 
         if (arguments.length === len0 && test00(arg0) && test01(arg1)) { return fn0.apply(this, arguments); }
         if (arguments.length === len1 && test10(arg0) && test11(arg1)) { return fn1.apply(this, arguments); }
@@ -1333,6 +1371,26 @@
       return signaturesMap;
     }
 
+    /**
+     * Create a reference callback function
+     * @param {(self) => function} callback
+     * @returns {{reference: (self) => function}}
+     */
+    function reference(callback) {
+      return {
+        reference: callback
+      }
+    }
+
+    /**
+     * Test whether something is an object or function with a .reference property
+     * @param {Object | function} objectOrFn
+     * @returns {boolean}
+     */
+    function isReference(objectOrFn) {
+      return objectOrFn && typeof objectOrFn.reference === 'function'
+    }
+
     typed = createTypedFunction('typed', {
       'string, Object': createTypedFunction,
       'Object': function (signaturesMap) {
@@ -1362,6 +1420,7 @@
     typed.throwMismatchError = _onMismatch;
     typed.createError = createError;
     typed.convert = convert;
+    typed.reference = reference;
     typed.find = find;
 
     /**

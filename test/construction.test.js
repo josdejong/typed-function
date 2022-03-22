@@ -360,16 +360,18 @@ describe('construction', function() {
       'number': function (value) {
         return 'number:' + value;
       },
-      'string': function (value) {
-        return typed.self(parseInt(value, 10));
-      }
+      'string': typed.reference((self) => {
+        return function (value) {
+          return self(parseInt(value, 10));
+        }
+      })
     });
 
     assert.equal(fn('2'), 'number:2');
   });
 
   it('should pass this function context', () => {
-    var getProperty = typed('getProperty', {
+    var getProperty = typed({
       'string': function (key) {
         return this[key]
       }
@@ -383,5 +385,8 @@ describe('construction', function() {
     }
 
     assert.equal(obj.getProperty('value'), 42)
+
+    var boundGetProperty = getProperty.bind({ otherValue: 123 })
+    assert.equal(boundGetProperty('otherValue'), 123)
   })
 });
