@@ -360,7 +360,7 @@ describe('construction', function() {
       'number': function (value) {
         return 'number:' + value;
       },
-      'string': typed.reference((self) => {
+      'string': typed.reference((resolve, self) => {
         return function (value) {
           return self(parseInt(value, 10));
         }
@@ -368,6 +368,84 @@ describe('construction', function() {
     });
 
     assert.equal(fn('2'), 'number:2');
+  });
+
+  it('should allow to resolve function signatures at creation time', function () {
+    var fnNumber = function (value) {
+      return 'number:' + value;
+    }
+
+    var fn = typed({
+      'number': fnNumber,
+      'string': typed.reference((resolve) => {
+        const fnNumberResolved = resolve('number')
+
+        assert.strictEqual(fnNumberResolved, fnNumber)
+
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number:2');
+  });
+
+  it('should allow to resolve reference function signatures at creation time', function () {
+    var fnNumber = function (value) {
+      return 'number:' + value + ', this.value:' + this.value;
+    }
+
+    var fn = typed({
+      'number': typed.reference(() => {
+        // created as a "reference" function just for the unit test...
+        return fnNumber
+      }),
+      'string': typed.reference((resolve) => {
+        const fnNumberResolved = resolve('number')
+
+        assert.notStrictEqual(fnNumberResolved, fnNumber)
+
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number:2, this.value:undefined');
+  });
+
+  it('should have correct context `this` when resolving reference function signatures', function () {
+    // to make this work, in all functions we must use regular functions and no arrow functions,
+    // and we need to use .call or .apply, passing the `this` context along
+    var fnNumber = function (value) {
+      return 'number:' + value + ', this.value:' + this.value;
+    }
+
+    var fn = typed({
+      'number': typed.reference(function () {
+        // created as a "reference" function just for the unit test...
+        return fnNumber
+      }),
+      'string': typed.reference(function (resolve) {
+        const fnNumberResolved = resolve('number')
+
+        assert.notStrictEqual(fnNumberResolved, fnNumber)
+
+        return function fnString(value) {
+          return fnNumberResolved.call(this, parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number:2, this.value:undefined');
+
+    // verify the reference function has the right context
+    var obj = {
+      value: 42,
+      fn
+    }
+    assert.equal(obj.fn('2'), 'number:2, this.value:42');
   });
 
   it('should pass this function context', () => {

@@ -979,6 +979,23 @@
     function resolveReferences(rawSignaturesMap, self) {
       var signaturesMap = rawSignaturesMap;
 
+      // FIXME: unify this with the resolve function introduced in https://github.com/josdejong/typed-function/pull/135
+      //  in the end this can be `resolve(signatureStr | argsList)`
+      //  and the static version `typed.resolve(fn, signatureStr | argsList)`
+      function resolve(signature) {
+        const fn = rawSignaturesMap[signature]
+
+        if (isReference(fn)) {
+          // return a "proxy" which dynamically resolves the function
+          return function referenceResolver() {
+            return signaturesMap[signature].apply(this, arguments)
+          }
+        } else {
+          // return the raw function itself (fastest)
+          return fn
+        }
+      }
+
       // resolve references, providing "self"
       for (var signature in signaturesMap) {
         if (signaturesMap.hasOwnProperty(signature)) {
@@ -993,7 +1010,7 @@
             // we need to keep .reference to be able to merge typed-functions
             // later on: then we need to resolve the new `self` again.
             var reference = signaturesMap[signature].reference;
-            var resolved = reference.call(null, self);
+            var resolved = reference.call(this, resolve, self);
             resolved.reference = reference;
 
             signaturesMap[signature] = resolved;

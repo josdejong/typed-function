@@ -392,16 +392,39 @@ A typed function can be constructed in two ways:
 
 ### Recursion
 
-The `typed.reference` function can be used to self-reference the typed-function itself:
+The `typed.reference((resolve: (signature: string) => string, self: function) => function)` function can be used to self-reference the typed-function itself. The most efficient way is to resolve the signature that you need at creation time:
 
 ```js
 var sqrt = typed({
   'number': function (value) {
     return Math.sqrt(value);
   },
-  'string': typed.reference(self => {
+  'string': typed.reference(function (resolve, self) {
+    // resolve a specific signature at creation time (most optimal for runtime performance)
+    const sqrtNumber = resolve('number')
+    
+    return function (value) {
+      return sqrtNumber(parseInt(value, 10));
+    }
+  })
+});
+
+// use the typed function
+console.log(sqrt('9')); // output: 3
+```
+
+When the typed-function is needed as a whole, and you basically want to re-dispatch the whole function, you can use the `self` reference: 
+
+```js
+var sqrt = typed({
+  'number': function (value) {
+    return Math.sqrt(value);
+  },
+  'string': typed.reference(function (resolve, self) {
     return function (value) {
       // on the following line we self reference the typed-function
+      // here, `self` will reference to the same function instance as `var sqrt = ...`
+      // this will re-dispatch the whole function 
       return self(parseInt(value, 10));
     }
   })

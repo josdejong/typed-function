@@ -101,7 +101,7 @@ describe('merge', function () {
     });
 
     var fn2 = typed({
-      '...string': typed.reference((self) => {
+      '...string': typed.reference((resolve, self) => {
         return function (values) {
           var newValues = [];
           for (var i = 0; i < values.length; i++) {
