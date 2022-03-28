@@ -390,49 +390,45 @@ A typed function can be constructed in two ways:
     console.log(lenOrNothing(57, 'varieties')) // Output: 0
     ```
 
-### Recursion
+-   `typed.referTo(...string, callback: (resolvedFunctions: ...function) => function)`
 
-The `typed.reference((resolve: (signature: string) => string, self: function) => function)` function can be used to self-reference the typed-function itself. The most efficient way is to resolve the signature that you need at creation time:
+    Resolve references to one or multiple signatures of the typed-function itself. This looks like:
 
-```js
-var sqrt = typed({
-  'number': function (value) {
-    return Math.sqrt(value);
-  },
-  'string': typed.reference(function (resolve, self) {
-    // resolve a specific signature at creation time (most optimal for runtime performance)
-    const sqrtNumber = resolve('number')
-    
-    return function (value) {
-      return sqrtNumber(parseInt(value, 10));
-    }
-  })
-});
+    ```
+    typed.referTo(signature1, signature2, ..., function callback(fn1, fn2, ...) {
+      // ... use the resolved signatures fn1, fn2, ...
+    }) 
+    ```
 
-// use the typed function
-console.log(sqrt('9')); // output: 3
-```
+    Example usage:
+ 
+    ```js
+    const fn = typed({
+      'number': function (value) {
+        return 'Input was a number: ' + value;
+      },
+      'boolean': function (value) {
+        return 'Input was a boolean: ' + value;
+      },
+      'string': typed.referTo('number', 'boolean', (fnNumber, fnBoolean) => {
+        return function fnString(value) {
+          // here we use one of the other signatures of the typed-function directly:
+          return fnNumber(parseInt(value, 10));
+        }
+      })
+    });
+    ```
 
-When the typed-function is needed as a whole, and you basically want to re-dispatch the whole function, you can use the `self` reference: 
+    See also `typed.referToSelf(callback)`.
 
-```js
-var sqrt = typed({
-  'number': function (value) {
-    return Math.sqrt(value);
-  },
-  'string': typed.reference(function (resolve, self) {
-    return function (value) {
-      // on the following line we self reference the typed-function
-      // here, `self` will reference to the same function instance as `var sqrt = ...`
-      // this will re-dispatch the whole function 
-      return self(parseInt(value, 10));
-    }
-  })
-});
+-   `typed.referToSelf(callback: (self) => function)`
 
-// use the typed function
-console.log(sqrt('9')); // output: 3
-```
+    Refer to the typed-function itself. This can be used for recursive calls.
+    Note that this will fully re-dispatch the typed-function, which gives 
+    overhead. If the signature that needs to be invoked is already know, please
+    use `typed.referTo(...)` instead for better performance.
+
+    > In `typed-function@2` it was possible to use `this(...)` to reference the typed-function itself. In `typed-function@v3`, is replaced with the `typed.referTo(...)` and `typed.referToSelf(...)` methods. Typed-functions are unbound in `typed-function@v3` and can be bound to another context if needed.
 
 
 ### Output

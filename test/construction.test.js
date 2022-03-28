@@ -355,13 +355,15 @@ describe('construction', function() {
         ['number', 'string', 'boolean']);
   });
 
-  it('should allow a function to be defined recursively', function () {
+  it('should allow a function refer to itself', function () {
     var fn = typed({
       'number': function (value) {
         return 'number:' + value;
       },
-      'string': typed.reference((resolve, self) => {
+      'string': typed.referToSelf((self) => {
         return function (value) {
+          assert.strictEqual(self, fn)
+
           return self(parseInt(value, 10));
         }
       })
@@ -370,17 +372,21 @@ describe('construction', function() {
     assert.equal(fn('2'), 'number:2');
   });
 
-  it('should allow to resolve function signatures at creation time', function () {
+  it('should allow to resolve function signatures with referTo', function () {
     var fnNumber = function (value) {
       return 'number:' + value;
     }
 
+    var fnBoolean = function (value) {
+      return 'boolean:' + value;
+    }
+
     var fn = typed({
       'number': fnNumber,
-      'string': typed.reference((resolve) => {
-        const fnNumberResolved = resolve('number')
-
+      'boolean': fnBoolean,
+      'string': typed.referTo('number', 'boolean', (fnNumberResolved, fnBooleanResolved) => {
         assert.strictEqual(fnNumberResolved, fnNumber)
+        assert.strictEqual(fnBooleanResolved, fnBoolean)
 
         return function fnString(value) {
           return fnNumberResolved(parseInt(value, 10));
@@ -391,29 +397,55 @@ describe('construction', function() {
     assert.equal(fn('2'), 'number:2');
   });
 
-  it('should allow to resolve reference function signatures at creation time', function () {
-    var fnNumber = function (value) {
-      return 'number:' + value + ', this.value:' + this.value;
-    }
+  it('should throw an exception when a signature is not found with referTo', function () {
+    assert.throws(() => {
+      typed({
+        'string': typed.referTo('number', (fnNumberResolved) => {
+          return function fnString(value) {
+            return fnNumberResolved(parseInt(value, 10));
+          }
+        })
+      });
+    }, /Cannot refer to signature "string": reference signature "number" not found/)
+  })
 
-    var fn = typed({
-      'number': typed.reference(() => {
-        // created as a "reference" function just for the unit test...
-        return fnNumber
-      }),
-      'string': typed.reference((resolve) => {
-        const fnNumberResolved = resolve('number')
+  it('should throw an exception when a signature is not resolved with referTo', function () {
+    assert.throws(() => {
+      typed({
+        'string': typed.referTo('number', (fnNumberResolved) => {
+          return function fnString(value) {
+            return fnNumberResolved(parseInt(value, 10));
+          }
+        }),
+        // we define `number` after we use it in `string` to enforce getting an error
+        'number': typed.referTo(() => {
+          return 'number:' + value;
+        })
+      });
+    }, /Cannot refer to signature "string": signature is referring to a signature "number" which is not yet resolved/)
+  })
 
-        assert.notStrictEqual(fnNumberResolved, fnNumber)
+  it('should throw an exception when a signature in referTo is not a string', function () {
+    assert.throws(() => {
+      typed.referTo(123, () => {});
+    }, /TypeError: Signatures must be strings/);
 
-        return function fnString(value) {
-          return fnNumberResolved(parseInt(value, 10));
-        }
-      })
-    });
+    assert.throws(() => {
+      typed.referTo('number', 123, () => {});
+    }, /TypeError: Signatures must be strings/);
+  })
 
-    assert.equal(fn('2'), 'number:2, this.value:undefined');
-  });
+  it('should throw an exception when the last argument of referTo is not a callback function', function () {
+    assert.throws(() => {
+      typed.referTo('number');
+    }, /TypeError: Callback function expected as last argument/);
+  })
+
+  it('should throw an exception when the first argument of referToSelf is not a callback function', function () {
+    assert.throws(() => {
+      typed.referToSelf(123);
+    }, /TypeError: Callback function expected as first argument/);
+  })
 
   it('should have correct context `this` when resolving reference function signatures', function () {
     // to make this work, in all functions we must use regular functions and no arrow functions,
@@ -423,14 +455,12 @@ describe('construction', function() {
     }
 
     var fn = typed({
-      'number': typed.reference(function () {
+      'number': typed.referTo(function () {
         // created as a "reference" function just for the unit test...
         return fnNumber
       }),
-      'string': typed.reference(function (resolve) {
-        const fnNumberResolved = resolve('number')
-
-        assert.notStrictEqual(fnNumberResolved, fnNumber)
+      'string': typed.referTo('number', function (fnNumberResolved) {
+        assert.strictEqual(fnNumberResolved, fnNumber)
 
         return function fnString(value) {
           return fnNumberResolved.call(this, parseInt(value, 10));

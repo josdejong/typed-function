@@ -976,44 +976,66 @@
       return clone
     }
 
-    function resolveReferences(rawSignaturesMap, self) {
-      var signaturesMap = rawSignaturesMap;
-
-      // FIXME: unify this with the resolve function introduced in https://github.com/josdejong/typed-function/pull/135
-      //  in the end this can be `resolve(signatureStr | argsList)`
-      //  and the static version `typed.resolve(fn, signatureStr | argsList)`
-      function resolve(signature) {
-        const fn = rawSignaturesMap[signature]
-
-        if (isReference(fn)) {
-          // return a "proxy" which dynamically resolves the function
-          return function referenceResolver() {
-            return signaturesMap[signature].apply(this, arguments)
-          }
-        } else {
-          // return the raw function itself (fastest)
-          return fn
-        }
+    /**
+     * Helper function for `resolveReferences` to throw a meaningful error when
+     * there is an issue with a resolved reference
+     * @param {function | undefined} resolvedReference
+     * @param {string} reference
+     * @param {string} signature
+     */
+    function verifyResolvedReference(resolvedReference, reference, signature) {
+      if (!resolvedReference) {
+        throw new TypeError('Cannot refer to signature "' + signature + '": ' +
+          'reference signature "' + reference + '" not found');
       }
+
+      if (
+        typeof resolvedReference !== 'function' && (
+          isReferTo(resolvedReference) ||
+          isReferToSelf(resolvedReference)
+        )
+      ) {
+        throw new TypeError('Cannot refer to signature "' + signature + '": ' +
+          'signature is referring to a signature "' + reference + '" which is not yet resolved');
+      }
+    }
+
+    function resolveReferences(rawSignaturesMap, self) {
+      // we must not make changes in the original signatures map
+      var signaturesMap = shallowClone(rawSignaturesMap);
 
       // resolve references, providing "self"
       for (var signature in signaturesMap) {
         if (signaturesMap.hasOwnProperty(signature)) {
-          var callback = signaturesMap[signature];
+          var fn = signaturesMap[signature];
 
-          if (isReference(callback)) {
-            // shallow clone, do not adjust the original input
-            if (signaturesMap === rawSignaturesMap) {
-              signaturesMap = shallowClone(signaturesMap);
-            }
+          if (isReferTo(fn)) {
+            var resolvedReferences = fn.referTo.references.map(reference => {
+              var resolvedReference = signaturesMap[reference];
 
-            // we need to keep .reference to be able to merge typed-functions
-            // later on: then we need to resolve the new `self` again.
-            var reference = signaturesMap[signature].reference;
-            var resolved = reference.call(this, resolve, self);
-            resolved.reference = reference;
+              verifyResolvedReference(resolvedReference, reference, signature);
+
+              return resolvedReference;
+            })
+            var resolved = fn.referTo.callback.apply(this, resolvedReferences);
+
+            // we need to keep the .referTo object (with references and callback)
+            // to be able to merge typed-functions later on: then we need to
+            // resolve the new signatures again.
+            resolved.referTo = fn.referTo;
 
             signaturesMap[signature] = resolved;
+          }
+
+          if (isReferToSelf(fn)) {
+            var resolvedSelf = fn.referToSelf.callback(self);
+
+            // we need to keep the .referTo object (with references and callback)
+            // to be able to merge typed-functions later on: then we need to
+            // resolve the new signatures again.
+            resolvedSelf.referToSelf = fn.referToSelf;
+
+            signaturesMap[signature] = resolvedSelf;
           }
         }
       }
@@ -1389,23 +1411,78 @@
     }
 
     /**
-     * Create a reference callback function
-     * @param {(self) => function} callback
-     * @returns {{reference: (self) => function}}
+     * Create a reference callback to one or multiple signatures
+     *
+     * Syntax:
+     *
+     *     typed.referTo(signature1, signature2, ..., function callback(fn1, fn2, ...) {
+     *       // ...
+     *     })
+     *
+     * @returns {{referTo: {references: string[], callback}}}
      */
-    function reference(callback) {
-      return {
-        reference: callback
+    function referTo() {
+      const args = Array.prototype.slice.call(arguments) // IE compatible
+
+      const references = args.slice(0, args.length - 1)
+      const callback = args[args.length - 1]
+
+      if (references.some(reference => typeof reference !== 'string')) {
+        throw new TypeError('Signatures must be strings');
       }
+
+      if (typeof callback !== 'function') {
+        throw new TypeError('Callback function expected as last argument');
+      }
+
+      return {
+        referTo: {
+          references,
+          callback
+        }
+      };
     }
 
     /**
-     * Test whether something is an object or function with a .reference property
+     * Create a reference callback to the typed-function itself
+     * @param {(self: function) => function} callback
+     * @returns {{referToSelf: { callback: function }}}
+     */
+    function referToSelf(callback) {
+      if (typeof callback !== 'function') {
+        throw new TypeError('Callback function expected as first argument');
+      }
+
+      return {
+        referToSelf: {
+          callback
+        }
+      };
+    }
+
+    /**
+     * Test whether something is a referTo object, holding a list with reference
+     * signatures and a callback.
      * @param {Object | function} objectOrFn
      * @returns {boolean}
      */
-    function isReference(objectOrFn) {
-      return objectOrFn && typeof objectOrFn.reference === 'function'
+    function isReferTo(objectOrFn) {
+      return objectOrFn &&
+        typeof objectOrFn.referTo === 'object' &&
+        Array.isArray(objectOrFn.referTo.references) &&
+        typeof objectOrFn.referTo.callback === 'function';
+    }
+
+    /**
+     * Test whether something is a referToSelf object, holding a callback where
+     * to pass `self`.
+     * @param {Object | function} objectOrFn
+     * @returns {boolean}
+     */
+    function isReferToSelf(objectOrFn) {
+      return objectOrFn &&
+        typeof objectOrFn.referToSelf === 'object' &&
+        typeof objectOrFn.referToSelf.callback === 'function';
     }
 
     typed = createTypedFunction('typed', {
@@ -1437,7 +1514,8 @@
     typed.throwMismatchError = _onMismatch;
     typed.createError = createError;
     typed.convert = convert;
-    typed.reference = reference;
+    typed.referTo = referTo;
+    typed.referToSelf = referToSelf;
     typed.find = find;
 
     /**

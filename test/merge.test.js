@@ -101,8 +101,10 @@ describe('merge', function () {
     });
 
     var fn2 = typed({
-      '...string': typed.reference((resolve, self) => {
+      '...string': typed.referToSelf((self) => {
         return function (values) {
+          assert.strictEqual(self, fn3); // only holds after merging fn1 and fn2
+
           var newValues = [];
           for (var i = 0; i < values.length; i++) {
             newValues[i] = parseInt(values[i], 10);
