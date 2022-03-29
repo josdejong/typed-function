@@ -1259,96 +1259,137 @@
     }
 
     /**
-     * Retrieve the function name from a set of typed functions,
-     * and check whether the name of all functions match (if given)
-     * @param {function[]} fns
+     * Check if name is (A) new, (B) a match, or (C) a mismatch; and throw
+     * an error in case (C).
+     * @param { string | undefined } nameSoFar
+     * @param { string | undefined } newName
+     * @returns { string } updated name
      */
-    function getName (fns) {
-      var name = '';
-
-      for (var i = 0; i < fns.length; i++) {
-        var fn = fns[i];
-
-        // check whether the names are the same when defined
-        if ((typeof fn.signatures === 'object' || typeof fn.signature === 'string') && fn.name !== '') {
-          if (name === '') {
-            name = fn.name;
-          }
-          else if (name !== fn.name) {
-            var err = new Error('Function names do not match (expected: ' + name + ', actual: ' + fn.name + ')');
-            err.data = {
-              actual: fn.name,
-              expected: name
-            };
-            throw err;
-          }
-        }
+    function checkName (nameSoFar, newName) {
+      if (!nameSoFar) return newName
+      if (newName && newName != nameSoFar) {
+        const err = new Error('Function names do not match (expected: ' +
+          nameSoFar + ', actual: ' + newName + ')')
+        err.data = { actual: newName, expected: nameSoFar }
+        throw err
       }
-
-      return name;
+      return nameSoFar
     }
 
-    // extract and merge all signatures of a list with typed functions
-    function extractSignatures(fns) {
-      var err;
-      var signaturesMap = {};
-
-      function validateUnique(_signature, _fn) {
-        if (signaturesMap.hasOwnProperty(_signature) && _fn !== signaturesMap[_signature]) {
-          err = new Error('Signature "' + _signature + '" is defined twice');
-          err.data = {signature: _signature};
-          throw err;
-          // else: both signatures point to the same function, that's fine
+    /**
+     * Retrieve the implied name from an object with signature keys
+     * and function values, checking whether all value names match
+     * @param { {string: function} } obj
+     */
+    function getObjectName (obj) {
+      let name
+      for (const key in obj) {
+        // Only pay attention to own properties, and only if their values
+        // are typed functions or functions with a signature property
+        if (obj.hasOwnProperty(key) &&
+            (typeof obj[key].signatures === 'object' ||
+             typeof obj[key].signature === 'string')) {
+          name = checkName(name, obj[key].name)
         }
       }
+      return name
+    }
 
-      for (var i = 0; i < fns.length; i++) {
-        var fn = fns[i];
-
-        // test whether this is a typed-function
-        if (typeof fn.signatures === 'object') {
-          // merge the signatures
-          for (var signature in fn.signatures) {
-            if (fn.signatures.hasOwnProperty(signature)) {
-              validateUnique(signature, fn.signatures[signature]);
-              signaturesMap[signature] = fn.signatures[signature];
+    /**
+     * Copy all of the signatures from the second argument into the first,
+     * which is modified by side effect, checking for conflicts
+     */
+    function mergeSignatures (dest, source) {
+      for (const key in source) {
+        if (source.hasOwnProperty(key)) {
+          if (key in dest) {
+            if (source[key] !== dest[key]) {
+              const err = new Error('Signature "' + key + '" is defined twice')
+              err.data = { signature: key }
+              throw err
             }
+            // else: both signatures point to the same function, that's fine
           }
-        }
-        else if (typeof fn.signature === 'string') {
-          validateUnique(fn.signature, fn);
-          signaturesMap[fn.signature] = fn;
-        }
-        else {
-          err = new TypeError('Function is no typed-function (index: ' + i + ')');
-          err.data = {index: i};
-          throw err;
+          dest[key] = source[key]
         }
       }
-
-      return signaturesMap;
     }
 
-    typed = createTypedFunction('typed', {
-      'string, Object': createTypedFunction,
-      'Object': function (signaturesMap) {
-        // find existing name
-        var fns = [];
-        for (var signature in signaturesMap) {
-          if (signaturesMap.hasOwnProperty(signature)) {
-            fns.push(signaturesMap[signature]);
+    /**
+     * Originally the main function was a typed function itself, but then
+     * it might not be able to generate error messages if the client
+     * replaced the type system with different names.
+     *
+     * Main entry: typed([name], functions/objects with signatures...)
+     *
+     * Assembles and returns a new typed-function from the given items
+     * that provide signatures and implementations, each of which may be
+     * * a plain object mapping (string) signatures to implementing functions,
+     * * a previously constructed typed function, or
+     * * any other single function with a string-valued property `signature`.
+
+     * The name of the resulting typed-function will be given by the
+     * string-valued name argument if present, or if not, by the name
+     * of any of the arguments that have one, as long as any that do are
+     * consistent with each other. If no name is specified, the name will be
+     * an empty string.
+     *
+     * @param {string} name [optional]
+     * @param {(function|object)[]} signature providers
+     * @returns {typed-function}
+     */
+    typed = function(maybeName) {
+      const named = typeof maybeName === 'string'
+      let name = named ? maybeName : ''
+      let start = named ? 1 : 0
+      let allSignatures = {}
+      for (let i = start; i < arguments.length; ++i) {
+        const item = arguments[i]
+        let theseSignatures
+        let thisName
+        if (typeof item === 'function') {
+          thisName = item.name
+          /* Case 1: a single function with a string signature property */
+          if (typeof item.signature === 'string') {
+            theseSignatures = {}
+            theseSignatures[item.signature] = item
+          }
+          /* Case 2: an existing typed function */
+          else if (typeof item.signatures === 'object') {
+            theseSignatures = item.signatures
+          } else {
+            /* Oops, not a function we can deal with */
+            const err = new TypeError(
+              "Cannot merge a function without a 'signature' property " +
+              '(index ' + i + ', named: ' + thisName + ')')
+            err.data = { index: i, name: thisName }
+            throw err
           }
         }
-        var name = getName(fns);
-        return createTypedFunction(name, signaturesMap);
-      },
-      '...Function': function (fns) {
-        return createTypedFunction(getName(fns), extractSignatures(fns));
-      },
-      'string, ...Function': function (name, fns) {
-        return createTypedFunction(name, extractSignatures(fns));
+        /* Case 3: Plain object, with keys = signatures, values = functions */
+        else if (typeof item === 'object' &&
+                 (!(item.constructor) || item.constructor.name === 'Object')) {
+          theseSignatures = item
+          if (!named) {
+            thisName = getObjectName(item)
+          }
+        } else {
+          /* Oops, not a type we can deal with */
+          const err = new TypeError(
+            'Can only create typed-functions from functions, or objects ' +
+            'with signatures as keys and functions as values (not "' +
+            item.toString() + '" at index ' + i + ')')
+          err.data = { index: i, item: item }
+          throw err
+        }
+        /* Item is ok and we have the signatures and maybe a name */
+        if (!named) {
+          name = checkName(name, thisName)
+        }
+        mergeSignatures(allSignatures, theseSignatures)
       }
-    });
+      return createTypedFunction(name || '', allSignatures)
+    }
 
     typed.create = create;
     typed.types = _types;

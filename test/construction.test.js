@@ -69,6 +69,11 @@ describe('construction', function() {
     assert.equal(fn.name, '');
   });
 
+  it('should throw if attempting to construct from other types', () => {
+    assert.throws(() => typed(1), TypeError)
+    assert.throws(() => typed('myfunc', 'implementation'), TypeError)
+  })
+
   it('should compose a function with zero arguments', function() {
     var signatures = {
       '': function () {
