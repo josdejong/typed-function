@@ -397,7 +397,7 @@ A typed function can be constructed in two ways:
     ```
     typed.referTo(signature1, signature2, ..., function callback(fn1, fn2, ...) {
       // ... use the resolved signatures fn1, fn2, ...
-    }) 
+    });
     ```
 
     Example usage:
@@ -412,7 +412,13 @@ A typed function can be constructed in two ways:
       },
       'string': typed.referTo('number', 'boolean', (fnNumber, fnBoolean) => {
         return function fnString(value) {
-          // here we use one of the other signatures of the typed-function directly:
+          // here we use the signatures of the typed-function directly:
+          if (value === 'true') {
+            return fnBoolean(true);
+          }
+          if (value === 'false') {
+            return fnBoolean(false);
+          }
           return fnNumber(parseInt(value, 10));
         }
       })
