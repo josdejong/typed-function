@@ -89,7 +89,41 @@ describe('merge', function () {
     assert.equal(typed4.name, 'fn2');
   });
 
-  it('should allow recursive across merged signatures', function () {
+  it('should be able to use referTo when merging signatures from multiple typed-functions', function () {
+    function add1(a, b) {
+      return 'add1:' + (a + b);
+    }
+
+    function add2(a, b) {
+      return 'add2:' + (a + b);
+    }
+
+    var fn1 = typed({
+      'number,number': add1,
+      'string': typed.referTo('number,number', (fnNumberNumber) => {
+        return function (valuesString) {
+          const values = valuesString.split(',').map(Number);
+          return fnNumberNumber.apply(null, values);
+        }
+      })
+    });
+
+    var fn2 = typed({
+      'number,number': add2
+    });
+
+    assert.equal(fn1('2,3'), 'add1:5');
+    assert.equal(fn2(2, 3), 'add2:5');
+
+    var fn3 = typed({
+      ...fn1.signatures,
+      ...fn2.signatures, // <-- will override the 'number,number' signature of fn1 with the one of fn2
+    });
+
+    assert.equal(fn3('2,3'), 'add2:5');
+  });
+
+  it('should be able to use referToSelf across merged signatures', function () {
     var fn1 = typed({
       '...number': function (values) {
         var sum = 0;

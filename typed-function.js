@@ -1020,8 +1020,9 @@
             var resolved = fn.referTo.callback.apply(this, resolvedReferences);
 
             // we need to keep the .referTo object (with references and callback)
-            // to be able to merge typed-functions later on: then we need to
-            // resolve the new signatures again.
+            // to be able to merge typed-functions later on: then we may need to
+            // resolve the new signatures again, though this is only the case
+            // when replacing an existing signature with another one.
             resolved.referTo = fn.referTo;
 
             signaturesMap[signature] = resolved;
