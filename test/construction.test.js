@@ -500,20 +500,66 @@ describe('construction', function() {
   it('should pass this function context', () => {
     var getProperty = typed({
       'string': function (key) {
-        return this[key]
+        return this[key];
       }
-    })
+    });
 
     assert.equal(getProperty('value'), undefined)
 
     var obj = {
       value: 42,
       getProperty
-    }
+    };
 
-    assert.equal(obj.getProperty('value'), 42)
+    assert.equal(obj.getProperty('value'), 42);
 
-    var boundGetProperty = getProperty.bind({ otherValue: 123 })
-    assert.equal(boundGetProperty('otherValue'), 123)
+    var boundGetProperty = getProperty.bind({ otherValue: 123 });
+    assert.equal(boundGetProperty('otherValue'), 123);
+  });
+
+  it('should throw a deprecation warning when self reference via `this(...)` is used', () => {
+    assert.throws(() => {
+      typed({
+        'number': function (value) {
+          return value * value;
+        },
+        'string': function (value) {
+          return this(parseFloat(value));
+        }
+      });
+    }, /SyntaxError: Using `this` to self-reference a function is deprecated since typed-function@3\. Use typed\.referTo and typed\.referToSelf instead\./);
+  });
+
+  it('should not throw a deprecation warning on `this(...)` when the warning is turned off', () => {
+    var typed2 = typed.create();
+    typed2.warnAgainstDeprecatedThis = false;
+
+    var deprecatedSquare = typed2({
+      'number': function (value) {
+        return value * value;
+      },
+      'string': function (value) {
+        return this(parseFloat(value));
+      }
+    });
+
+    assert.equal(deprecatedSquare(3), 9);
+
+    assert.throws(() => {
+      deprecatedSquare('3');
+    }, /TypeError: this is not a function/);
+  });
+
+  it('should throw a deprecation warning when self reference via `this.signatures` is used', () => {
+    assert.throws(() => {
+      var square = typed({
+        'number': function (value) {
+          return value * value;
+        },
+        'string': function (value) {
+          return this.signatures['number'](parseFloat(value));
+        }
+      });
+    }, /SyntaxError: Using `this` to self-reference a function is deprecated since typed-function@3\. Use typed\.referTo and typed\.referToSelf instead\./);
   });
 });

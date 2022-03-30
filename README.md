@@ -450,7 +450,7 @@ A typed function can be constructed in two ways:
           if (value === 'false') {
             return fnBoolean(false);
           }
-          return fnNumber(parseInt(value, 10));
+          return fnNumber(parseFloat(value));
         }
       })
     });
@@ -467,6 +467,9 @@ A typed function can be constructed in two ways:
 
     > In `typed-function@2` it was possible to use `this(...)` to reference the typed-function itself. In `typed-function@v3`, is replaced with the `typed.referTo(...)` and `typed.referToSelf(...)` methods. Typed-functions are unbound in `typed-function@v3` and can be bound to another context if needed.
 
+-   `typed.warnAgainstDeprecatedThis: boolean`
+
+    Since `typed-function` v3, self-referencing a typed function using `this(...)` or `this.signatures` has been deprecated and replaced with the functions `typed.referTo` and `typed.referToSelf`. By default, all function bodies will be scanned against this deprecated usage pattern and an error will be thrown when encountered. To disable this validation step, change this option to `false`.
 
 ### Output
 

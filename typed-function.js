@@ -1125,6 +1125,30 @@
     }
 
     /**
+     * Validate whether any of the function bodies contains a self-reference
+     * usage like `this(...)` or `this.signatures`. This self-referencing is
+     * deprecated since typed-function v3. It has been replaced with
+     * the functions typed.referTo and typed.referToSelf.
+     * @param {Object.<string, function>} signaturesMap
+     */
+    function validateDeprecatedThis(signaturesMap) {
+      // TODO: remove this deprecation warning logic some day (it's introduced in v3)
+
+      // match occurrences like 'this(' and 'this.signatures'
+      var deprecatedThisRegex = /\bthis(\(|\.signatures\b)/;
+
+      Object.keys(signaturesMap).forEach(signature => {
+        var fn = signaturesMap[signature];
+
+        if (deprecatedThisRegex.test(fn.toString())) {
+          throw new SyntaxError('Using `this` to self-reference a function ' +
+            'is deprecated since typed-function@3. ' +
+            'Use typed.referTo and typed.referToSelf instead.');
+        }
+      });
+    }
+
+    /**
      * Create a typed function
      * @param {String} name               The name for the typed function
      * @param {Object.<string, function>} signaturesMap
@@ -1137,6 +1161,10 @@
     function createTypedFunction(name, signaturesMap) {
       if (Object.keys(signaturesMap).length === 0) {
         throw new SyntaxError('No signatures provided');
+      }
+
+      if (typed.warnAgainstDeprecatedThis) {
+        validateDeprecatedThis(signaturesMap);
       }
 
       // parse the signatures, and check for conflicts
@@ -1610,6 +1638,7 @@
     typed.referTo = referTo;
     typed.referToSelf = referToSelf;
     typed.find = find;
+    typed.warnAgainstDeprecatedThis = true;
 
     /**
      * add a type
