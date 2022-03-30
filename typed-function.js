@@ -345,6 +345,15 @@
     }
 
     /**
+     * Test whether a parameter handles 'any'
+     * @param {Param} param
+     * @return {boolean} Returns true when at least one of the types is any
+     */
+    function hasAny(param) {
+      return param.types.some(t => getTypeName(t) === 'any')
+    }
+
+    /**
      * Test whether a parameter contains conversions
      * @param {Param} param
      * @return {boolean} Returns true when at least one of the parameters
@@ -646,6 +655,20 @@
       return min;
     }
 
+    // When we compare parameters for sorting signatures, we will judge them
+    // by a number of metrics in priority order. Here they are, in the
+    // order they will be checked. (The first matric that distinguishes the
+    // two parameters takes precedence, and the parameter with the lower
+    // value for that metric precedes the one with the higher value.)
+
+    const parameterMetrics = [
+      hasAny, // 'any' parameters are the least preferred
+      par => par.restParam, // prefer non-rest to rest parameters
+      hasConversions,
+      getLowestTypeIndex,
+      getLowestConversionIndex
+    ]
+
     /**
      * Compare two params
      * @param {Param} param1
@@ -655,29 +678,28 @@
      *                  or zero when both are equal
      */
     function compareParams (param1, param2) {
-      var c;
-
-      // compare having a rest parameter or not
-      c = param1.restParam - param2.restParam;
-      if (c !== 0) {
-        return c;
+      // We compare a number of metrics on a param in turn:
+      for (const metric of parameterMetrics) {
+        const c = metric(param1) - metric(param2)
+        if (c !== 0) return c
       }
 
-      // compare having conversions or not
-      c = hasConversions(param1) - hasConversions(param2);
-      if (c !== 0) {
-        return c;
-      }
-
-      // compare the index of the types
-      c = getLowestTypeIndex(param1) - getLowestTypeIndex(param2);
-      if (c !== 0) {
-        return c;
-      }
-
-      // compare the index of any conversion
-      return getLowestConversionIndex(param1) - getLowestConversionIndex(param2);
+      // Don't have a basis for preference
+      return 0
     }
+
+    // Similarly, when we compare two signatures for determining in what order
+    // they should be checked against an incoming argument list for dispatch,
+    // we compare them by a sequence of metrics in priority order.
+    const signatureMetrics = [
+      pars => hasRestParam(pars) && hasAny(last(pars)),
+      pars => summap(pars, hasAny), // minimize number of 'any' parameters
+      pars => hasRestParam(pars) && hasConversions(last(pars)),
+      pars => summap(pars, hasConversions), // minimize conversions used
+      hasRestParam,
+      // shorter first without rest param, longer first with rest:
+      pars => pars.length * (hasRestParam(pars) ? -1 : 1)
+    ]
 
     /**
      * Compare two signatures
@@ -688,34 +710,33 @@
      *                  or zero when both are equal
      */
     function compareSignatures (signature1, signature2) {
-      var len = Math.min(signature1.params.length, signature2.params.length);
-      var i;
-      var c;
-
-      // compare whether the params have conversions at all or not
-      c = signature1.params.some(hasConversions) - signature2.params.some(hasConversions)
-      if (c !== 0) {
-        return c;
+      const pars1 = signature1.params
+      const pars2 = signature2.params
+      for (const metric of signatureMetrics) {
+        const c = metric(pars1) - metric(pars2)
+        if (c !== 0) return c
       }
 
-      // next compare whether the params have conversions one by one
-      for (i = 0; i < len; i++) {
-        c = hasConversions(signature1.params[i]) - hasConversions(signature2.params[i]);
-        if (c !== 0) {
-          return c;
-        }
+      // Signatures are identical in each of the above metrics.
+      // In particular, they are the same length.
+      // We can therefore compare the parameters one by one.
+      // First we count which signature has more preferred parameters.
+      const comparisons = []
+      for (let i = 0; i < pars1.length; ++i) {
+        comparisons.push(compareParams(pars1[i], pars2[i]))
+      }
+      const tc = summap(comparisons, c => (c < 0) ? -1 : (c > 0) ? 1 : 0)
+      if (tc !== 0) return tc
+      // They have the same number of preferred parameters, so go by the
+      // earliest parameter in which we have a preference.
+      // In other words, dispatch is driven somewhat more by earlier
+      // parameters than later ones.
+      for (const c of comparisons) {
+        if (c !== 0) return c
       }
 
-      // compare the types of the params one by one
-      for (i = 0; i < len; i++) {
-        c = compareParams(signature1.params[i], signature2.params[i]);
-        if (c !== 0) {
-          return c;
-        }
-      }
-
-      // compare the number of params
-      return signature1.params.length - signature2.params.length;
+      // It's a tossup:
+      return 0
     }
 
     /**
@@ -1261,6 +1282,16 @@
      */
     function last(arr) {
       return arr[arr.length - 1];
+    }
+
+    /**
+     * Return the sum of the values of the function on the array
+     * @param {Array} arr
+     * @param {function} f - should return number
+     * @return {number} total of f(arr[i]) for all indices i
+     */
+    function summap(arr, f) {
+      return arr.reduce((t, a) => t + f(a), 0)
     }
 
     /**

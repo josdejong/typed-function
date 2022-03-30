@@ -160,6 +160,37 @@ The following type expressions are supported:
 - Variable arguments: `...number`
 - Any type: `any`
 
+### Dispatch
+
+When a typed function is called, an implementation with a matching signature
+is called, where conversions may be applied to actual arguments in order to
+find a match.
+
+Among all matching signatures, the one to execute is chosen by the following
+preferences, in order of priority:
+
+* one that does not have an `...any` parameter
+* one with the fewest `any` parameters
+* one that does not use conversions to match a rest parameter
+* one with the fewest conversions needed to match overall
+* one with no rest parameter
+* If there's a rest parameter, the one with the most non-rest parameters
+* The one with the largest number of preferred parameters
+* The one with the earliest preferred parameter
+
+When this process gets to the point of comparing individual parameters,
+the preference between parameters is determined by the following, in
+priority order:
+
+* All specific types are preferred to the 'any' type
+* All directly matching types are preferred to conversions
+* Types earlier in the list of known types are preferred
+* Among conversions, ones earlier in the list are preferred
+
+If none of these aspects produces a preference, then in those contexts in
+which Array.sort is stable, the order implementations were listed when
+the typed-function was created breaks the tie. Otherwise the dispatch may
+select any of the "tied" implementations.
 
 ## API
 
