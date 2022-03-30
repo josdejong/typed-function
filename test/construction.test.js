@@ -406,7 +406,7 @@ describe('construction', function() {
           }
         })
       });
-    }, /Cannot refer to signature "string": reference signature "number" not found/)
+    }, /Cannot resolve reference in signature "string": reference signature "number" not found/)
   })
 
   it('should throw an exception when a signature is not resolved with referTo', function () {
@@ -422,7 +422,7 @@ describe('construction', function() {
           return 'number:' + value;
         })
       });
-    }, /Cannot refer to signature "string": signature is referring to a signature "number" which is not yet resolved/)
+    }, /Cannot resolve reference in signature "string": signature is referring to a signature "number" which is not yet resolved/)
   })
 
   it('should throw an exception when a signature in referTo is not a string', function () {
@@ -496,5 +496,17 @@ describe('construction', function() {
 
     var boundGetProperty = getProperty.bind({ otherValue: 123 })
     assert.equal(boundGetProperty('otherValue'), 123)
+  })
+
+  it('test', () => {
+    const refer = typed({
+      'number|string': arg => 'wow: ' + arg,
+      'boolean': typed.referTo('number|string', refS => b => {
+        if (b) return refS('true that!')
+        return refS('no way...')
+      })
+    })
+
+    console.log(refer.signatures)
   })
 });

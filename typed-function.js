@@ -985,7 +985,7 @@
      */
     function verifyResolvedReference(resolvedReference, reference, signature) {
       if (!resolvedReference) {
-        throw new TypeError('Cannot refer to signature "' + signature + '": ' +
+        throw new TypeError('Cannot resolve reference in signature "' + signature + '": ' +
           'reference signature "' + reference + '" not found');
       }
 
@@ -995,7 +995,7 @@
           isReferToSelf(resolvedReference)
         )
       ) {
-        throw new TypeError('Cannot refer to signature "' + signature + '": ' +
+        throw new TypeError('Cannot resolve reference in signature "' + signature + '": ' +
           'signature is referring to a signature "' + reference + '" which is not yet resolved');
       }
     }
