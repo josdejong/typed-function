@@ -372,7 +372,7 @@ describe('construction', function() {
     assert.equal(fn('2'), 'number:2');
   });
 
-  it('should allow to resolve function signatures with referTo', function () {
+  it('should allow to resolve multiple function signatures with referTo', function () {
     var fnNumber = function (value) {
       return 'number:' + value;
     }
@@ -395,6 +395,25 @@ describe('construction', function() {
     });
 
     assert.equal(fn('2'), 'number:2');
+  });
+
+  it('should resolve referTo signatures on the resolved signatures, not exact matches', function () {
+    var fnNumberOrBoolean = function (value) {
+      return 'number or boolean:' + value;
+    }
+
+    var fn = typed({
+      'number|boolean': fnNumberOrBoolean,
+      'string': typed.referTo('number', (fnNumberResolved) => {
+        assert.strictEqual(fnNumberResolved, fnNumberOrBoolean)
+
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number or boolean:2');
   });
 
   it('should throw an exception when a signature is not found with referTo', function () {
@@ -496,17 +515,5 @@ describe('construction', function() {
 
     var boundGetProperty = getProperty.bind({ otherValue: 123 })
     assert.equal(boundGetProperty('otherValue'), 123)
-  })
-
-  it('test', () => {
-    const refer = typed({
-      'number|string': arg => 'wow: ' + arg,
-      'boolean': typed.referTo('number|string', refS => b => {
-        if (b) return refS('true that!')
-        return refS('no way...')
-      })
-    })
-
-    console.log(refer.signatures)
-  })
+  });
 });
