@@ -39,6 +39,26 @@ describe('merge', function () {
     assert.equal(typed3.name, 'typed3');
   });
 
+  it('should merge a typed function with an object of signatures', () => {
+    const typed1 = typed({boolean: b => !b, string: s => '!' + s})
+    const typed2 = typed(typed1, {number: n => 1 - n})
+
+    assert.equal(typed2(true), false)
+    assert.equal(typed2('true'), '!true')
+    assert.equal(typed2(1), 0)
+  })
+
+  it('should merge two objects of signatures', () => {
+    const typed1 = typed(
+      {boolean: b => !b, string: s => '!' + s},
+      {number: n => 1 - n}
+    )
+
+    assert.equal(typed1(true), false)
+    assert.equal(typed1('true'), '!true')
+    assert.equal(typed1(1), 0)
+  })
+
   it('should not copy conversions as exact signatures', function () {
     var typed2 = typed.create();
     typed2.conversions = [
