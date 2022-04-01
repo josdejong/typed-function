@@ -104,7 +104,7 @@
     var typed = {
       types: _types,
       conversions: _conversions,
-      ignore: _ignore,
+      ignore: _ignore
     };
 
     /**
@@ -166,6 +166,16 @@
     }
 
     /**
+     * Check if an entity is a typed function created by any instance
+     * @param {any} entity
+     * @returns {boolean}
+     */
+    function isTypedFunction(entity) {
+      return entity && typeof entity === 'function' &&
+        '_isTypedFunction' in entity;
+    }
+
+    /**
      * Find a specific signature from a (composed) typed function, for example:
      *
      *   typed.find(fn, ['number', 'string'])
@@ -181,7 +191,7 @@
      *                                        is found.
      */
     function find (fn, signature) {
-      if (!fn.signatures) {
+      if (!isTypedFunction(fn)) {
         throw new TypeError('Function is no typed-function');
       }
 
@@ -1354,7 +1364,7 @@
         // Only pay attention to own properties, and only if their values
         // are typed functions or functions with a signature property
         if (obj.hasOwnProperty(key) &&
-            (typeof obj[key].signatures === 'object' ||
+            (isTypedFunction(obj[key]) ||
              typeof obj[key].signature === 'string')) {
           name = checkName(name, obj[key].name)
         }
@@ -1382,7 +1392,6 @@
       }
     }
 
-    const saveTyped = typed
     /**
      * Originally the main function was a typed function itself, but then
      * it might not be able to generate error messages if the client
@@ -1420,7 +1429,7 @@
           if (typeof item.signature === 'string') {
             // Case 1: Ordinary function with a string 'signature' property
             theseSignatures[item.signature] = item
-          } else if (typeof item.signatures === 'object') {
+          } else if (isTypedFunction(item)) {
             // Case 2: Existing typed function
             theseSignatures = item.signatures
           }
@@ -1458,6 +1467,7 @@
     typed.createError = createError;
     typed.convert = convert;
     typed.find = find;
+    typed.isTypedFunction = isTypedFunction;
 
     /**
      * add a type
@@ -1500,14 +1510,6 @@
 
       typed.conversions.push(conversion);
     };
-
-    /**
-     * Check if an entity is a typed function created by this instance
-     * @param {any} entity
-     * @returns {boolean}
-     */
-    typed.isTypedFunction = entity => entity && typeof entity === 'function' &&
-      '_isTypedFunction' in entity
 
     return typed;
   }
