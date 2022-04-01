@@ -196,25 +196,30 @@ select any of the "tied" implementations.
 
 ### Construction
 
-A typed function can be constructed in two ways:
+```
+typed([name: string], ...Object.<string, function>|function)
+```
+A typed function can be constructed from an optional name and any number of
+(additional) arguments that supply the implementations for various
+signatures. Each of these further arguments must be one of the following:
 
--   Create from an object with one or multiple signatures:
+-   An object with one or multiple signatures, i.e. a plain object
+    with string keys, each of which names a signature, and functions as
+    the values of those keys.
 
-    ```
-    typed(signatures: Object.<string, function>) : function
-    typed(name: string, signatures: Object.<string, function>) : function
-    ```
+-   A previously constructed typed function, in which case all of its
+    signatures and corresponding implementations are merged into the new
+    typed function.
 
--   Merge multiple typed functions into a new typed function:
+-   A plain function with a `signature` property whose value is a string
+    giving that function's signature.
 
-    ```
-    typed(functions: ...function) : function
-    typed(name: string, functions: ...function) : function
-    ```
+The name, if specified, must be the first argument. If not specified, the new
+typed-function's name is inherited from the arguments it is composed from,
+as long as any that have names agree with one another.
 
-    Each function in `functions` can be either a typed function created before,
-    or a plain function having a `signature` property.
-
+If the same signature is specified by the collection of arguments more than
+once with different implementations, an error will be thrown.
 
 ### Methods
 

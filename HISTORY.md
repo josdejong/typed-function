@@ -1,6 +1,13 @@
 # History
 
 
+## not yet published, version 2.1.1
+
+- Refactored the `typed` constructor to be more flexible, accepting a
+  combination of multiple typed functions or objects. And internally refactored
+  the constructor to not use typed-function itself (#142). Thanks @gwhitney.
+
+
 ## 2022-03-11, version 2.1.0
 
 - Implemented configurable callbacks `typed.createError` and `typed.onMismatch`. 
