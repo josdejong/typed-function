@@ -12,12 +12,12 @@ describe('isTypedFunction', function () {
   });
 
   it('should distinguish typed functions from others', () => {
-    assert(typed.isTypedFunction(fn))
+    assert.ok(typed.isTypedFunction(fn))
     assert.strictEqual(typed.isTypedFunction(a), false)
     assert.strictEqual(typed.isTypedFunction(7), false)
   })
 
-  it('should only recognize typed functions from the same typed universe', () => {
+  it('recognize typed functions from any typed instance', () => {
     const parallel = typed.create()
     const fn2 = parallel('fn', {
       'number': b,
@@ -25,8 +25,8 @@ describe('isTypedFunction', function () {
     })
 
     assert.ok(parallel.isTypedFunction(fn2))
-    assert.strictEqual(parallel.isTypedFunction(fn), false)
-    assert.strictEqual(typed.isTypedFunction(fn2), false)
+    assert.ok(parallel.isTypedFunction(fn))
+    assert.ok(typed.isTypedFunction(fn2))
   })
 
 })

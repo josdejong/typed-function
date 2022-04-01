@@ -30,7 +30,7 @@ describe('resolve', function () {
     ]
     for (example of examples) {
       assert.strictEqual(
-        typed.resolve(fn, example).implementation.apply(fn, example),
+        fn.resolve(example).implementation.apply(null, example),
         fn.apply(fn, example)
       )
     }
