@@ -68,6 +68,14 @@
   // create a new instance of typed-function
   function create () {
     // data type tests
+
+    /**
+     * Returns true if the argument is a non-null "plain" object
+     */
+    function isPlainObject (x) {
+      return typeof x === 'object' && x !== null && x.constructor === Object
+    }
+
     var _types = [
       { name: 'number',    test: function (x) { return typeof x === 'number' } },
       { name: 'string',    test: function (x) { return typeof x === 'string' } },
@@ -76,9 +84,7 @@
       { name: 'Array',     test: Array.isArray },
       { name: 'Date',      test: function (x) { return x instanceof Date } },
       { name: 'RegExp',    test: function (x) { return x instanceof RegExp } },
-      { name: 'Object',    test: function (x) {
-        return typeof x === 'object' && x !== null && x.constructor === Object
-      }},
+      { name: 'Object',    test: isPlainObject },
       { name: 'null',      test: function (x) { return x === null } },
       { name: 'undefined', test: function (x) { return x === undefined } }
     ];
@@ -1340,54 +1346,44 @@
      */
     typed = function(maybeName) {
       const named = typeof maybeName === 'string'
+      const start = named ? 1 : 0
       let name = named ? maybeName : ''
-      let start = named ? 1 : 0
-      let allSignatures = {}
+      const allSignatures = {}
       for (let i = start; i < arguments.length; ++i) {
         const item = arguments[i]
-        let theseSignatures
+        let theseSignatures = {}
         let thisName
         if (typeof item === 'function') {
           thisName = item.name
-          /* Case 1: a single function with a string signature property */
           if (typeof item.signature === 'string') {
-            theseSignatures = {}
+            // Case 1: Ordinary function with a string 'signature' property
             theseSignatures[item.signature] = item
-          }
-          /* Case 2: an existing typed function */
-          else if (typeof item.signatures === 'object') {
+          } else if (typeof item.signatures === 'object') {
+            // Case 2: Existing typed function
             theseSignatures = item.signatures
-          } else {
-            /* Oops, not a function we can deal with */
-            const err = new TypeError(
-              "Cannot merge a function without a 'signature' property " +
-              '(index ' + i + ', named: ' + thisName + ')')
-            err.data = { index: i, name: thisName }
-            throw err
           }
-        }
-        /* Case 3: Plain object, with keys = signatures, values = functions */
-        else if (typeof item === 'object' &&
-                 (!(item.constructor) || item.constructor.name === 'Object')) {
+        } else if (isPlainObject(item)) {
+          // Case 3: Plain object, assume keys = signatures, values = functions
           theseSignatures = item
           if (!named) {
             thisName = getObjectName(item)
           }
-        } else {
-          /* Oops, not a type we can deal with */
+        }
+
+        if (Object.keys(theseSignatures).length === 0) {
           const err = new TypeError(
-            'Can only create typed-functions from functions, or objects ' +
-            'with signatures as keys and functions as values (not "' +
-            item.toString() + '" at index ' + i + ')')
-          err.data = { index: i, item: item }
+            `Argument to 'typed' at index ${i} is not a (typed) function, ` +
+            'nor an object with signatures as keys and functions as values.')
+          err.data = { index: i, argument: item }
           throw err
         }
-        /* Item is ok and we have the signatures and maybe a name */
+
         if (!named) {
           name = checkName(name, thisName)
         }
         mergeSignatures(allSignatures, theseSignatures)
       }
+
       return createTypedFunction(name || '', allSignatures)
     }
 

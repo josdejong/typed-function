@@ -4,10 +4,16 @@ var typed = require('../typed-function');
 
 describe('construction', function() {
 
+  it('should throw an error when not providing any arguments', function() {
+    assert.throws(function () {
+      typed();
+    }, /Error: No signatures provided/);
+  });
+
   it('should throw an error when not providing any signatures', function() {
     assert.throws(function () {
       typed({});
-    }, /Error: No signatures provided/);
+    }, /Error: Argument .*typed.* 0 .* not/);
   });
 
   it('should create a named function', function() {
