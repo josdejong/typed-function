@@ -181,7 +181,7 @@
      *                                        is found.
      */
     function find (fn, signature) {
-      var foundFn = findOrNull(fn, signature);
+      var foundFn = findOrNull(fn?.signatures, signature);
 
       if (foundFn) {
         return foundFn;
@@ -191,21 +191,21 @@
     }
 
     /**
-     * Find a specific signature from a (composed) typed function, for example:
+     * Find a specific signature from a signature map, for example:
      *
-     *   typed.find(fn, ['number', 'string'])
-     *   typed.find(fn, 'number, string')
+     *   typed.findOrNull(signatures, ['number', 'string'])
+     *   typed.findOrNull(signatures, 'number, string')
      *
-     * Function find only works for exact matches, not with conversions.
+     * Function findOrNull only works for exact matches, not with conversions.
      *
-     * @param {Function | {name?: string, signatures: Object}} fn A typed-function
+     * @param {Object.<string,function>} signatures  A signature map
      * @param {string | string[]} signature   Signature to be found, can be
      *                                        an array or a comma separated string.
      * @return {Function | null}              Returns the matching signature, or
      *                                        null when no signature is found.
      */
-    function findOrNull (fn, signature) {
-      if (!fn.signatures) {
+    function findOrNull (signatures, signature) {
+      if (!signatures) {
         throw new TypeError('Function is no typed-function');
       }
 
@@ -227,7 +227,7 @@
       var str = arr.join(',');
 
       // find an exact match
-      var match = fn.signatures[str];
+      var match = signatures[str];
       if (match) {
         return match;
       }
@@ -261,41 +261,42 @@
     }
 
     /**
+     * Stringify a parameter in a normalized way
+     * @param {Param} param
+     * @return {string}
+     */
+    function stringifyParam (param) {
+      const typeNames = param.types.map(getTypeName);
+      return (param.restParam ? '...' : '') + typeNames.join('|');
+    }
+
+    /**
      * Stringify parameters in a normalized way
      * @param {Param[]} params
      * @return {string}
      */
     function stringifyParams (params) {
-      return params
-          .map(function (param) {
-            var typeNames = param.types.map(getTypeName);
-
-            return (param.restParam ? '...' : '') + typeNames.join('|');
-          })
-          .join(',');
+      return params.map(stringifyParam).join(',');
     }
 
     /**
      * Parse a parameter, like "...number | boolean"
      * @param {string} param
-     * @param {ConversionDef[]} conversions
      * @return {Param} param
      */
-    function parseParam (param, conversions) {
+    function parseParam (param) {
       var restParam = param.indexOf('...') === 0;
-      var types = (!restParam)
+      var typeSpecifier = (!restParam)
           ? param
           : (param.length > 3)
               ? param.slice(3)
               : 'any';
 
-      var typeNames = types.split('|').map(trim)
+      var typeNames = typeSpecifier.split('|').map(trim)
           .filter(notEmpty)
           .filter(notIgnore);
 
-      var matchingConversions = filterConversions(conversions, typeNames);
-
-      var exactTypes = typeNames.map(function (typeName) {
+      var types = typeNames.map(function (typeName) {
         var type = findTypeByName(typeName);
 
         return {
@@ -307,6 +308,19 @@
         };
       });
 
+      return { types, restParam }
+    }
+
+    /**
+     * Expands a parsed parameter by the adding the types allowed
+     * by the given conversions.
+     * @param {{ types: Type[], restParam: boolean }} param
+     * @param {ConversionDef[]} conversions
+     * @return {Param} param
+     */
+    function expandParam (param, conversions = []) {
+      var typeNames = param.types.map(t => t.name)
+      var matchingConversions = filterConversions(conversions, typeNames);
       var convertibleTypes = matchingConversions.map(function (conversion) {
         var type = findTypeByName(conversion.from);
 
@@ -320,8 +334,8 @@
       });
 
       return {
-        types: exactTypes.concat(convertibleTypes),
-        restParam: restParam
+        types: param.types.concat(convertibleTypes),
+        restParam: param.restParam
       };
     }
 
@@ -330,10 +344,9 @@
      * like "number | boolean, ...string"
      * @param {string} signature
      * @param {function} fn
-     * @param {ConversionDef[]} conversions
      * @return {Signature | null} signature
      */
-    function parseSignature (signature, fn, conversions) {
+    function parseSignature (signature, fn) {
       var params = [];
 
       if (signature.trim() !== '') {
@@ -341,7 +354,7 @@
             .split(',')
             .map(trim)
             .map(function (param, index, array) {
-              var parsedParam = parseParam(param, conversions);
+              var parsedParam = parseParam(param);
 
               if (parsedParam.restParam && (index !== array.length - 1)) {
                 throw new SyntaxError('Unexpected rest parameter "' + param + '": ' +
@@ -900,28 +913,6 @@
     }
 
     /**
-     * Convert an array with signatures into a map with signatures,
-     * where signatures with union types are split into separate signatures
-     *
-     * Throws an error when there are conflicting types
-     *
-     * @param {Signature[]} signatures
-     * @return {Object.<string, function>}  Returns a map with signatures
-     *                                      as key and the original function
-     *                                      of this signature as value.
-     */
-    function createSignaturesMap(signatures) {
-      var signaturesMap = {};
-      signatures.forEach(function (signature) {
-        splitParams(signature.params, true).forEach(function (params) {
-          signaturesMap[stringifyParams(params)] = signature.fn;
-        });
-      });
-
-      return signaturesMap;
-    }
-
-    /**
      * Split params with union types in to separate params.
      *
      * For example:
@@ -936,16 +927,13 @@
      *     // ]
      *
      * @param {Param[]} params
-     * @param {boolean} ignoreConversionTypes
      * @return {Param[][]}
      */
-    function splitParams(params, ignoreConversionTypes) {
+    function splitParams(params) {
       function _splitParams(params, index, types) {
         if (index < params.length) {
           var param = params[index]
-          var filteredTypes = ignoreConversionTypes
-              ? param.types.filter(isExactType)
-              : param.types;
+          var filteredTypes = param.types;
           var typeGroups
 
           if (param.restParam) {
@@ -1032,102 +1020,99 @@
      * @param {string} reference
      * @param {Param[]} params
      */
-    function verifyResolvedReference(resolvedReference, reference, params) {
+    function verifyResolvedReference(resolvedReference, reference, signature) {
       if (!resolvedReference) {
-        throw new TypeError('Cannot resolve reference in signature "' + stringifyParams(params) + '": ' +
+        throw new TypeError('Cannot resolve reference in signature "' + signature + '": ' +
           'reference signature "' + reference + '" not found');
       }
+      return typeof resolvedReference === 'function'
+    }
 
-      if (
-        typeof resolvedReference !== 'function' && (
-          isReferTo(resolvedReference) ||
-          isReferToSelf(resolvedReference)
-        )
-      ) {
-        throw new TypeError('Cannot resolve reference in signature "' + stringifyParams(params) + '": ' +
-          'signature is referring to a signature "' + reference + '" which is not yet resolved');
+    /**
+     * Take a list of references and a signatureMap and return
+     * the list of resolutions, or a false-y value if they don't all
+     * resolve in a valid way (yet).
+     * @param {string[]} references
+     * @param {Object.<string, function>} signatureMap
+     * @param {string} signature (where the references are from)
+     * @return {function[] | false} resolutions
+     */
+    function collectResolutions(references, signatureMap, signature) {
+      const resolvedReferences = []
+      for (const reference of references) {
+        const resolution = findOrNull(signatureMap, reference)
+        if (!verifyResolvedReference(resolution, reference, signature)) {
+          return false
+        }
+        resolvedReferences.push(resolution)
+      }
+      return resolvedReferences
+    }
+      
+    /**
+     * Helper function for `resolveReferences` that clears out
+     * any prior resolutions from signatureMap (by side effect)
+     * in case we are recycling a signature from a prior typed function
+     * construction.
+     * @param {Object.<string, function>} signatureMap
+     */
+    function clearResolutions(signatureMap) {
+      for (const signature in signatureMap) {
+        const fn = signatureMap[signature]
+
+        if (typeof fn === 'function') {
+          if (isReferToSelf(fn)) {
+            signatureMap[signature] = referToSelf(fn.referToSelf.callback)
+          } else if (isReferTo(fn)) {
+            signatureMap[signature] =
+              makeReferTo(fn.referTo.references, fn.referTo.callback)
+          }
+        }
       }
     }
 
-    function resolveReferences(unresolvedSignatures, self) {
-      // TODO: refactor this function. It's a mess and way to complicated and large.
-      //  Would be nice too to auto resolve forward references if possible,
-      //  but will need to address circular references too then.
+    /**
+     * Resolve any references in the signatureMap for typed function self.
+     * Modifies signatureMap by side effect.
+     * @param {Object.<string, function>} signatureMap
+     * @param {typed-function} self
+     */
+    function resolveReferences(signatureMap, self) {
+      clearResolutions(signatureMap)
 
-      // to prevent needless work (building a signaturesMap), we first check
-      // whether there are any signatures using referTo or referToSelf.
-      // If not, we can directly exit
-      if (unresolvedSignatures.every(signature => {
-        return !isReferTo(signature.fn) && !isReferToSelf(signature.fn)
-      })) {
-        return unresolvedSignatures;
-      }
+      let leftUnresolved = true
+      while (leftUnresolved) {
+        leftUnresolved = false
+        let nothingResolved = true
 
-      // we must not make changes in the original signatures array
-      var signatures = [];
+        for (const signature in signatureMap) {
+          const fn = signatureMap[signature]
 
-      // built a map with all (splitted) signatures. We'll replace referTo
-      // signatures there later one by one.
-      var signaturesMap = createSignaturesMap(unresolvedSignatures);
+          if (isReferToSelf(fn)) {
+            signatureMap[signature] = fn.referToSelf.callback(self);
+            // Preserve reference in case signature is reused someday:
+            signatureMap[signature].referToSelf = fn.referToSelf;
+            nothingResolved = false
+          } else if (isReferTo(fn)) {
+            const resolvedReferences = collectResolutions(
+              fn.referTo.references, signatureMap, signature)
+            if (resolvedReferences) {
+              signatureMap[signature] =
+                fn.referTo.callback.apply(this, resolvedReferences);
+              // Preserve reference in case signature is reused someday:
+              signatureMap[signature].referTo = fn.referTo;
+              nothingResolved = false
+            } else {
+              leftUnresolved = signature
+            }
+          }
+        }
 
-      for (let i = 0; i < unresolvedSignatures.length; i++) {
-        var parsedSignature = unresolvedSignatures[i];
-        var fn = parsedSignature.fn;
-        var params = parsedSignature.params;
-        var resolvedSignature;
-
-        if (isReferTo(fn)) {
-          var resolvedReferences = fn.referTo.references.map(reference => {
-            var resolvedReference = findOrNull({ signatures: signaturesMap }, reference);
-
-            verifyResolvedReference(resolvedReference, reference, params);
-
-            return resolvedReference;
-          })
-          var fnResolved = fn.referTo.callback.apply(this, resolvedReferences);
-
-          // we need to keep the .referTo object (with references and callback)
-          // to be able to merge typed-functions later on: then we may need to
-          // resolve the new signatures again, though this is only the case
-          // when replacing an existing signature with another one.
-          fnResolved.referTo = fn.referTo;
-
-          resolvedSignature = {
-            params: params,
-            fn: fnResolved
-          };
-
-          // add the resolved reference to both the signatures array,
-          // and replace it in the signaturesMap
-          signatures[i] = resolvedSignature;
-          splitParams(params, true).forEach(function (splittedParams) {
-             signaturesMap[stringifyParams(splittedParams)] = fnResolved;
-          });
-        } else if (isReferToSelf(fn)) {
-          var fnResolvedSelf = fn.referToSelf.callback(self);
-
-          // we need to keep the .referTo object (with references and callback)
-          // to be able to merge typed-functions later on: then we need to
-          // resolve the new signatures again.
-          fnResolvedSelf.referToSelf = fn.referToSelf;
-
-          resolvedSignature = {
-            params: params,
-            fn: fnResolvedSelf
-          };
-
-          // add the resolved reference to both the signatures array,
-          // and replace it in the signaturesMap
-          signatures[i] = resolvedSignature;
-          splitParams(params, true).forEach(function (splittedParams) {
-            signaturesMap[stringifyParams(splittedParams)] = fnResolvedSelf;
-          });
-        } else {
-          signatures[i] = parsedSignature
+        if (nothingResolved && leftUnresolved) {
+          throw new SyntaxError(
+            'Circular reference involving signature ' + leftUnresolved)
         }
       }
-
-      return signatures;
     }
 
     /**
@@ -1164,53 +1149,56 @@
      *                                    signature as value.
      * @return {function}  Returns the created typed function.
      */
-    function createTypedFunction(name, signaturesMap) {
-      if (Object.keys(signaturesMap).length === 0) {
+    function createTypedFunction(name, rawSignaturesMap) {
+      if (Object.keys(rawSignaturesMap).length === 0) {
         throw new SyntaxError('No signatures provided');
       }
 
       if (typed.warnAgainstDeprecatedThis) {
-        validateDeprecatedThis(signaturesMap);
+        validateDeprecatedThis(rawSignaturesMap);
       }
 
-      // parse the signatures, and check for conflicts
-      var parsedSignatures = [];
-      Object.keys(signaturesMap)
-          .map(function (signature) {
-            return parseSignature(signature, signaturesMap[signature], typed.conversions);
-          })
-          .filter(notNull)
-          .forEach(function (parsedSignature) {
-            // check whether this parameter conflicts with already parsed signatures
-            var conflictingSignature = findInArray(parsedSignatures, function (s) {
-              return hasConflictingParams(s, parsedSignature)
-            });
-            if (conflictingSignature) {
-              throw new TypeError('Conflicting signatures "' +
-                  stringifyParams(conflictingSignature.params) + '" and "' +
-                  stringifyParams(parsedSignature.params) + '".');
-            }
+      // parse the signatures, check for conflicts, and split them
+      const parsedSignatures = []
+      const signaturesMap = {}
+      const parseCache = {}
+      for (const signature in rawSignaturesMap) {
+        const parsed = parseSignature(signature, rawSignaturesMap[signature])
+        if (!parsed) continue;
+        for (const s of parsedSignatures) {
+          if (hasConflictingParams(s, parsed)) {
+            throw new TypeError('Conflicting signatures "' +
+              stringifyParams(s.params) + '" and "' +
+              stringifyParams(parsed.params) + '".');
+          }
+        }
+        parsedSignatures.push(parsed)
+        for (const params of splitParams(parsed.params)) {
+          const signature = stringifyParams(params)
+          signaturesMap[signature] = parsed.fn
+          parseCache[signature] = params
+        }
+      }
 
-            parsedSignatures.push(parsedSignature);
-          });
+      // Note the forward reference to the_typed_fn:
+      resolveReferences(signaturesMap, the_typed_fn);
 
-      // split and filter the types of the signatures
-      var signatures = flatMap(parsedSignatures, function (parsedSignature) {
-        var params = parsedSignature ? splitParams(parsedSignature.params, false) : []
+      // Collect all of the signatures and their extensions by conversions
+      const signatures = []
+      for (const s in signaturesMap) {
+        const fn = signaturesMap[s]
+        const params = parseCache[s]
+        signatures.push({ params, fn })
+        const conversionParams = params.map(
+          p => expandParam(p, typed.conversions)
+        )
+        for (const splitConversion of splitParams(conversionParams)) {
+          // Don't redefine any explicitly provided signatures:
+          if (stringifyParams(splitConversion) in signaturesMap) continue
+          signatures.push({ params: splitConversion, fn })
+        }
+      }
 
-        return params.map(function (params) {
-          return {
-            params: params,
-            fn: parsedSignature.fn
-          };
-        });
-      }).filter(notNull);
-
-      // resolve referTo and referToSelf references
-      // This is done *after* splitting the params, and *before* sorting
-      signatures = resolveReferences(signatures, fn);
-
-      // order the splitted signatures
       signatures.sort(compareSignatures);
 
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
@@ -1277,7 +1265,7 @@
 
       // create the typed function
       // fast, specialized version. Falls back to the slower, generic one if needed
-      function fn(arg0, arg1) {
+      function the_typed_fn(arg0, arg1) {
         'use strict';
 
         if (arguments.length === len0 && test00(arg0) && test01(arg1)) { return fn0.apply(this, arguments); }
@@ -1290,9 +1278,9 @@
         return generic.apply(this, arguments);
       }
 
-      // attach name the typed function
+      // attach name to the typed function
       try {
-        Object.defineProperty(fn, 'name', {value: name});
+        Object.defineProperty(the_typed_fn, 'name', {value: name});
       }
       catch (err) {
         // old browsers do not support Object.defineProperty and some don't support setting the name property
@@ -1301,9 +1289,9 @@
       }
 
       // attach signatures to the function
-      fn.signatures = createSignaturesMap(signatures);
+      the_typed_fn.signatures = signaturesMap;
 
-      return fn;
+      return the_typed_fn;
     }
 
     /**
@@ -1548,12 +1536,11 @@
         throw new TypeError('Callback function expected as last argument');
       }
 
-      return {
-        referTo: {
-          references,
-          callback
-        }
-      };
+      return makeReferTo(references, callback)
+    }
+
+    function makeReferTo(references, callback) {
+      return { referTo: { references, callback } }
     }
 
     /**

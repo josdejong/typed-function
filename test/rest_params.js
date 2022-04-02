@@ -141,10 +141,6 @@ describe('rest parameters', function () {
     assert.equal(fn(2, 3), '...number');
     assert.equal(fn(2), '...number');
     assert.equal(fn({}), 'Object');
-    assert.deepEqual(Object.keys(fn.signatures), [
-      'Object',
-      '...number'
-    ]);
   });
 
   it('should split rest params with conversions in two and order them correctly', function() {

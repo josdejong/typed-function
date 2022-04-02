@@ -349,21 +349,21 @@ describe('construction', function() {
   });
 
   it('should correctly order signatures', function () {
-    var fn = typed({
-      'boolean': function (a) {
-        return 'boolean';
-      },
-      'string': function (a) {
-        return 'string';
-      },
-      'number': function (a) {
-        return 'number';
-      }
-    });
+    const t2 = typed.create()
+    t2.types = [
+      {name: 'foo', test: x => x[0] === 1},
+      {name: 'bar', test: x => x[1] === 1},
+      {name: 'baz', test: x => x[2] === 1}
+    ]
+    var fn = t2({
+      baz: a => 'isbaz',
+      bar: a => 'isbar',
+      foo: a => 'isfoo'
+    })
 
-    // TODO: this is tricky, object keys do not officially have a guaranteed order
-    assert.deepEqual(Object.keys(fn.signatures),
-        ['number', 'string', 'boolean']);
+    assert.strictEqual(fn([1,1,1]), 'isfoo')
+    assert.strictEqual(fn([0,1,1]), 'isbar')
+    assert.strictEqual(fn([0,0,1]), 'isbaz')
   });
 
   it('should allow a function refer to itself', function () {
@@ -439,20 +439,28 @@ describe('construction', function() {
     }, /Cannot resolve reference in signature "string": reference signature "number" not found/)
   })
 
-  it('should throw an exception when a signature is not resolved with referTo', function () {
-    assert.throws(() => {
-      typed({
-        'string': typed.referTo('number', (fnNumberResolved) => {
-          return function fnString(value) {
-            return fnNumberResolved(parseInt(value, 10));
-          }
-        }),
-        // we define `number` after we use it in `string` to enforce getting an error
-        'number': typed.referTo(() => {
-          return 'number:' + value;
-        })
-      });
-    }, /Cannot resolve reference in signature "string": signature is referring to a signature "number" which is not yet resolved/)
+  it('should allow forward references with referTo', function () {
+    const forward = typed({
+      'string': typed.referTo('number', (fnNumberResolved) => {
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      }),
+      // Forward reference: we define `number` after we use it in `string`
+      'number': typed.referTo(() => {
+        return value => 'number:' + value;
+      })
+    })
+    assert.strictEqual(forward('10'), 'number:10')
+  })
+
+  it('should throw an exception in case of circular referTo', () => {
+    assert.throws(
+      () => { typed({
+        string: typed.referTo('number', fN => s => fN(s.length)),
+        number: typed.referTo('string', fS => n => fS(n.toString()))
+      })},
+      SyntaxError)
   })
 
   it('should throw an exception when a signature in referTo is not a string', function () {
