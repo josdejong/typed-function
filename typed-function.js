@@ -317,7 +317,7 @@
         };
       });
 
-      return { types, restParam }
+      return { types: types, restParam: restParam }
     }
 
     /**
@@ -327,8 +327,12 @@
      * @param {ConversionDef[]} conversions
      * @return {Param} param
      */
-    function expandParam (param, conversions = []) {
-      var typeNames = param.types.map(t => t.name)
+    function expandParam (param, conversions) {
+      conversions = conversions || []
+
+      var typeNames = param.types.map(function (type) {
+        return type.name
+      })
       var matchingConversions = filterConversions(conversions, typeNames);
       var convertibleTypes = matchingConversions.map(function (conversion) {
         var type = findTypeByName(conversion.from);
@@ -402,7 +406,9 @@
      * @return {boolean} Returns true when at least one of the types is any
      */
     function hasAny(param) {
-      return param.types.some(t => getTypeName(t) === 'any')
+      return param.types.some(function (type) {
+        return getTypeName(type) === 'any'
+      })
     }
 
     /**
@@ -715,7 +721,10 @@
 
     const parameterMetrics = [
       hasAny, // 'any' parameters are the least preferred
-      par => par.restParam, // prefer non-rest to rest parameters
+      function (par) {
+        // prefer non-rest to rest parameters
+        return par.restParam
+      },
       hasConversions,
       getLowestTypeIndex,
       getLowestConversionIndex
@@ -731,7 +740,8 @@
      */
     function compareParams (param1, param2) {
       // We compare a number of metrics on a param in turn:
-      for (const metric of parameterMetrics) {
+      for (let i = 0; i < parameterMetrics.length; i++) {
+        const metric = parameterMetrics[i]
         const c = metric(param1) - metric(param2)
         if (c !== 0) return c
       }
@@ -744,13 +754,13 @@
     // they should be checked against an incoming argument list for dispatch,
     // we compare them by a sequence of metrics in priority order.
     const signatureMetrics = [
-      pars => hasRestParam(pars) && hasAny(last(pars)),
-      pars => summap(pars, hasAny), // minimize number of 'any' parameters
-      pars => hasRestParam(pars) && hasConversions(last(pars)),
-      pars => summap(pars, hasConversions), // minimize conversions used
+      function (pars) { return hasRestParam(pars) && hasAny(last(pars)) },
+      function (pars) { return summap(pars, hasAny) }, // minimize number of 'any' parameters
+      function (pars) { return hasRestParam(pars) && hasConversions(last(pars)) },
+      function (pars) { return summap(pars, hasConversions)  }, // minimize conversions used
       hasRestParam,
       // shorter first without rest param, longer first with rest:
-      pars => pars.length * (hasRestParam(pars) ? -1 : 1)
+      function (pars) { return pars.length * (hasRestParam(pars) ? -1 : 1) }
     ]
 
     /**
@@ -764,7 +774,8 @@
     function compareSignatures (signature1, signature2) {
       const pars1 = signature1.params
       const pars2 = signature2.params
-      for (const metric of signatureMetrics) {
+      for (let i = 0; i < signatureMetrics.length; i++) {
+        const metric = signatureMetrics[i]
         const c = metric(pars1) - metric(pars2)
         if (c !== 0) return c
       }
@@ -777,13 +788,16 @@
       for (let i = 0; i < pars1.length; ++i) {
         comparisons.push(compareParams(pars1[i], pars2[i]))
       }
-      const tc = summap(comparisons, c => (c < 0) ? -1 : (c > 0) ? 1 : 0)
+      const tc = summap(comparisons, function (c) {
+        return (c < 0) ? -1 : (c > 0) ? 1 : 0
+      })
       if (tc !== 0) return tc
       // They have the same number of preferred parameters, so go by the
       // earliest parameter in which we have a preference.
       // In other words, dispatch is driven somewhat more by earlier
       // parameters than later ones.
-      for (const c of comparisons) {
+      for (let i = 0; i < comparisons.length; i++) {
+        const c = comparisons[i]
         if (c !== 0) return c
       }
 
@@ -1015,7 +1029,7 @@
       // we cannot use destructuring {...object} because we still want to support IE11
       var clone = {}
 
-      Object.keys(object).forEach(key => {
+      Object.keys(object).forEach(function (key) {
         clone[key] = object[key];
       })
 
@@ -1048,7 +1062,8 @@
      */
     function collectResolutions(references, signatureMap, signature) {
       const resolvedReferences = []
-      for (const reference of references) {
+      for (let i = 0; i < references.length; i++) {
+        const reference = references[i]
         const resolution = findOrNull(signatureMap, reference)
         if (!verifyResolvedReference(resolution, reference, signature)) {
           return false
@@ -1069,7 +1084,7 @@
     function clearResolutions(signatureMap) {
       const clearedMap = {}
 
-      for (const signature in signatureMap) {
+      for (let signature in signatureMap) {
         const fn = signatureMap[signature]
 
         if (isReferToSelf(fn)) {
@@ -1100,7 +1115,7 @@
         leftUnresolved = false
         let nothingResolved = true
 
-        for (const signature in resolvedMap) {
+        for (let signature in resolvedMap) {
           const fn = resolvedMap[signature]
 
           if (isReferToSelf(fn)) {
@@ -1145,7 +1160,7 @@
       // match occurrences like 'this(' and 'this.signatures'
       var deprecatedThisRegex = /\bthis(\(|\.signatures\b)/;
 
-      Object.keys(signaturesMap).forEach(signature => {
+      Object.keys(signaturesMap).forEach(function (signature) {
         var fn = signaturesMap[signature];
 
         if (deprecatedThisRegex.test(fn.toString())) {
@@ -1179,22 +1194,22 @@
       const parsedSignatures = []
       let signaturesMap = {}
       const parseCache = {}
-      for (const signature in rawSignaturesMap) {
+      for (let signature in rawSignaturesMap) {
         const parsed = parseSignature(signature, rawSignaturesMap[signature])
         if (!parsed) continue;
-        for (const s of parsedSignatures) {
+        parsedSignatures.forEach(function (s) {
           if (hasConflictingParams(s, parsed)) {
             throw new TypeError('Conflicting signatures "' +
               stringifyParams(s.params) + '" and "' +
               stringifyParams(parsed.params) + '".');
           }
-        }
+        })
         parsedSignatures.push(parsed)
-        for (const params of splitParams(parsed.params)) {
+        splitParams(parsed.params).forEach(function (params) {
           const signature = stringifyParams(params)
           signaturesMap[signature] = parsed.fn
           parseCache[signature] = params
-        }
+        })
       }
 
       // Note the forward reference to the_typed_fn:
@@ -1202,18 +1217,21 @@
 
       // Collect all of the signatures and their extensions by conversions
       const signatures = []
-      for (const s in signaturesMap) {
+      for (let s in signaturesMap) {
         const fn = signaturesMap[s]
         const params = parseCache[s]
-        signatures.push({ params, fn })
-        const conversionParams = params.map(
-          p => expandParam(p, typed.conversions)
-        )
-        for (const splitConversion of splitParams(conversionParams)) {
-          // Don't redefine any explicitly provided signatures:
-          if (stringifyParams(splitConversion) in signaturesMap) continue
-          signatures.push({ params: splitConversion, fn })
-        }
+        signatures.push({ params: params, fn: fn })
+        const conversionParams = params.map(function (p) {
+          return expandParam(p, typed.conversions)
+        })
+
+        splitParams(conversionParams)
+          .filter(function (splitConversion) {
+            return !(stringifyParams(splitConversion) in signaturesMap)
+          })
+          .forEach(function (splitConversion) {
+            signatures.push({ params: splitConversion, fn: fn })
+          })
       }
 
       signatures.sort(compareSignatures);
@@ -1325,11 +1343,10 @@
        * @param {any[]} argList
        * @returns {{params: string, test: function, fn: function, implementation: function} | null}
        */
-      the_typed_fn.resolve = argList => {
-        for (const signature of signatures) {
-          if (signature.test(argList)) return signature
-        }
-        return null
+      the_typed_fn.resolve = function (argList) {
+        return signatures.find(function (signature) {
+          return signature.test(argList)
+        })
       }
 
       // Also attach a property that is unlikely to collide with anything
@@ -1419,7 +1436,9 @@
      * @return {number} total of f(arr[i]) for all indices i
      */
     function summap(arr, f) {
-      return arr.reduce((t, a) => t + f(a), 0)
+      return arr.reduce(function (t, a) {
+        return t + f(a)
+      }, 0)
     }
 
     /**
@@ -1573,7 +1592,9 @@
       const references = args.slice(0, args.length - 1)
       const callback = args[args.length - 1]
 
-      if (references.some(reference => typeof reference !== 'string')) {
+      if (references.some(function (reference) {
+        return typeof reference !== 'string'
+      })) {
         throw new TypeError('Signatures must be strings');
       }
 
@@ -1585,7 +1606,7 @@
     }
 
     function makeReferTo(references, callback) {
-      return { referTo: { references, callback } }
+      return { referTo: { references: references, callback: callback } }
     }
 
     /**
@@ -1600,7 +1621,7 @@
 
       return {
         referToSelf: {
-          callback
+          callback: callback
         }
       };
     }
