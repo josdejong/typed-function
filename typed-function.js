@@ -279,7 +279,6 @@
       const typeNames = param.types.map(getTypeName);
       return (param.restParam ? '...' : '') + typeNames.join('|');
     }
-
     /**
      * Stringify parameters in a normalized way
      * @param {Param[]} params
@@ -1525,7 +1524,7 @@
      */
     function getObjectName (obj) {
       let name
-      for (const key in obj) {
+      for (let key in obj) {
         // Only pay attention to own properties, and only if their values
         // are typed functions or functions with a signature property
         if (obj.hasOwnProperty(key) &&
@@ -1542,7 +1541,7 @@
      * which is modified by side effect, checking for conflicts
      */
     function mergeSignatures (dest, source) {
-      for (const key in source) {
+      for (let key in source) {
         if (source.hasOwnProperty(key)) {
           if (key in dest) {
             if (source[key] !== dest[key]) {
@@ -1682,7 +1681,7 @@
 
         if (Object.keys(theseSignatures).length === 0) {
           const err = new TypeError(
-            `Argument to 'typed' at index ${i} is not a (typed) function, ` +
+            'Argument to \'typed\' at index ' + i + ' is not a (typed) function, ' +
             'nor an object with signatures as keys and functions as values.')
           err.data = { index: i, argument: item }
           throw err
