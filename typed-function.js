@@ -166,6 +166,16 @@
     }
 
     /**
+     * Check if an entity is a typed function created by any instance
+     * @param {any} entity
+     * @returns {boolean}
+     */
+    function isTypedFunction(entity) {
+      return entity && typeof entity === 'function' &&
+        '_isTypedFunction' in entity;
+    }
+
+    /**
      * Find a specific signature from a (composed) typed function, for example:
      *
      *   typed.find(fn, ['number', 'string'])
@@ -181,7 +191,7 @@
      *                                        is found.
      */
     function find (fn, signature) {
-      if (!fn.signatures) {
+      if (!isTypedFunction(fn)) {
         throw new TypeError('Function is no typed-function');
       }
 
@@ -1129,8 +1139,38 @@
         // so it's fine to have unnamed functions.
       }
 
-      // attach signatures to the function
+      // attach signatures to the function.
+      // This property is close to the original collection of signatures
+      // used to create the typed-function, just with unions split:
       fn.signatures = createSignaturesMap(signatures);
+
+      // Now we round out the exact list of tests and implementing functions
+      // with possible conversions compiled in, that are used in executing
+      // the typed-function, so that we can implement the .resolve() method:
+      for (let i = 0; i < signatures.length; ++i) {
+        signatures[i].implementation = fns[i]
+        signatures[i].test = tests[i]
+      }
+
+      /**
+       * A method to produce the specific signature that this typed function
+       * will execute on the given arguments. Here, a "signature" is an
+       * object with properties 'params', 'test', 'fn', and 'implementation'.
+       * This last property is a function that converts params as necessary
+       * and then calls 'fn'. Returns null if there is no matching signature.
+       * @param {any[]} argList
+       * @returns {{params: string, test: function, fn: function, implementation: function}}
+       */
+      fn.resolve = argList => {
+        for (const signature of signatures) {
+          if (signature.test(argList)) return signature
+        }
+        return null
+      }
+
+      // Also attach a property that is unlikely to collide with anything
+      // else so that we can check that this is a typed function:
+      fn._isTypedFunction = true
 
       return fn;
     }
@@ -1324,7 +1364,7 @@
         // Only pay attention to own properties, and only if their values
         // are typed functions or functions with a signature property
         if (obj.hasOwnProperty(key) &&
-            (typeof obj[key].signatures === 'object' ||
+            (isTypedFunction(obj[key]) ||
              typeof obj[key].signature === 'string')) {
           name = checkName(name, obj[key].name)
         }
@@ -1389,7 +1429,7 @@
           if (typeof item.signature === 'string') {
             // Case 1: Ordinary function with a string 'signature' property
             theseSignatures[item.signature] = item
-          } else if (typeof item.signatures === 'object') {
+          } else if (isTypedFunction(item)) {
             // Case 2: Existing typed function
             theseSignatures = item.signatures
           }
@@ -1427,6 +1467,7 @@
     typed.createError = createError;
     typed.convert = convert;
     typed.find = find;
+    typed.isTypedFunction = isTypedFunction;
 
     /**
      * add a type
@@ -1453,7 +1494,12 @@
       typed.types.push(type);
     };
 
-    // add a conversion
+    /**
+     * Add a conversion
+     * @param {{from: string, to: string, convert: function}} conversion
+     * @returns {void}
+     * @throws {TypeError}
+     */
     typed.addConversion = function (conversion) {
       if (!conversion
           || typeof conversion.from !== 'string'

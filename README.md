@@ -221,7 +221,42 @@ as long as any that have names agree with one another.
 If the same signature is specified by the collection of arguments more than
 once with different implementations, an error will be thrown.
 
-### Methods
+#### Properties and methods of a typed function `fn`
+
+-   `fn.signatures : Object.<string, function>`
+
+    An object that gives for each string signature on which this typed
+    function `fn` is defined, the function it will call when arguments
+    match that signature. This may differ from the similar object used to
+    create the typed function in that the originally provided signatures
+    will be parsed into a canonical and more usable form: union types will
+    be split into their consituents where possible, whitespace in the
+    signature strings will be regularized, etc.
+
+-   `fn.resolve(argList: Array<any>): signature-object`
+
+    Find the specific signature and implementation that this typed function
+    will call if invoked on the argument list `argList`. Returns null if
+    there is no matching signature. The returned signature object has
+    properties `params`, `test`, `fn`, and `implementation`. The difference
+    between the last two properties is that `fn` is the original function
+    supplied at typed-function creation time, whereas `implementation` is
+    ready to be called on this specific argList, in that it will first
+    perform any necessary conversions and gather arguments up into "rest"
+    parameters as needed.
+
+    Thus, in the case that arguments `a0`,`a1`,`a2` (say) do match one of
+    the signatures of this typed function `fn`, then `fn(a0, a1, a2)`
+    (in a context in which `this` will be, say, `t`) does exactly the same
+    thing as
+
+    `fn.resolve([a0,a1,a2]).implementation.apply(t, [a0,a1,a2])`.
+
+    But `resolve` is useful if you want to interpose any other operation
+    (such as bookkeeping or additional custom error checking) between
+    signature selection and execution dispatch.
+
+### Methods of the typed package
 
 -   `typed.convert(value: *, type: string) : *`
 
@@ -264,6 +299,11 @@ once with different implementations, an error will be thrown.
     var f = typed.find(fn, ['number', 'string']);
     var f = typed.find(fn, 'number, string');
     ```
+
+-   `typed.isTypedFunction(entity: any): boolean`
+
+    Return true if the given entity is a typed function created by any
+    instance of typed-function, false otherwise.
 
 -   `typed.addType(type: {name: string, test: function} [, beforeObjectTest=true]): void`
 
