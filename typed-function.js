@@ -1048,59 +1048,65 @@
       }
       return resolvedReferences
     }
-      
+
     /**
      * Helper function for `resolveReferences` that clears out
      * any prior resolutions from signatureMap (by side effect)
      * in case we are recycling a signature from a prior typed function
      * construction.
      * @param {Object.<string, function>} signatureMap
+     * @return {Object.<string, function>}
      */
     function clearResolutions(signatureMap) {
+      const clearedMap = {}
+
       for (const signature in signatureMap) {
         const fn = signatureMap[signature]
 
-        if (typeof fn === 'function') {
-          if (isReferToSelf(fn)) {
-            signatureMap[signature] = referToSelf(fn.referToSelf.callback)
-          } else if (isReferTo(fn)) {
-            signatureMap[signature] =
-              makeReferTo(fn.referTo.references, fn.referTo.callback)
-          }
+        if (isReferToSelf(fn)) {
+          clearedMap[signature] = referToSelf(fn.referToSelf.callback)
+        } else if (isReferTo(fn)) {
+          clearedMap[signature] =
+            makeReferTo(fn.referTo.references, fn.referTo.callback)
+        } else {
+          clearedMap[signature] = fn
         }
       }
+
+      return clearedMap
     }
 
     /**
      * Resolve any references in the signatureMap for typed function self.
      * Modifies signatureMap by side effect.
      * @param {Object.<string, function>} signatureMap
-     * @param {typed-function} self
+     * @param {function} self  The typed-function itself
+     * @return {Object.<string, function>}
      */
     function resolveReferences(signatureMap, self) {
-      clearResolutions(signatureMap)
+      var resolvedMap = clearResolutions(signatureMap)
 
       let leftUnresolved = true
       while (leftUnresolved) {
         leftUnresolved = false
         let nothingResolved = true
 
-        for (const signature in signatureMap) {
-          const fn = signatureMap[signature]
+        for (const signature in resolvedMap) {
+          const fn = resolvedMap[signature]
 
           if (isReferToSelf(fn)) {
-            signatureMap[signature] = fn.referToSelf.callback(self);
+            resolvedMap[signature] = fn.referToSelf.callback(self);
             // Preserve reference in case signature is reused someday:
-            signatureMap[signature].referToSelf = fn.referToSelf;
+            resolvedMap[signature].referToSelf = fn.referToSelf;
             nothingResolved = false
           } else if (isReferTo(fn)) {
             const resolvedReferences = collectResolutions(
-              fn.referTo.references, signatureMap, signature)
+              fn.referTo.references, resolvedMap, signature)
             if (resolvedReferences) {
-              signatureMap[signature] =
+              resolvedMap[signature] =
                 fn.referTo.callback.apply(this, resolvedReferences);
               // Preserve reference in case signature is reused someday:
-              signatureMap[signature].referTo = fn.referTo;
+              resolvedMap[signature].referTo = fn.referTo;
               nothingResolved = false
             } else {
               leftUnresolved = signature
@@ -1113,6 +1119,8 @@
             'Circular reference involving signature ' + leftUnresolved)
         }
       }
+
+      return resolvedMap
     }
 
     /**
@@ -1142,7 +1150,7 @@
     /**
      * Create a typed function
      * @param {String} name               The name for the typed function
-     * @param {Object.<string, function>} signaturesMap
+     * @param {Object.<string, function>} rawSignaturesMap
      *                                    An object with one or
      *                                    multiple signatures as key, and the
      *                                    function corresponding to the
@@ -1160,7 +1168,7 @@
 
       // parse the signatures, check for conflicts, and split them
       const parsedSignatures = []
-      const signaturesMap = {}
+      let signaturesMap = {}
       const parseCache = {}
       for (const signature in rawSignaturesMap) {
         const parsed = parseSignature(signature, rawSignaturesMap[signature])
@@ -1181,7 +1189,7 @@
       }
 
       // Note the forward reference to the_typed_fn:
-      resolveReferences(signaturesMap, the_typed_fn);
+      signaturesMap = resolveReferences(signaturesMap, the_typed_fn);
 
       // Collect all of the signatures and their extensions by conversions
       const signatures = []
