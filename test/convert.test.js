@@ -4,7 +4,7 @@ var typed = require('../typed-function');
 describe('convert', function () {
 
   before(function () {
-    typed.conversions = [
+    typed.addConversions([
       {from: 'boolean', to: 'number', convert: function (x) {return +x;}},
       {from: 'boolean', to: 'string', convert: function (x) {return x + '';}},
       {from: 'number',  to: 'string', convert: function (x) {return x + '';}},
@@ -17,12 +17,12 @@ describe('convert', function () {
         },
         fallible: true // TODO: not yet supported
       }
-    ];
+    ]);
   });
 
   after(function () {
     // cleanup conversions
-    typed.conversions = [];
+    typed.clearConversions();
   });
 
   it('should convert a value', function() {
@@ -53,7 +53,8 @@ describe('convert', function () {
     // based on https://github.com/josdejong/typed-function/issues/128
     const typed2 = typed.create()
 
-    typed2.types = [
+    typed2.clear()
+    typed2.addTypes([
       {
         name: 'number',
         test: x => typeof x === 'number'
@@ -67,7 +68,7 @@ describe('convert', function () {
         name: 'string',
         test: x => typeof x === 'string'
       }
-    ]
+    ])
 
     typed2.addConversion({ from: 'string', to: 'number', convert: x => parseFloat(x) })
 

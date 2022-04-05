@@ -145,9 +145,9 @@ describe('rest parameters', function () {
 
   it('should split rest params with conversions in two and order them correctly', function() {
     var typed2 = typed.create()
-    typed2.conversions = [
+    typed2.addConversion(
       {from: 'string', to: 'number', convert: function (x) {return parseFloat(x)}}
-    ];
+    );
 
     var fn = typed2({
       '...number': function (values) {

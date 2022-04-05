@@ -5,7 +5,7 @@ var strictEqualArray = require('./strictEqualArray');
 describe('conversion', function () {
 
   before(function () {
-    typed.conversions = [
+    typed.addConversions([
       {from: 'boolean', to: 'number', convert: function (x) {return +x;}},
       {from: 'boolean', to: 'string', convert: function (x) {return x + '';}},
       {from: 'number',  to: 'string', convert: function (x) {return x + '';}},
@@ -18,12 +18,12 @@ describe('conversion', function () {
         },
         fallible: true // TODO: not yet supported
       }
-    ];
+    ]);
   });
 
   after(function () {
     // cleanup conversions
-    typed.conversions = [];
+    typed.clearConversions();
   });
 
   it('should add conversions to a function with one argument', function() {
@@ -49,12 +49,11 @@ describe('conversion', function () {
       }
     };
 
-    assert.equal(typed2.conversions.length, 0);
+    assert.equal(typed2._nconversions, 0);
 
     typed2.addConversion(conversion);
 
-    assert.equal(typed2.conversions.length, 1);
-    assert.strictEqual(typed2.conversions[0], conversion);
+    assert.equal(typed2._nconversions, 1);
   });
 
   it('should throw an error when passing an invalid conversion object to addConversion', function() {
@@ -156,11 +155,11 @@ describe('conversion', function () {
 
   it('should add conversions to a function with rest parameters in a non-conflicting way', function() {
     var typed2 = typed.create();
-    typed2.conversions = [
+    typed2.addConversions([
       {from: 'boolean', to: 'number', convert: function (x) {return +x}},
       {from: 'string',  to: 'number', convert: function (x) {return parseFloat(x)}},
       {from: 'string', to: 'boolean', convert: function (x) {return !!x}}
-    ];
+    ]);
 
     // booleans can be converted to numbers, so the `...number` signature
     // will match. But the `...boolean` signature is a better (exact) match so that
@@ -198,9 +197,9 @@ describe('conversion', function () {
 
   it('should order conversions and type Object correctly ', function() {
     var typed2 = typed.create();
-    typed2.conversions = [
+    typed2.addConversion(
       {from: 'Date', to: 'string', convert: function (x) {return x.toISOString()}}
-    ];
+    );
 
     var fn = typed2({
       'string': function () {
@@ -344,10 +343,11 @@ describe('conversion', function () {
     });
 
     it('should select the signatures with the conversion with the lowest index (1)', function () {
-      typed.conversions = [
+      typed.clearConversions();
+      typed.addConversions([
         {from: 'boolean', to: 'string', convert: function (x) {return x + '';}},
         {from: 'boolean', to: 'number', convert: function (x) {return x + 0;}}
-      ];
+      ]);
 
       // in the following typed function, a boolean input can be converted to
       // both a string or a number, which is both ok. In that case,
@@ -364,10 +364,11 @@ describe('conversion', function () {
     });
 
     it('should select the signatures with the conversion with the lowest index (2)', function () {
-      typed.conversions = [
+      typed.clearConversions();
+      typed.addConversions([
         {from: 'boolean', to: 'number', convert: function (x) {return x + 0;}},
         {from: 'boolean', to: 'string', convert: function (x) {return x + '';}}
-      ];
+      ]);
 
       // in the following typed function, a boolean input can be converted to
       // both a string or a number, which is both ok. In that case,
@@ -382,11 +383,12 @@ describe('conversion', function () {
     });
 
     it('should select the signatures with least needed conversions (1)', function () {
-      typed.conversions = [
+      typed.clearConversions();
+      typed.addConversions([
         {from: 'number', to: 'boolean', convert: function (x) {return !!x }},
         {from: 'number', to: 'string', convert: function (x) {return x + '' }},
         {from: 'boolean', to: 'string', convert: function (x) {return x + '' }}
-      ];
+      ]);
 
       // in the following typed function, the number input can be converted to
       // both a string or a boolean, which is both ok. It should pick the
@@ -400,11 +402,12 @@ describe('conversion', function () {
     });
 
     it('should select the signatures with least needed conversions (2)', function () {
-      typed.conversions = [
+      typed.clearConversions();
+      typed.addConversions([
         {from: 'number', to: 'boolean', convert: function (x) {return !!x }},
         {from: 'number', to: 'string', convert: function (x) {return x + '' }},
         {from: 'boolean', to: 'string', convert: function (x) {return x + '' }}
-      ];
+      ]);
 
       // in the following typed function, the number input can be converted to
       // both a string or a boolean, which is both ok. It should pick the

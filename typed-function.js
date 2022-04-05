@@ -97,54 +97,113 @@
     // types which need to be ignored
     var _ignore = [];
 
-    // type conversions
-    var _conversions = [];
-
-    // This is a temporary object, will be replaced with a typed function at the end
+    // This is a temporary object, will be replaced with a function at the end
     var typed = {
-      types: _types,
-      conversions: _conversions,
       ignore: _ignore
     };
 
     /**
-     * Find the test function for a type
-     * @param {String} typeName
-     * @return {TypeDef} Returns the type definition when found,
-     *                    Throws a TypeError otherwise
+     * Takes a type name or a type object and returns the corresponding
+     * officially registered type object for that type.
+     * @param {string | Type | TypeDef} typeSpec
+     * @returns {TypeDef} type
      */
-    function findTypeByName (typeName) {
-      var entry = findInArray(typed.types, function (entry) {
-        return entry.name === typeName;
-      });
-
-      if (entry) {
-        return entry;
+    function findType (typeSpec) {
+      let type = typeof typeSpec === 'string' ?
+        typed._map.get(typeSpec) :
+        typed._map.get(typeSpec.name)
+      if (type) return type;
+      // Remainder is error handling
+      let name = typeof typeSpec === 'string' ? typeSpec : typeSpec.name;
+      let message = 'Unknown type "' + name + '"';
+      name = name.toLowerCase();
+      type = typed._first;
+      while (type) {
+        if (type.name.toLowerCase() === name) {
+          message += '. Did you mean "' + type.name + '" ?';
+          break
+        }
+        type = type.next;
       }
-
-      if (typeName === 'any') { // special baked-in case 'any'
-        return anyType;
-      }
-
-      var hint = findInArray(typed.types, function (entry) {
-        return entry.name.toLowerCase() === typeName.toLowerCase();
-      });
-
-      throw new TypeError('Unknown type "' + typeName + '"' +
-          (hint ? ('. Did you mean "' + hint.name + '"?') : ''));
+      throw new TypeError(message);
     }
 
     /**
-     * Find the index of a type definition. Handles special case 'any'
-     * @param {TypeDef} type
-     * @return {number}
+     * Adds an array of type definitions to this typed instance. Each type
+     * definition should be an object with properties 'name' - a string               * giving the name of the type - and 'test' - function returning a boolean
+     * that tests membership in the type. The second optional argument,
+     * gives the name of a type that these types should be added before. The
+     * new types are added in the order specified.
+     * @param {TypeDef[]} types
+     * @param {string} before = ''
      */
-    function findTypeIndex(type) {
-      if (type === anyType) {
-        return 999;
+    function addTypes (types, beforeSpec = 'any') {
+      let before = beforeSpec ? findType(beforeSpec) : null;
+      let prev = before ?  before.prev : typed._last;
+      let next = prev ? prev.next : typed._first;
+      let base = prev ? prev.index + 1 : 1;
+      for (var i = 0; i < types.length; ++i) {
+        if (!types[i] || typeof types[i].name !== 'string' ||
+            typeof types[i].test !== 'function') {
+          throw new TypeError('Object with properties {name: string, test: function} expected');
+        }
+        if (typed._map.has(types[i].name)) {
+          throw new TypeError('Duplicate type name "' + types[i].name + '"');
+        }
+        const type = {
+          name: types[i].name,
+          test: types[i].test,
+          prev: prev,
+          next: next,
+          index: base + i,
+          conversionsTo: [] // Newly added type can't have any conversions to it
+        }
+        if (prev) {
+          prev.next = type;
+        } else {
+          typed._first = type;
+        }
+        prev = type;
+        typed._map.set(type.name, type);
       }
+      if (next) {
+        next.prev = prev;
+        while (next) {
+          next.index += types.length;
+          next = next.next;
+        }
+      } else {
+        typed._last = prev;
+      }
+    }
 
-      return typed.types.indexOf(type);
+    /**
+     * Removes all types and conversions from this typed instance.
+     * May cause previously contructed typed-functions to throw
+     * strange errors when they are called with types that do not
+     * match any of their signatures.
+     */
+    function clear () {
+      typed._map = new Map();
+      typed._first = null;
+      typed._last = null;
+      typed._nconversions = 0;
+      addTypes([anyType], false);
+    }
+
+    clear();
+    addTypes(_types);
+
+    /**
+     * Removes all conversions, leaving the types alone.
+     */
+    function clearConversions() {
+      let type = typed._first;
+      while (type) {
+        type.conversionsTo = [];
+        type = type.next;
+      }
+      typed._nconversions = 0;
     }
 
     /**
@@ -154,12 +213,10 @@
      *                  the type test matches the value.
      */
     function findTypeName(value) {
-      var entry = findInArray(typed.types, function (entry) {
-        return entry.test(value);
-      });
-
-      if (entry) {
-        return entry.name;
+      let type = typed._first;
+      while (type) {
+        if (type.test(value)) return type.name;
+        type = type.next;
       }
 
       throw new TypeError('Value has unknown type. Value: ' + value);
@@ -250,26 +307,26 @@
     /**
      * Convert a given value to another data type.
      * @param {*} value
-     * @param {string} typeName
+     * @param {string | TypeDef} type
      */
-    function convert (value, typeName) {
+    function convert (value, typeSpec) {
       // check conversion is needed
-      const type = findTypeByName(typeName)
+      const type = findType(typeSpec);
       if (type.test(value)) {
         return value;
       }
-      const conversions = filterConversions(typed.conversions, [typeName]);
+      const conversions = type.conversionsTo;
       if (conversions.length === 0) {
-        throw new Error('There are no conversions to ' + typeName + ' defined.')
+        throw new Error('There are no conversions to ' + type.name + ' defined.')
       }
       for (var i = 0; i < conversions.length; i++) {
-        const fromType = findTypeByName(conversions[i].from);
+        const fromType = findType(conversions[i].from);
         if (fromType.test(value)) {
           return conversions[i].convert(value);
         }
       }
 
-      throw new Error('Cannot convert ' + value + ' to ' + typeName);
+      throw new Error('Cannot convert ' + value + ' to ' + type.name);
     }
 
     /**
@@ -308,11 +365,11 @@
           .filter(notIgnore);
 
       var types = typeNames.map(function (typeName) {
-        var type = findTypeByName(typeName);
+        var type = findType(typeName);
 
         return {
           name: typeName,
-          typeIndex: findTypeIndex(type),
+          typeIndex: type.index,
           test: type.test,
           conversion: null,
           conversionIndex: -1
@@ -335,16 +392,16 @@
       var typeNames = param.types.map(function (type) {
         return type.name
       })
-      var matchingConversions = filterConversions(conversions, typeNames);
+      var matchingConversions = allConversions(typeNames);
       var convertibleTypes = matchingConversions.map(function (conversion) {
-        var type = findTypeByName(conversion.from);
+        var type = findType(conversion.from);
 
         return {
           name: conversion.from,
-          typeIndex: findTypeIndex(type),
+          typeIndex: type.index,
           test: type.test,
           conversion: conversion,
-          conversionIndex: conversions.indexOf(conversion)
+          conversionIndex: conversion.index
         };
       });
 
@@ -409,7 +466,7 @@
      */
     function hasAny(param) {
       return param.types.some(function (type) {
-        return getTypeName(type) === 'any'
+        return type.name === 'any'
       })
     }
 
@@ -437,18 +494,18 @@
         return ok;
       }
       else if (param.types.length === 1) {
-        return findTypeByName(param.types[0].name).test;
+        return findType(param.types[0].name).test;
       }
       else if (param.types.length === 2) {
-        var test0 = findTypeByName(param.types[0].name).test;
-        var test1 = findTypeByName(param.types[1].name).test;
+        var test0 = findType(param.types[0].name).test;
+        var test1 = findType(param.types[1].name).test;
         return function or(x) {
           return test0(x) || test1(x);
         }
       }
       else { // param.types.length > 2
         var tests = param.types.map(function (type) {
-          return findTypeByName(type.name).test;
+          return findType(type.name).test;
         })
         return function or(x) {
           for (var i = 0; i < tests.length; i++) {
@@ -686,7 +743,7 @@
      * @return {number} Returns the index of the lowest type in typed.types
      */
     function getLowestTypeIndex (param) {
-      var min = 999;
+      var min = typed._last.index + 1;
 
       for (var i = 0; i < param.types.length; i++) {
         if (isExactType(param.types[i])) {
@@ -704,7 +761,7 @@
      * @return {number} Returns the lowest index of the conversions of this type
      */
     function getLowestConversionIndex (param) {
-      var min = 999;
+      var min = typed._nconversions;
 
       for (var i = 0; i < param.types.length; i++) {
         if (!isExactType(param.types[i])) {
@@ -815,20 +872,35 @@
      * @return {ConversionDef[]} Returns the conversions that are available
      *                        for every type (if any)
      */
-    function filterConversions(conversions, typeNames) {
-      var matches = {};
+    function allConversions(typeNames) {
+      if (typeNames.length === 0) return [];
+      let matches = findType(typeNames[0]).conversionsTo;
+      if (typeNames.length > 1) {
+        matches = matches.concat([]) // shallow copy the matches
+      }
+      for (var i = 1; i < typeNames.length; ++i) {
+        let oldM = matches;
+        let newM = findType(typeNames[i]).conversionsTo.concat([]);
+        matches = []
+        let matchesFrom = new Set(typeNames); // don't allow any conversions
+        // from a type already in typeNames
 
-      conversions.forEach(function (conversion) {
-        if (typeNames.indexOf(conversion.from) === -1 &&
-            typeNames.indexOf(conversion.to) !== -1 &&
-            !matches[conversion.from]) {
-          matches[conversion.from] = conversion;
+        // Merge old and new into matches
+        while (oldM.length || newM.length) {
+          let nextM
+          if (oldM.length > 0 &&
+              (newM.length === 0 || oldM[0].index < newM[0].index)) {
+            nextM = oldM.shift();
+          } else {
+            nextM = newM.shift();
+          }
+          if (!matchesFrom.has(nextM.from)) {
+            matches.push(nextM);
+            matchesFrom.add(nextM.from);
+          }
         }
-      });
-
-      return Object.keys(matches).map(function (from) {
-        return matches[from];
-      });
+      }
+      return matches;
     }
 
     /**
@@ -888,7 +960,7 @@
 
       param.types.forEach(function (type) {
         if (type.conversion) {
-          tests.push(findTypeByName(type.conversion.from).test);
+          tests.push(findType(type.conversion.from).test);
           conversions.push(type.conversion.convert);
         }
       });
@@ -1653,6 +1725,7 @@
         typeof objectOrFn.referToSelf.callback === 'function';
     }
 
+    const saveTyped = typed
     /**
      * Originally the main function was a typed function itself, but then
      * it might not be able to generate error messages if the client
@@ -1720,12 +1793,18 @@
     }
 
     typed.create = create;
-    typed.types = _types;
-    typed.conversions = _conversions;
+    typed._map = saveTyped._map;
+    typed._first = saveTyped._first;
+    typed._last = saveTyped._last;
+    typed._nconversions = saveTyped._nconversions;
     typed.ignore = _ignore;
     typed.onMismatch = _onMismatch;
     typed.throwMismatchError = _onMismatch;
     typed.createError = createError;
+    typed.clear = clear;
+    typed.clearConversions = clearConversions;
+    typed.addTypes = addTypes;
+    typed._findType = findType; // For unit testing only
     typed.convert = convert;
     typed.referTo = referTo;
     typed.referToSelf = referToSelf;
@@ -1734,7 +1813,7 @@
     typed.warnAgainstDeprecatedThis = true;
 
     /**
-     * add a type
+     * add a type (convenience wrapper on typed.addTypes)
      * @param {{name: string, test: function}} type
      * @param {boolean} [beforeObjectTest=true]
      *                          If true, the new test will be inserted before
@@ -1742,20 +1821,11 @@
      *                          tests for Object match Array and classes too.
      */
     typed.addType = function (type, beforeObjectTest) {
-      if (!type || typeof type.name !== 'string' || typeof type.test !== 'function') {
-        throw new TypeError('Object with properties {name: string, test: function} expected');
-      }
-
+      let before = 'any'
       if (beforeObjectTest !== false) {
-        for (var i = 0; i < typed.types.length; i++) {
-          if (typed.types[i].name === 'Object') {
-            typed.types.splice(i, 0, type);
-            return
-          }
-        }
+        before = 'Object'
       }
-
-      typed.types.push(type);
+      typed.addTypes([type], before);
     };
 
     /**
@@ -1772,8 +1842,36 @@
         throw new TypeError('Object with properties {from: string, to: string, convert: function} expected');
       }
 
-      typed.conversions.push(conversion);
+      if (conversion.to === conversion.from) {
+        throw new SyntaxError(
+          'Illegal to define conversion from "' + conversion.from +
+          '" to itself.');
+      }
+
+      const to = findType(conversion.to)
+      console.log('Adding', conversion.from, 'to', to.name)
+      if (to.conversionsTo.every(function (other) {
+        return other.from !== conversion.from
+      })) {
+        to.conversionsTo.push({
+          from: conversion.from,
+          convert: conversion.convert,
+          index: typed._nconversions++
+        })
+        console.log('...yielding', to.conversionsTo)
+      } else {
+        throw new Error(
+          'There is already a conversion from "' + conversion.from + '" to "' +
+          to.name + '"');
+      }
     };
+
+    /**
+     * Convenience wrapper to call addConversion on each conversion in a list.
+     */
+    typed.addConversions = function (conversions) {
+      conversions.forEach(typed.addConversion);
+    }
 
     return typed;
   }
