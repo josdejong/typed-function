@@ -250,24 +250,26 @@
     /**
      * Convert a given value to another data type.
      * @param {*} value
-     * @param {string} type
+     * @param {string} typeName
      */
-    function convert (value, type) {
-      var from = findTypeName(value);
-
+    function convert (value, typeName) {
       // check conversion is needed
-      if (type === from) {
+      const type = findTypeByName(typeName)
+      if (type.test(value)) {
         return value;
       }
-
-      for (var i = 0; i < typed.conversions.length; i++) {
-        var conversion = typed.conversions[i];
-        if (conversion.from === from && conversion.to === type) {
-          return conversion.convert(value);
+      const conversions = filterConversions(typed.conversions, [typeName]);
+      if (conversions.length === 0) {
+        throw new Error('There are no conversions to ' + typeName + ' defined.')
+      }
+      for (var i = 0; i < conversions.length; i++) {
+        const fromType = findTypeByName(conversions[i].from);
+        if (fromType.test(value)) {
+          return conversions[i].convert(value);
         }
       }
 
-      throw new Error('Cannot convert from ' + from + ' to ' + type);
+      throw new Error('Cannot convert ' + value + ' to ' + typeName);
     }
 
     /**
