@@ -366,6 +366,12 @@ describe('construction', function() {
         ['number', 'string', 'boolean']);
   });
 
+  it('should increment the count of typed functions', function () {
+    const saveCount = typed.createCount;
+    const fn = typed({number: () => true});
+    assert.strictEqual(typed.createCount - saveCount, 1);
+  });
+
   it('should allow a function to be defined recursively', function () {
     var fn = typed({
       'number': function (value) {

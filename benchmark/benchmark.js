@@ -116,6 +116,8 @@ suite
     console.log(String(event.target));
   })
   .on('complete', function() {
+    console.log('First typed universe created', typed.createCount, 'functions')
+    console.log('typed2 universe created', typed2.createCount, 'functions')
   })
   .run();
 
