@@ -6,6 +6,8 @@
 - Refactored the `typed` constructor to be more flexible, accepting a
   combination of multiple typed functions or objects. And internally refactored
   the constructor to not use typed-function itself (#142). Thanks @gwhitney.
+- Extended the benchmark script and added counting of creation of typed
+  functions (#146).
 
 
 ## 2022-03-11, version 2.1.0
