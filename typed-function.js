@@ -104,7 +104,8 @@
     var typed = {
       types: _types,
       conversions: _conversions,
-      ignore: _ignore
+      ignore: _ignore,
+      createCount: 0
     };
 
     /**
@@ -982,6 +983,8 @@
      * @return {function}  Returns the created typed function.
      */
     function createTypedFunction(name, signaturesMap) {
+      typed.createCount++
+
       if (Object.keys(signaturesMap).length === 0) {
         throw new SyntaxError('No signatures provided');
       }
@@ -1321,6 +1324,7 @@
       }
     }
 
+    const saveTyped = typed
     /**
      * Originally the main function was a typed function itself, but then
      * it might not be able to generate error messages if the client
@@ -1391,6 +1395,7 @@
     typed.types = _types;
     typed.conversions = _conversions;
     typed.ignore = _ignore;
+    typed.createCount = saveTyped.createCount;
     typed.onMismatch = _onMismatch;
     typed.throwMismatchError = _onMismatch;
     typed.createError = createError;
