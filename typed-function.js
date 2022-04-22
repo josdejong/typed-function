@@ -42,6 +42,8 @@
    *
    * @typedef {{
    *   types: Type[],
+   *   hasAny: boolean,
+   *   hasConversion: boolean,
    *   restParam: boolean
    * }} Param
    *
@@ -49,6 +51,7 @@
    *   name: string,
    *   typeIndex: number,
    *   test: function,
+   *   isAny: boolean,
    *   conversion?: ConversionDef,
    *   conversionIndex: number,
    * }} Type
@@ -91,7 +94,8 @@
 
     var anyType = {
       name: 'any',
-      test: ok
+      test: ok,
+      isAny: true
     }
 
     // types which need to be ignored
@@ -272,13 +276,17 @@
 
       var matchingConversions = filterConversions(conversions, typeNames);
 
+      var hasAny = false
+
       var exactTypes = typeNames.map(function (typeName) {
         var type = findTypeByName(typeName);
+        hasAny = type.isAny || hasAny;
 
         return {
           name: typeName,
           typeIndex: findTypeIndex(type),
           test: type.test,
+          isAny: type.isAny,
           conversion: null,
           conversionIndex: -1
         };
@@ -286,11 +294,13 @@
 
       var convertibleTypes = matchingConversions.map(function (conversion) {
         var type = findTypeByName(conversion.from);
+        hasAny = type.isAny || hasAny;
 
         return {
           name: conversion.from,
           typeIndex: findTypeIndex(type),
           test: type.test,
+          isAny: type.isAny,
           conversion: conversion,
           conversionIndex: conversions.indexOf(conversion)
         };
@@ -298,6 +308,8 @@
 
       return {
         types: exactTypes.concat(convertibleTypes),
+        hasAny: hasAny,
+        hasConversion: convertibleTypes.length > 0,
         restParam: restParam
       };
     }
@@ -349,18 +361,6 @@
     function hasRestParam(params) {
       var param = last(params)
       return param ? param.restParam : false;
-    }
-
-    /**
-     * Test whether a parameter contains conversions
-     * @param {Param} param
-     * @return {boolean} Returns true when at least one of the parameters
-     *                   contains a conversion.
-     */
-    function hasConversions(param) {
-      return param.types.some(function (type) {
-        return type.conversion != null;
-      });
     }
 
     /**
@@ -657,33 +657,41 @@
      * Compare two params
      * @param {Param} param1
      * @param {Param} param2
-     * @return {number} returns a negative number when param1 must get a lower
-     *                  index than param2, a positive number when the opposite,
+     * @return {number} returns -1 when param1 must get a lower
+     *                  index than param2, 1 when the opposite,
      *                  or zero when both are equal
      */
     function compareParams (param1, param2) {
-      var c;
-
-      // compare having a rest parameter or not
-      c = param1.restParam - param2.restParam;
-      if (c !== 0) {
-        return c;
+      // We compare a number of metrics on a param in turn:
+      // 1) 'any' parameters are the least preferred
+      if (param1.hasAny) {
+        if (!param2.hasAny) return 1
       }
+      else if (param2.hasAny) return -1
 
-      // compare having conversions or not
-      c = hasConversions(param1) - hasConversions(param2);
-      if (c !== 0) {
-        return c;
-      }
+      // 2) Prefer non-rest to rest parameters
+      if (param1.restParam) {
+        if (!param2.restParam) return 1
+      } else if (param2.restParam) return -1
 
-      // compare the index of the types
-      c = getLowestTypeIndex(param1) - getLowestTypeIndex(param2);
-      if (c !== 0) {
-        return c;
-      }
+      // 3) Prefer exact type match to conversions
+      if (param1.hasConversion) {
+        if (!param2.hasConversion) return 1
+      } else if (param2.hasConversion) return -1
 
-      // compare the index of any conversion
-      return getLowestConversionIndex(param1) - getLowestConversionIndex(param2);
+      // 4) Prefer lower type index:
+      const typeDiff = getLowestTypeIndex(param1) - getLowestTypeIndex(param2)
+      if (typeDiff < 0) return -1
+      if (typeDiff > 0) return 1
+
+      // 5) Prefer lower conversion index
+      const convDiff =
+        getLowestConversionIndex(param1) - getLowestConversionIndex(param2)
+      if (convDiff < 0) return -1
+      if (convDiff > 0) return 1
+
+      // Don't have a basis for preference
+      return 0
     }
 
     /**
@@ -695,34 +703,75 @@
      *                  or zero when both are equal
      */
     function compareSignatures (signature1, signature2) {
-      var len = Math.min(signature1.params.length, signature2.params.length);
-      var i;
-      var c;
+      const pars1 = signature1.params
+      const pars2 = signature2.params
+      const last1 = last(pars1)
+      const last2 = last(pars2)
+      const hasRest1 = hasRestParam(pars1)
+      const hasRest2 = hasRestParam(pars2)
+      // We compare a number of metrics on signatures in turn:
+      // 1) An "any rest param" is least preferred
+      if (hasRest1 && last1.hasAny) {
+        if (!hasRest2 || !last2.hasAny) return 1
+      } else if (hasRest2 && last2.hasAny) return -1
 
-      // compare whether the params have conversions at all or not
-      c = signature1.params.some(hasConversions) - signature2.params.some(hasConversions)
-      if (c !== 0) {
-        return c;
+      // 2) Minimize the number of 'any' parameters
+      let any1 = 0;
+      let conv1 = 0;
+      let par;
+      for (par of pars1) {
+        if (par.hasAny) ++any1;
+        if (par.hasConversion) ++conv1;
+      }
+      let any2 = 0;
+      let conv2 = 0;
+      for (par of pars2) {
+        if (par.hasAny) ++any2;
+        if (par.hasConversion) ++conv2;
+      }
+      if (any1 !== any2) return any1 - any2;
+
+      // 3) A conversion rest param is less preferred
+      if (hasRest1 && last1.hasConversion) {
+        if (!hasRest2 || !last2.hasConversion) return 1
+      } else if (hasRest2 && last2.hasConversion) return -1
+
+      // 4) Minimize the number of conversions
+      if (conv1 !== conv2) return conv1 - conv2;
+
+      // 5) Prefer no rest param
+      if (hasRest1) {
+        if (!hasRest2) return 1
+      } else if (hasRest2) return -1
+
+      // 6) Prefer shorter with rest param, longer without
+      const lengthCriterion = (pars1.length - pars2.length) * (hasRest1 ? -1 : 1)
+      if (lengthCriterion !== 0) return lengthCriterion
+
+      // Signatures are identical in each of the above metrics.
+      // In particular, they are the same length.
+      // We can therefore compare the parameters one by one.
+      // First we count which signature has more preferred parameters.
+      const comparisons = []
+      let tc = 0
+      for (let i = 0; i < pars1.length; ++i) {
+        const thisComparison = compareParams(pars1[i], pars2[i])
+        comparisons.push(thisComparison)
+        tc += thisComparison
+      }
+      if (tc !== 0) return tc
+
+      // They have the same number of preferred parameters, so go by the
+      // earliest parameter in which we have a preference.
+      // In other words, dispatch is driven somewhat more by earlier
+      // parameters than later ones.
+      let c
+      for (c of comparisons) {
+        if (c !== 0) return c
       }
 
-      // next compare whether the params have conversions one by one
-      for (i = 0; i < len; i++) {
-        c = hasConversions(signature1.params[i]) - hasConversions(signature2.params[i]);
-        if (c !== 0) {
-          return c;
-        }
-      }
-
-      // compare the types of the params one by one
-      for (i = 0; i < len; i++) {
-        c = compareParams(signature1.params[i], signature2.params[i]);
-        if (c !== 0) {
-          return c;
-        }
-      }
-
-      // compare the number of params
-      return signature1.params.length - signature2.params.length;
+      // It's a tossup:
+      return 0
     }
 
     /**
@@ -762,7 +811,7 @@
 
       // TODO: can we make this wrapper function smarter/simpler?
 
-      if (params.some(hasConversions)) {
+      if (params.some(p => p.hasConversion)) {
         var restParam = hasRestParam(params);
         var compiledConversions = params.map(compileArgConversion)
 
@@ -869,7 +918,7 @@
     function createSignaturesMap(signatures) {
       var signaturesMap = {};
       signatures.forEach(function (signature) {
-        if (!signature.params.some(hasConversions)) {
+        if (!signature.params.some(p => p.hasConversion)) {
           splitParams(signature.params, true).forEach(function (params) {
             signaturesMap[stringifyParams(params)] = signature.fn;
           });
@@ -898,46 +947,61 @@
      * @return {Param[]}
      */
     function splitParams(params, ignoreConversionTypes) {
-      function _splitParams(params, index, types) {
+      function _splitParams(params, index, paramsSoFar) {
         if (index < params.length) {
           var param = params[index]
           var filteredTypes = ignoreConversionTypes
               ? param.types.filter(isExactType)
               : param.types;
-          var typeGroups
+          var resultingParams
 
           if (param.restParam) {
             // split the types of a rest parameter in two:
             // one with only exact types, and one with exact types and conversions
             var exactTypes = filteredTypes.filter(isExactType)
-            typeGroups = exactTypes.length < filteredTypes.length
-                ? [exactTypes, filteredTypes]
-                : [filteredTypes]
-
+            if (exactTypes.length < filteredTypes.length) {
+              const exactParam = {
+                types: exactTypes,
+                hasAny: exactTypes.some(t => t.isAny),
+                hasConversion: false,
+                restParam: true
+              }
+              resultingParams = [exactParam, {
+                types: filteredTypes,
+                hasAny: exactTypes.hasAny || filteredTypes.some(t => t.isAny),
+                hasConversion: true,
+                restParam: true
+              }]
+            } else { // None of the filtered types were conversions, so:
+              resultingParams = [{
+                types: filteredTypes,
+                hasAny: filteredTypes.some(t => t.isAny),
+                hasConversion: false,
+                restParam: true
+              }]
+            }
           }
           else {
-            // split all the types of a regular parameter into one type per group
-            typeGroups = filteredTypes.map(function (type) {
-              return [type]
+            // split all the types of a regular parameter into one type per param
+            resultingParams = filteredTypes.map(function (type) {
+              return {
+                types: [type],
+                hasAny: type.isAny,
+                hasConversion: type.conversion,
+                restParam: false
+              }
             })
           }
 
           // recurse over the groups with types
-          return flatMap(typeGroups, function (typeGroup) {
-            return _splitParams(params, index + 1, types.concat([typeGroup]));
+          return flatMap(resultingParams, function (nextParam) {
+            return _splitParams(params, index + 1, paramsSoFar.concat([nextParam]));
           });
 
         }
         else {
-          // we've reached the end of the parameters. Now build a new Param
-          var splittedParams = types.map(function (type, typeIndex) {
-            return {
-              types: type,
-              restParam: (typeIndex === params.length - 1) && hasRestParam(params)
-            }
-          });
-
-          return [splittedParams];
+          // we've reached the end of the parameters.
+          return [paramsSoFar];
         }
       }
 
