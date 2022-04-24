@@ -34,6 +34,8 @@
     return undefined;
   }
 
+  const NOT_TYPED_FUNCTION = 'Argument is not a typed-function.'
+
   /**
    * @typedef {{
    *   params: Param[],
@@ -171,6 +173,16 @@
     }
 
     /**
+     * Check if an entity is a typed function created by any instance
+     * @param {any} entity
+     * @returns {boolean}
+     */
+    function isTypedFunction(entity) {
+      return entity && typeof entity === 'function' &&
+        '_isTypedFunction' in entity;
+    }
+
+    /**
      * Find a specific signature from a (composed) typed function, for example:
      *
      *   typed.find(fn, ['number', 'string'])
@@ -186,8 +198,8 @@
      *                                        is found.
      */
     function find (fn, signature) {
-      if (!fn.signatures) {
-        throw new TypeError('Function is no typed-function');
+      if (!isTypedFunction(fn)) {
+        throw new TypeError(NOT_TYPED_FUNCTION);
       }
 
       // normalize input
@@ -1098,9 +1110,9 @@
       var allOk = ok0 && ok1 && ok2 && ok3 && ok4 && ok5;
 
       // compile the tests
-      var tests = signatures.map(function (signature) {
-        return compileTests(signature.params);
-      });
+      for (var i = 0; i < signatures.length; ++i) {
+        signatures[i].test = compileTests(signatures[i].params);
+      }
 
       var test00 = ok0 ? compileTest(signatures[0].params[0]) : notOk;
       var test10 = ok1 ? compileTest(signatures[1].params[0]) : notOk;
@@ -1117,16 +1129,17 @@
       var test51 = ok5 ? compileTest(signatures[5].params[1]) : notOk;
 
       // compile the functions
-      var fns = signatures.map(function(signature) {
-        return compileArgsPreprocessing(signature.params, signature.fn);
-      });
+      for (var i = 0; i < signatures.length; ++i) {
+        signatures[i].implementation =
+          compileArgsPreprocessing(signatures[i].params, signatures[i].fn);
+      }
 
-      var fn0 = ok0 ? fns[0] : undef;
-      var fn1 = ok1 ? fns[1] : undef;
-      var fn2 = ok2 ? fns[2] : undef;
-      var fn3 = ok3 ? fns[3] : undef;
-      var fn4 = ok4 ? fns[4] : undef;
-      var fn5 = ok5 ? fns[5] : undef;
+      var fn0 = ok0 ? signatures[0].implementation : undef;
+      var fn1 = ok1 ? signatures[1].implementation : undef;
+      var fn2 = ok2 ? signatures[2].implementation : undef;
+      var fn3 = ok3 ? signatures[3].implementation : undef;
+      var fn4 = ok4 ? signatures[4].implementation : undef;
+      var fn5 = ok5 ? signatures[5].implementation : undef;
 
       var len0 = ok0 ? signatures[0].params.length : -1;
       var len1 = ok1 ? signatures[1].params.length : -1;
@@ -1142,8 +1155,8 @@
         'use strict';
 
         for (var i = iStart; i < iEnd; i++) {
-          if (tests[i](arguments)) {
-            return fns[i].apply(this, arguments);
+          if (signatures[i].test(arguments)) {
+            return signatures[i].implementation.apply(this, arguments);
           }
         }
 
@@ -1175,8 +1188,17 @@
         // so it's fine to have unnamed functions.
       }
 
-      // attach signatures to the function
+      // attach signatures to the function.
+      // This property is close to the original collection of signatures
+      // used to create the typed-function, just with unions split:
       fn.signatures = createSignaturesMap(signatures);
+
+      // Store internal data for functions like resolve, find, etc.
+      fn._internal = { signatures: signatures };
+
+      // Also attach a property that is unlikely to collide with anything
+      // else so that we can check that this is a typed function:
+      fn._isTypedFunction = true
 
       return fn;
     }
@@ -1360,7 +1382,7 @@
         // Only pay attention to own properties, and only if their values
         // are typed functions or functions with a signature property
         if (obj.hasOwnProperty(key) &&
-            (typeof obj[key].signatures === 'object' ||
+            (isTypedFunction(obj[key]) ||
              typeof obj[key].signature === 'string')) {
           name = checkName(name, obj[key].name)
         }
@@ -1426,7 +1448,7 @@
           if (typeof item.signature === 'string') {
             // Case 1: Ordinary function with a string 'signature' property
             theseSignatures[item.signature] = item
-          } else if (typeof item.signatures === 'object') {
+          } else if (isTypedFunction(item)) {
             // Case 2: Existing typed function
             theseSignatures = item.signatures
           }
@@ -1465,6 +1487,7 @@
     typed.createError = createError;
     typed.convert = convert;
     typed.find = find;
+    typed.isTypedFunction = isTypedFunction;
 
     /**
      * add a type
@@ -1491,7 +1514,12 @@
       typed.types.push(type);
     };
 
-    // add a conversion
+    /**
+     * Add a conversion
+     * @param {{from: string, to: string, convert: function}} conversion
+     * @returns {void}
+     * @throws {TypeError}
+     */
     typed.addConversion = function (conversion) {
       if (!conversion
           || typeof conversion.from !== 'string'
@@ -1502,6 +1530,27 @@
 
       typed.conversions.push(conversion);
     };
+
+    /**
+     * Produce the specific signature that a typed function
+     * will execute on the given arguments. Here, a "signature" is an
+     * object with properties 'params', 'test', 'fn', and 'implementation'.
+     * This last property is a function that converts params as necessary
+     * and then calls 'fn'. Returns null if there is no matching signature.
+     * @param {typed-function} tf
+     * @param {any[]} argList
+     * @returns {{params: string, test: function, fn: function, implementation: function}}
+     */
+    typed.resolve = function (tf, argList) {
+      if (!isTypedFunction(tf)) {
+        throw new TypeError(NOT_TYPED_FUNCTION);
+      }
+      const sigs = tf._internal.signatures;
+      for (var i = 0; i < sigs.length; ++i) {
+        if (sigs[i].test(argList)) return sigs[i];
+      }
+      return null;
+    }
 
     return typed;
   }

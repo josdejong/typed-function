@@ -223,7 +223,30 @@ as long as any that have names agree with one another.
 If the same signature is specified by the collection of arguments more than
 once with different implementations, an error will be thrown.
 
-### Methods
+#### Properties and methods of a typed function `fn`
+
+-   `fn.name : string`
+
+    The name of the typed function, if one was assigned at creation; otherwise,
+    the value of this property is the empty string.
+
+-   `fn.signatures : Object.<string, function>`
+
+    The value of this property is a plain object. Its keys are the string
+    signatures on which this typed function `fn` is directly defined
+    (without conversions). The value for each key is the function `fn`
+    will call when its arguments match that signature. This property may
+    differ from the similar object used to create the typed function,
+    in that the originally provided signatures are parsed into a canonical,
+    more usable form: union types are split into their constituents where
+    possible, whitespace in the signature strings is removed, etc.
+
+-   `fn.toString() : string`
+
+    Returns human-readable code showing exactly what the function does.
+    Mostly for debugging purposes.
+
+### Methods of the typed package
 
 -   `typed.convert(value: *, type: string) : *`
 
@@ -254,6 +277,29 @@ once with different implementations, an error will be thrown.
     This would allow you, for example, to have two different type hierarchies
     for different purposes.
 
+-   `typed.resolve(fn: typed-function, argList: Array<any>): signature-object`
+
+    Find the specific signature and implementation that the typed function
+    `fn` will call if invoked on the argument list `argList`. Returns null if
+    there is no matching signature. The returned signature object has
+    properties `params`, `test`, `fn`, and `implementation`. The difference
+    between the last two properties is that `fn` is the original function
+    supplied at typed-function creation time, whereas `implementation` is
+    ready to be called on this specific argList, in that it will first
+    perform any necessary conversions and gather arguments up into "rest"
+    parameters as needed.
+
+    Thus, in the case that arguments `a0`,`a1`,`a2` (say) do match one of
+    the signatures of this typed function `fn`, then `fn(a0, a1, a2)`
+    (in a context in which `this` will be, say, `t`) does exactly the same
+    thing as
+
+    `typed.resolve(fn, [a0,a1,a2]).implementation.apply(t, [a0,a1,a2])`.
+
+    But `resolve` is useful if you want to interpose any other operation
+    (such as bookkeeping or additional custom error checking) between
+    signature selection and execution dispatch.
+
 -   `typed.find(fn: typed-function, signature: string | Array) : function | null`
 
     Find a specific signature from a typed function. The function currently
@@ -266,6 +312,14 @@ once with different implementations, an error will be thrown.
     var f = typed.find(fn, ['number', 'string']);
     var f = typed.find(fn, 'number, string');
     ```
+
+-   `typed.isTypedFunction(entity: any): boolean`
+
+    Return true if the given entity appears to be a typed function
+    (created by any instance of typed-function), and false otherwise. It
+    tests for the presence of a particular property on the entity,
+    and so could be deceived by another object with the same property, although
+    the property is chosen so that's unlikely to happen unintentionally.
 
 -   `typed.addType(type: {name: string, test: function} [, beforeObjectTest=true]): void`
 
@@ -448,31 +502,17 @@ console.log(sqrt('9')); // output: 3
 ```
 
 
-### Output
-
-The functions generated with `typed({...})` have:
-
-- A function `toString`. Returns well readable code which can be used to see
-  what the function exactly does. Mostly for debugging purposes.
-- A property `signatures`, which holds a map with the (normalized)
-  signatures as key and the original sub-functions as value.
-- A property `name` containing the name of the typed function, if it was
-  assigned one at creation, or an empty string.
-
-
 ## Roadmap
 
-### Version 2
+### Version 4
 
-- Be able to turn off exception throwing.
 - Extend function signatures:
   - Optional arguments like `'[number], array'` or like `number=, array`
   - Nullable arguments like `'?Object'`
-- Create a good benchmark, to get insight in the overhead.
 - Allow conversions to fail (for example string to number is not always
   possible). Call this `fallible` or `optional`?
 
-### Version 3
+### Version 5
 
 - Extend function signatures:
   - Constants like `'"linear" | "cubic"'`, `'0..10'`, etc.
