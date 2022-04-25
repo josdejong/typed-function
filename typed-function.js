@@ -179,7 +179,7 @@
      */
     function isTypedFunction(entity) {
       return entity && typeof entity === 'function' &&
-        '_isTypedFunction' in entity;
+        '_typedFunctionData' in entity;
     }
 
     /**
@@ -1194,11 +1194,8 @@
       fn.signatures = createSignaturesMap(signatures);
 
       // Store internal data for functions like resolve, find, etc.
-      fn._internal = { signatures: signatures };
-
-      // Also attach a property that is unlikely to collide with anything
-      // else so that we can check that this is a typed function:
-      fn._isTypedFunction = true
+      // Also serves as the flag that this is a typed-function
+      fn._typedFunctionData = { signatures: signatures };
 
       return fn;
     }
@@ -1545,7 +1542,7 @@
       if (!isTypedFunction(tf)) {
         throw new TypeError(NOT_TYPED_FUNCTION);
       }
-      const sigs = tf._internal.signatures;
+      const sigs = tf._typedFunctionData.signatures;
       for (var i = 0; i < sigs.length; ++i) {
         if (sigs[i].test(argList)) return sigs[i];
       }
