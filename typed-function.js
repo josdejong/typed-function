@@ -185,19 +185,33 @@
     /**
      * Find a specific signature from a (composed) typed function, for example:
      *
-     *   typed.find(fn, ['number', 'string'])
-     *   typed.find(fn, 'number, string')
+     *   typed.findSignature(fn, ['number', 'string'])
+     *   typed.findSignature(fn, 'number, string')
+     *   typed.findSignature(fn, 'number,string', 'exact')
      *
-     * Function find only only works for exact matches.
+     * This function findSignature will by default return the best match to
+     * the given signature, possibly employing type conversions. If the optional
+     * third argument is supplied with a "truthy" value (such as 'exact'),
+     * only exact matches will be returned (i.e. signatures for which `fn` was
+     * directly defined).
+     *
+     * This function returns a "signature" object, as does `typed.resolve()`,
+     * which is a plain object with four keys: `params` (the array of parameters
+     * for this signature), `fn` (the originally supplied function for this
+     * signature), `test` (a generated function that determines if an argument
+     * list matches this signature, and `implementation` (the function to call
+     * on a matching argument list, that performs conversions if necessary and
+     * then calls the originally supplied function).
      *
      * @param {Function} fn                   A typed-function
      * @param {string | string[]} signature   Signature to be found, can be
      *                                        an array or a comma separated string.
-     * @return {Function}                     Returns the matching signature, or
-     *                                        throws an error when no signature
-     *                                        is found.
+     * @param {Boolean} [false] exact         Return only exact matches?
+     * @return {{ params: Param[], fn: function, test: function, implementation: function }}
+     *     Returns the matching signature, or throws an error when no signature
+     *     is found.
      */
-    function find (fn, signature) {
+    function findSignature (fn, signature, exact) {
       if (!isTypedFunction(fn)) {
         throw new TypeError(NOT_TYPED_FUNCTION);
       }
@@ -219,15 +233,50 @@
 
       var str = arr.join(',');
 
-      // find an exact match
-      var match = fn.signatures[str];
-      if (match) {
-        return match;
+      if (!exact || str in fn.signatures) {
+        // OK, we can check the internal signatures
+        // We do this via a map for efficiency, but first build the map
+        // if that hasn't happened yet.
+        if (!fn._typedFunctionData.signatureMap) {
+          fn._typedFunctionData.signatureMap =
+            createSignaturesMap(fn._typedFunctionData.signatures, false)
+        }
+
+        var match = fn._typedFunctionData.signatureMap[str];
+        if (match) {
+          return match;
+        }
       }
 
-      // TODO: extend find to match non-exact signatures
-
       throw new TypeError('Signature not found (signature: ' + (fn.name || 'unnamed') + '(' + arr.join(', ') + '))');
+    }
+
+    /**
+     * Find the proper function to call for a specific signature from
+     * a (composed) typed function, for example:
+     *
+     *   typed.find(fn, ['number', 'string'])
+     *   typed.find(fn, 'number, string')
+     *   typed.find(fn, 'number,string', 'exact')
+     *
+     * This function find will by default return the best match to
+     * the given signature, possibly employing type conversions (and returning
+     * a function that will perform those conversions as needed). If the optional
+     * third argument is supplied with a "truthy" value (such as 'exact'),
+     * only exact matches will be returned (i.e. signatures for which `fn` was
+     * directly defined).
+     *
+     *
+     * @param {Function} fn                   A typed-function
+     * @param {string | string[]} signature   Signature to be found, can be
+     *                                        an array or a comma separated string.
+     * @param {Boolean} [false] exact         Return only exact matches?
+     * @return {function}                     Returns the function to call for
+     *                                        the given signature, or throws an
+     *                                        error when no match is found.
+     */
+    function find (fn, signature, exact) {
+      return findSignature(fn, signature, exact).implementation;
     }
 
     /**
@@ -917,23 +966,26 @@
     }
 
     /**
-     * Convert an array with signatures into a map with signatures,
-     * where signatures with union types are split into separate signatures
-     *
-     * Throws an error when there are conflicting types
+     * Convert an array with signatures into a map with signatures.
+     * This function assumes that union types have already been split in the
+     * given array.
+     * If the second argument `exact` is true (the default), the map only
+     * includes exact match signatures, and the map values are the original
+     * functions supplied.
+     * If `exact` is false, all signatures are include and the map values
+     * are the full internal signature objects (as returned by `typed.resolve`)
      *
      * @param {Signature[]} signatures
-     * @return {Object.<string, function>}  Returns a map with signatures
-     *                                      as key and the original function
-     *                                      of this signature as value.
+     * @param {boolean} exact
+     * @return {Object.<string, function|signature-object>}
+     *     Returns a map with signatures as key and values as above.
      */
-    function createSignaturesMap(signatures) {
+    function createSignaturesMap(signatures, exact = true) {
       var signaturesMap = {};
       signatures.forEach(function (signature) {
-        if (!signature.params.some(p => p.hasConversion)) {
-          splitParams(signature.params, true).forEach(function (params) {
-            signaturesMap[stringifyParams(params)] = signature.fn;
-          });
+        if (!(exact && signature.params.some(p => p.hasConversion))) {
+          signaturesMap[stringifyParams(signature.params)] =
+            exact ? signature.fn : signature;
         }
       });
 
@@ -1483,6 +1535,7 @@
     typed.throwMismatchError = _onMismatch;
     typed.createError = createError;
     typed.convert = convert;
+    typed.findSignature = findSignature;
     typed.find = find;
     typed.isTypedFunction = isTypedFunction;
 

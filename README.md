@@ -300,17 +300,31 @@ once with different implementations, an error will be thrown.
     (such as bookkeeping or additional custom error checking) between
     signature selection and execution dispatch.
 
--   `typed.find(fn: typed-function, signature: string | Array) : function | null`
+-   `typed.findSignature(fn: typed-function, signature: string | Array, exact: boolean) : signature-object`
 
-    Find a specific signature from a typed function. The function currently
-    only finds exact matching signatures.
+    Find the signature object (as returned by `typed.resolve` above), but
+    based on the specification of a signature (given either as a
+    comma-separated string of parameter types, or an Array of strings giving
+    the parameter types), rather than based on an example argument list.
+
+    The optional third argument, which defaults to false, specifies whether
+    to limit the search to exact type matches, i.e. signatures for which the
+    implementation was directly defined when the typed-function was created
+    (as opposed to signatures that require a type conversion).
+
+    Throws an error if the signature is not found.
+
+-   `typed.find(fn: typed-function, signature: string | Array, exact: boolean) : function`
+
+    Convenience method that returns just the implementation from the
+    signature object produced by `typed.findSignature(fn, signature, exact)`.
     
     For example:
     
     ```js
     var fn = typed(...);
     var f = typed.find(fn, ['number', 'string']);
-    var f = typed.find(fn, 'number, string');
+    var f = typed.find(fn, 'number, string', 'exact');
     ```
 
 -   `typed.isTypedFunction(entity: any): boolean`
