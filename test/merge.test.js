@@ -61,9 +61,9 @@ describe('merge', function () {
 
   it('should not copy conversions as exact signatures', function () {
     var typed2 = typed.create();
-    typed2.conversions = [
+    typed2.addConversion(
       {from: 'string', to: 'number', convert: function (x) {return parseFloat(x)}}
-    ];
+    );
 
     var fn2 = typed2({'number': function (value) { return value }});
 

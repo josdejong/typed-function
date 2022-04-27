@@ -139,7 +139,7 @@ describe('errors', function () {
 
   it('should only list matches of exact and convertable types', function() {
     var typed2 = typed.create();
-    typed2.conversions.push({
+    typed2.addConversion({
       from: 'number',
       to: 'string',
       convert: function (x) {

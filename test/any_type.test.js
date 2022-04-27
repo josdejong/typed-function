@@ -76,7 +76,9 @@ describe('any type', function () {
     });
 
     assert(fn.signatures instanceof Object);
-    assert.deepEqual(Object.keys(fn.signatures), ['any', 'string,any']);
+    assert.equal(Object.keys(fn.signatures).length, 2);
+    assert.ok('any' in fn.signatures);
+    assert.ok('string,any' in fn.signatures);
     assert.equal(fn('foo', 2), 'string,any');
     assert.equal(fn([]), 'any');
     assert.equal(fn('foo'), 'any');

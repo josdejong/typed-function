@@ -179,7 +179,7 @@ describe('construction', function() {
     var typed2 = typed.create();
     function Person() {}
 
-    typed1.types.push({
+    typed1.addType({
       name: 'Person',
       test: function (x) {
         return x instanceof Person;
@@ -187,16 +187,16 @@ describe('construction', function() {
     });
 
     assert.strictEqual(typed.create, typed1.create);
-    assert.notStrictEqual(typed.types, typed1.types);
-    assert.notStrictEqual(typed.conversions, typed1.conversions);
+    assert.notStrictEqual(typed.addTypes, typed1.addTypes);
+    assert.notStrictEqual(typed.addConversion, typed1.addConversion);
 
     assert.strictEqual(typed.create, typed2.create);
-    assert.notStrictEqual(typed.types, typed2.types);
-    assert.notStrictEqual(typed.conversions, typed2.conversions);
+    assert.notStrictEqual(typed.addTypes, typed2.addTypes);
+    assert.notStrictEqual(typed.addConversion, typed2.addConversion);
 
     assert.strictEqual(typed1.create, typed2.create);
-    assert.notStrictEqual(typed1.types, typed2.types);
-    assert.notStrictEqual(typed1.conversions, typed2.conversions);
+    assert.notStrictEqual(typed1.addTypes, typed2.addTypes);
+    assert.notStrictEqual(typed1.addConversion, typed2.addConversion);
 
     typed1({
       'Person': function (p) {return 'Person'}
@@ -220,14 +220,9 @@ describe('construction', function() {
       }
     };
 
-    var objectEntry = typed2.types.find(function (entry) {
-      return entry.name === 'Object';
-    });
-    var objectIndex = typed2.types.indexOf(objectEntry);
-
+    var objectIndex = typed2._findType('Object').index;
     typed2.addType(newType);
-
-    assert.strictEqual(typed2.types[objectIndex], newType);
+    assert.strictEqual(typed2._findType('Person').index, objectIndex);
   });
 
   it('should add a type using addType at the end (after Object)', function() {
@@ -243,7 +238,9 @@ describe('construction', function() {
 
     typed2.addType(newType, false);
 
-    assert.strictEqual(typed2.types[typed2.types.length - 1], newType);
+    assert.strictEqual(
+      typed2._findType('Person').index,
+      typed2._findType('any').index - 1);
   });
 
   it('should throw an error when passing an invalid type to addType', function() {
@@ -349,21 +346,22 @@ describe('construction', function() {
   });
 
   it('should correctly order signatures', function () {
-    var fn = typed({
-      'boolean': function (a) {
-        return 'boolean';
-      },
-      'string': function (a) {
-        return 'string';
-      },
-      'number': function (a) {
-        return 'number';
-      }
-    });
+    const t2 = typed.create()
+    t2.clear()
+    t2.addTypes([
+      {name: 'foo', test: x => x[0] === 1},
+      {name: 'bar', test: x => x[1] === 1},
+      {name: 'baz', test: x => x[2] === 1}
+    ])
+    var fn = t2({
+      baz: a => 'isbaz',
+      bar: a => 'isbar',
+      foo: a => 'isfoo'
+    })
 
-    // TODO: this is tricky, object keys do not officially have a guaranteed order
-    assert.deepEqual(Object.keys(fn.signatures),
-        ['number', 'string', 'boolean']);
+    assert.strictEqual(fn([1,1,1]), 'isfoo')
+    assert.strictEqual(fn([0,1,1]), 'isbar')
+    assert.strictEqual(fn([0,0,1]), 'isbaz')
   });
 
   it('should increment the count of typed functions', function () {

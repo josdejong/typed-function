@@ -364,6 +364,19 @@ once with different implementations, an error will be thrown.
     `typed-function` would never reach the new type. When `beforeObjectTest`
     is `false`, the new type will be added at the end of all tests.
 
+-   `typed.addTypes(types: TypeDef[] [, before = 'any']): void`
+
+    Adds an list of new types. Each entry of the `types` array is an object
+    like the `type` argument to `typed.addType`. The optional `before` argument
+    is similar to `typed.addType` as well, except it should be the name of an
+    arbitrary type that has already been added (rather than just a boolean flag)
+
+-   `typed.clear(): void`
+
+    Removes all types and conversions from the typed instance. Note that any
+    typed-functions created before a call to `clear` will still operate, but
+    they may prouce unintelligible messages in case of type mismatch errors.
+
 -   `typed.addConversion(conversion: {from: string, to: string, convert: function}) : void`
 
     Add a new conversion. Conversions are added to the Array `typed.conversions`.
@@ -382,6 +395,16 @@ once with different implementations, an error will be thrown.
     best to add all of your desired automatic conversions before defining any
     typed functions.
 
+-   `typed.addConversions(conversions: ConversionDef[]): void`
+
+    Convenience method that adds a list of conversions. Each element in the
+    `conversions` array should be an object like the `conversion` argument of
+    `typed.addConversion`.
+
+-   `typed.clearConversions(): void`
+
+    Removes all conversions from the typed instance (leaving the types alone).
+
 -   `typed.createError(name: string, args: Array.<any>, signatures: Array.<Signature>): TypeError`
 
     Generates a custom error object reporting the problem with calling
@@ -394,45 +417,6 @@ once with different implementations, an error will be thrown.
 
 ### Properties
 
--   `typed.types: Array.<{name: string, test: function}>`
-
-    Array with types. Each object contains a type name and a test function.
-    The order of the types determines in which order function arguments are 
-    type-checked, so for performance it's important to put the most used types 
-    first. Custom types can be added like:
-
-    ```js
-    function Person(...) {
-      ...
-    }
-    
-    Person.prototype.isPerson = true;
-
-    typed.types.push({
-      name: 'Person',
-      test: function (x) {
-        return x && x.isPerson === true;
-      }
-    });
-    ```
-
--   `typed.conversions: Array.<{from: string, to: string, convert: function}>`
-
-    An Array with built-in conversions. Empty by default. Can be used to define
-    conversions from `boolean` to `number`. For example:
-
-    ```js
-    typed.conversions.push({
-      from: 'boolean',
-      to: 'number',
-      convert: function (x) {
-        return +x;
-    });
-    ```
-
-    Also note the `addConversion()` method above for simply adding a single
-    conversion at a time.
-    
 -   `typed.ignore: Array.<string>`
 
     An Array with names of types to be ignored when creating a typed function.

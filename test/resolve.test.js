@@ -7,7 +7,7 @@ describe('resolve', function () {
     from: 'boolean', to: 'string', convert: x => '' + x
   }))
 
-  after(() => { typed.conversions = [] })
+  after(() => { typed.clearConversions() })
 
   it('should choose the signature that direct execution would', () => {
     const fn = typed({

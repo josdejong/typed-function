@@ -39,7 +39,9 @@
   /**
    * @typedef {{
    *   params: Param[],
-   *   fn: function
+   *   fn: function,
+   *   test: function,
+   *   implementation: function
    * }} Signature
    *
    * @typedef {{
@@ -66,7 +68,8 @@
    *
    * @typedef {{
    *   name: string,
-   *   test: function(*) : boolean
+   *   test: function(*) : boolean,
+   *   isAny?: boolean
    * }} TypeDef
    */
 
@@ -100,58 +103,124 @@
       isAny: true
     }
 
+    // Data structures to track the types. As these are local variables in
+    // create(), each typed universe will get its own copy, but the variables
+    // will only be accessible through the (closures of the) functions supplied
+    // as properties of the typed object, not directly.
+    // These will be initialized in clear() below
+    var typeMap; // primary store of all types
+    var typeList; // Array of just type names, for the sake of ordering
+
     // types which need to be ignored
     var _ignore = [];
 
-    // type conversions
-    var _conversions = [];
+    // And similar data structures for the type conversions:
+    var nConversions = 0;
+    // the actual conversions are stored on a property of the destination types
 
-    // This is a temporary object, will be replaced with a typed function at the end
+    // This is a temporary object, will be replaced with a function at the end
     var typed = {
-      types: _types,
-      conversions: _conversions,
       ignore: _ignore,
       createCount: 0
     };
 
     /**
-     * Find the test function for a type
-     * @param {String} typeName
-     * @return {TypeDef} Returns the type definition when found,
-     *                    Throws a TypeError otherwise
+     * Takes a type name or a type object and returns the corresponding
+     * officially registered type object for that type.
+     * @param {string | Type | TypeDef} typeSpec
+     * @returns {TypeDef} type
      */
-    function findTypeByName (typeName) {
-      var entry = findInArray(typed.types, function (entry) {
-        return entry.name === typeName;
-      });
-
-      if (entry) {
-        return entry;
+    function findType (typeSpec) {
+      let type = typeof typeSpec === 'string' ?
+        typeMap.get(typeSpec) :
+        typeMap.get(typeSpec.name)
+      if (type) return type;
+      // Remainder is error handling
+      var name = typeof typeSpec === 'string' ? typeSpec : typeSpec.name;
+      var message = 'Unknown type "' + name + '"';
+      name = name.toLowerCase();
+      var typeName;
+      for (typeName of typeList) {
+        if (typeName.toLowerCase() === name) {
+          message += '. Did you mean "' + typeName + '" ?';
+          break
+        }
       }
-
-      if (typeName === 'any') { // special baked-in case 'any'
-        return anyType;
-      }
-
-      var hint = findInArray(typed.types, function (entry) {
-        return entry.name.toLowerCase() === typeName.toLowerCase();
-      });
-
-      throw new TypeError('Unknown type "' + typeName + '"' +
-          (hint ? ('. Did you mean "' + hint.name + '"?') : ''));
+      throw new TypeError(message);
     }
 
     /**
-     * Find the index of a type definition. Handles special case 'any'
-     * @param {TypeDef} type
-     * @return {number}
+     * Adds an array `types` of type definitions to this typed instance.
+     * Each type definition should be an object with properties:
+     * 'name' - a string giving the name of the type; 'test' - function
+     * returning a boolean that tests membership in the type; and optionally
+     * 'isAny' - true only for the 'any' type.
+     *
+     * The second optional argument, `before`, gives the name of a type that
+     * these types should be added before. The new types are added in the
+     * order specified.
+     * @param {TypeDef[]} types
+     * @param {string} ['any'] before
      */
-    function findTypeIndex(type) {
-      if (type === anyType) {
-        return 999;
+    function addTypes (types, beforeSpec = 'any') {
+      var beforeIndex =
+        beforeSpec ? findType(beforeSpec).index : typeList.length;
+      var newTypes = []
+      for (var i = 0; i < types.length; ++i) {
+        if (!types[i] || typeof types[i].name !== 'string' ||
+            typeof types[i].test !== 'function') {
+          throw new TypeError('Object with properties {name: string, test: function} expected');
+        }
+        const typeName = types[i].name
+        if (typeMap.has(typeName)) {
+          throw new TypeError('Duplicate type name "' + typeName + '"');
+        }
+        newTypes.push(typeName);
+        typeMap.set(typeName, {
+          name: typeName,
+          test: types[i].test,
+          isAny: types[i].isAny,
+          index: beforeIndex + i,
+          conversionsTo: [] // Newly added type can't have any conversions to it
+        })
       }
+      // update the typeList
+      var affectedTypes = typeList.slice(beforeIndex)
+      typeList =
+        typeList.slice(0,beforeIndex).concat(newTypes).concat(affectedTypes);
+      // Fix the indices
+      var typeName
+      for (typeName of affectedTypes) {
+        typeMap.get(typeName).index += newTypes.length
+      }
+    }
 
-      return typed.types.indexOf(type);
+    /**
+     * Removes all types and conversions from this typed instance.
+     * May cause previously constructed typed-functions to throw
+     * strange errors when they are called with types that do not
+     * match any of their signatures.
+     */
+    function clear () {
+      typeMap = new Map();
+      typeList = [];
+      nConversions = 0;
+      addTypes([anyType], false);
+    }
+
+    // initialize the types to the default list
+    clear();
+    addTypes(_types);
+
+    /**
+     * Removes all conversions, leaving the types alone.
+     */
+    function clearConversions() {
+      var typeName
+      for (typeName of typeList) {
+        typeMap.get(typeName).conversionsTo = [];
+      }
+      nConversions = 0;
     }
 
     /**
@@ -161,12 +230,9 @@
      *                  the type test matches the value.
      */
     function findTypeName(value) {
-      var entry = findInArray(typed.types, function (entry) {
-        return entry.test(value);
-      });
-
-      if (entry) {
-        return entry.name;
+      var typeName
+      for (typeName of typeList) {
+        if (typeMap.get(typeName).test(value)) return typeName;
       }
 
       throw new TypeError('Value has unknown type. Value: ' + value);
@@ -211,6 +277,9 @@
      *     Returns the matching signature, or throws an error when no signature
      *     is found.
      */
+    // TODO: this is wrong, as it was in develop, does not handle rest params
+    // e.g. findSignature( fn, 'number,number', 'exact' )
+    // should match signature `...number` if it is present in fn.
     function findSignature (fn, signature, exact) {
       if (!isTypedFunction(fn)) {
         throw new TypeError(NOT_TYPED_FUNCTION);
@@ -239,7 +308,7 @@
         // if that hasn't happened yet.
         if (!fn._typedFunctionData.signatureMap) {
           fn._typedFunctionData.signatureMap =
-            createSignaturesMap(fn._typedFunctionData.signatures, false)
+            createSignaturesMap(fn._typedFunctionData.signatures)
         }
 
         var match = fn._typedFunctionData.signatureMap[str];
@@ -282,24 +351,26 @@
     /**
      * Convert a given value to another data type.
      * @param {*} value
-     * @param {string} type
+     * @param {string | TypeDef} type
      */
-    function convert (value, type) {
-      var from = findTypeName(value);
-
+    function convert (value, typeSpec) {
       // check conversion is needed
-      if (type === from) {
+      const type = findType(typeSpec);
+      if (type.test(value)) {
         return value;
       }
-
-      for (var i = 0; i < typed.conversions.length; i++) {
-        var conversion = typed.conversions[i];
-        if (conversion.from === from && conversion.to === type) {
-          return conversion.convert(value);
+      const conversions = type.conversionsTo;
+      if (conversions.length === 0) {
+        throw new Error('There are no conversions to ' + type.name + ' defined.')
+      }
+      for (var i = 0; i < conversions.length; i++) {
+        const fromType = findType(conversions[i].from);
+        if (fromType.test(value)) {
+          return conversions[i].convert(value);
         }
       }
 
-      throw new Error('Cannot convert from ' + from + ' to ' + type);
+      throw new Error('Cannot convert ' + value + ' to ' + type.name);
     }
 
     /**
@@ -320,10 +391,9 @@
     /**
      * Parse a parameter, like "...number | boolean"
      * @param {string} param
-     * @param {ConversionDef[]} conversions
      * @return {Param} param
      */
-    function parseParam (param, conversions) {
+    function parseParam (param) {
       var restParam = param.indexOf('...') === 0;
       var types = (!restParam)
           ? param
@@ -335,17 +405,15 @@
           .filter(notEmpty)
           .filter(notIgnore);
 
-      var matchingConversions = filterConversions(conversions, typeNames);
-
       var hasAny = false
 
       var exactTypes = typeNames.map(function (typeName) {
-        var type = findTypeByName(typeName);
+        var type = findType(typeName);
         hasAny = type.isAny || hasAny;
 
         return {
           name: typeName,
-          typeIndex: findTypeIndex(type),
+          typeIndex: type.index,
           test: type.test,
           isAny: type.isAny,
           conversion: null,
@@ -353,25 +421,44 @@
         };
       });
 
+      return {
+        types: exactTypes,
+        hasAny: hasAny,
+        hasConversion: false,
+        restParam: restParam
+      };
+    }
+
+    /**
+     * Expands a parsed parameter with the types available from currently
+     * defined conversions.
+     * @param {Param} param
+     * @return {Param} param
+     */
+    function expandParam (param) {
+      var typeNames = param.types.map(t => t.name);
+      var matchingConversions = availableConversions(typeNames);
+      var hasAny = param.hasAny
+
       var convertibleTypes = matchingConversions.map(function (conversion) {
-        var type = findTypeByName(conversion.from);
+        var type = findType(conversion.from);
         hasAny = type.isAny || hasAny;
 
         return {
           name: conversion.from,
-          typeIndex: findTypeIndex(type),
+          typeIndex: type.index,
           test: type.test,
           isAny: type.isAny,
           conversion: conversion,
-          conversionIndex: conversions.indexOf(conversion)
+          conversionIndex: conversion.index
         };
       });
 
       return {
-        types: exactTypes.concat(convertibleTypes),
+        types: param.types.concat(convertibleTypes),
         hasAny: hasAny,
         hasConversion: convertibleTypes.length > 0,
-        restParam: restParam
+        restParam: param.restParam
       };
     }
 
@@ -436,18 +523,18 @@
         return ok;
       }
       else if (param.types.length === 1) {
-        return findTypeByName(param.types[0].name).test;
+        return findType(param.types[0].name).test;
       }
       else if (param.types.length === 2) {
-        var test0 = findTypeByName(param.types[0].name).test;
-        var test1 = findTypeByName(param.types[1].name).test;
+        var test0 = findType(param.types[0].name).test;
+        var test1 = findType(param.types[1].name).test;
         return function or(x) {
           return test0(x) || test1(x);
         }
       }
       else { // param.types.length > 2
         var tests = param.types.map(function (type) {
-          return findTypeByName(type.name).test;
+          return findType(type.name).test;
         })
         return function or(x) {
           for (var i = 0; i < tests.length; i++) {
@@ -685,7 +772,7 @@
      * @return {number} Returns the index of the lowest type in typed.types
      */
     function getLowestTypeIndex (param) {
-      var min = 999;
+      var min = typeList.length + 1;
 
       for (var i = 0; i < param.types.length; i++) {
         if (isExactType(param.types[i])) {
@@ -703,7 +790,7 @@
      * @return {number} Returns the lowest index of the conversions of this type
      */
     function getLowestConversionIndex (param) {
-      var min = 999;
+      var min = nConversions + 1;
 
       for (var i = 0; i < param.types.length; i++) {
         if (!isExactType(param.types[i])) {
@@ -836,27 +923,37 @@
     }
 
     /**
-     * Get params containing all types that can be converted to the defined types.
+     * Produce a list of all conversions from distinct types to one of
+     * the given types.
      *
-     * @param {ConversionDef[]} conversions
      * @param {string[]} typeNames
      * @return {ConversionDef[]} Returns the conversions that are available
-     *                        for every type (if any)
+     *                        resulting in any given type (if any)
      */
-    function filterConversions(conversions, typeNames) {
-      var matches = {};
+    function availableConversions(typeNames) {
+      if (typeNames.length === 0) return [];
+      var types = typeNames.map(findType);
+      if (typeNames.length > 1) {
+        types.sort((t1, t2) => t1.index - t2.index);
+      }
+      let matches = types[0].conversionsTo;
+      if (typeNames.length === 1) return matches;
 
-      conversions.forEach(function (conversion) {
-        if (typeNames.indexOf(conversion.from) === -1 &&
-            typeNames.indexOf(conversion.to) !== -1 &&
-            !matches[conversion.from]) {
-          matches[conversion.from] = conversion;
+      matches = matches.concat([]) // shallow copy the matches
+      // Since the types are now in index order, we just want the first
+      // occurence of any from type:
+      var knownTypes = new Set(typeNames);
+      for (var i = 1; i < types.length; ++i) {
+        var newMatch
+        for (newMatch of types[i].conversionsTo) {
+          if (!knownTypes.has(newMatch.from)) {
+            matches.push(newMatch);
+            knownTypes.add(newMatch.from);
+          }
         }
-      });
+      }
 
-      return Object.keys(matches).map(function (from) {
-        return matches[from];
-      });
+      return matches;
     }
 
     /**
@@ -916,7 +1013,7 @@
 
       param.types.forEach(function (type) {
         if (type.conversion) {
-          tests.push(findTypeByName(type.conversion.from).test);
+          tests.push(findType(type.conversion.from).test);
           conversions.push(type.conversion.convert);
         }
       });
@@ -969,26 +1066,21 @@
      * Convert an array with signatures into a map with signatures.
      * This function assumes that union types have already been split in the
      * given array.
-     * If the second argument `exact` is true (the default), the map only
-     * includes exact match signatures, and the map values are the original
-     * functions supplied.
-     * If `exact` is false, all signatures are include and the map values
-     * are the full internal signature objects (as returned by `typed.resolve`)
+     * Note that all signatures are included in the map, even ones with
+     * conversions, and the map values are the full internal signature
+     * objects (as returned by `typed.resolve`)
      *
      * @param {Signature[]} signatures
      * @param {boolean} exact
-     * @return {Object.<string, function|signature-object>}
-     *     Returns a map with signatures as key and values as above.
+     * @return {Object.<string, signature-object>}
+     *     Returns a map with signatures as keys and signature-objects as values.
      */
-    function createSignaturesMap(signatures, exact = true) {
+    function createSignaturesMap(signatures) {
       var signaturesMap = {};
-      signatures.forEach(function (signature) {
-        if (!(exact && signature.params.some(p => p.hasConversion))) {
-          signaturesMap[stringifyParams(signature.params)] =
-            exact ? signature.fn : signature;
-        }
-      });
-
+      var signature
+      for (signature of signatures) {
+        signaturesMap[stringifyParams(signature.params)] = signature;
+      }
       return signaturesMap;
     }
 
@@ -1110,45 +1202,53 @@
      *                                    signature as value.
      * @return {function}  Returns the created typed function.
      */
-    function createTypedFunction(name, signaturesMap) {
+    function createTypedFunction(name, rawSignaturesMap) {
       typed.createCount++
 
-      if (Object.keys(signaturesMap).length === 0) {
+      if (Object.keys(rawSignaturesMap).length === 0) {
         throw new SyntaxError('No signatures provided');
       }
 
-      // parse the signatures, and check for conflicts
+      // Main processing loop for signatures
       var parsedSignatures = [];
-      Object.keys(signaturesMap)
-          .map(function (signature) {
-            return parseSignature(signature, signaturesMap[signature], typed.conversions);
-          })
-          .filter(notNull)
-          .forEach(function (parsedSignature) {
-            // check whether this parameter conflicts with already parsed signatures
-            var conflictingSignature = findInArray(parsedSignatures, function (s) {
-              return hasConflictingParams(s, parsedSignature)
-            });
-            if (conflictingSignature) {
-              throw new TypeError('Conflicting signatures "' +
-                  stringifyParams(conflictingSignature.params) + '" and "' +
-                  stringifyParams(parsedSignature.params) + '".');
-            }
+      var originalFunctions = [];
+      var signaturesMap = {};
+      var signatures = []
+      for (var signature in rawSignaturesMap) {
+        // A) Parse the signature
+        const parsed = parseSignature(signature, rawSignaturesMap[signature])
+        if (!parsed) continue;
+        // B) Check for conflicts
+        parsedSignatures.forEach(function (s) {
+          if (hasConflictingParams(s, parsed)) {
+            throw new TypeError('Conflicting signatures "' +
+              stringifyParams(s.params) + '" and "' +
+              stringifyParams(parsed.params) + '".');
+          }
+        })
+        parsedSignatures.push(parsed)
+        // C) Store the provided function and add conversions
+        const functionIndex = originalFunctions.length;
+        originalFunctions.push(parsed.fn)
+        const conversionParams = parsed.params.map(expandParam)
+        // D) Split the signatures and collect them up
+        var params
+        for (params of splitParams(conversionParams)) {
+          signatures.push({params: params, fn: functionIndex})
+          if (params.every(p => !p.hasConversion)) {
+            signaturesMap[stringifyParams(params)] = functionIndex
+          }
+        }
+      }
 
-            parsedSignatures.push(parsedSignature);
-          });
-
-      // split and filter the types of the signatures, and then order them
-      var signatures = flatMap(parsedSignatures, function (parsedSignature) {
-        var params = parsedSignature ? splitParams(parsedSignature.params, false) : []
-
-        return params.map(function (params) {
-          return {
-            params: params,
-            fn: parsedSignature.fn
-          };
-        });
-      }).filter(notNull);
+      // Fill in the proper function for each signature
+      var s
+      for (s of signatures) {
+        s.fn = originalFunctions[s.fn]
+      }
+      for (s in signaturesMap) {
+        signaturesMap[s] = originalFunctions[signaturesMap[s]]
+      }
 
       signatures.sort(compareSignatures);
 
@@ -1243,7 +1343,7 @@
       // attach signatures to the function.
       // This property is close to the original collection of signatures
       // used to create the typed-function, just with unions split:
-      fn.signatures = createSignaturesMap(signatures);
+      fn.signatures = signaturesMap;
 
       // Store internal data for functions like resolve, find, etc.
       // Also serves as the flag that this is a typed-function
@@ -1527,20 +1627,22 @@
     }
 
     typed.create = create;
-    typed.types = _types;
-    typed.conversions = _conversions;
     typed.ignore = _ignore;
     typed.createCount = saveTyped.createCount;
     typed.onMismatch = _onMismatch;
     typed.throwMismatchError = _onMismatch;
     typed.createError = createError;
+    typed.clear = clear;
+    typed.clearConversions = clearConversions;
+    typed.addTypes = addTypes;
+    typed._findType = findType; // For unit testing only
     typed.convert = convert;
     typed.findSignature = findSignature;
     typed.find = find;
     typed.isTypedFunction = isTypedFunction;
 
     /**
-     * add a type
+     * add a type (convenience wrapper for typed.addTypes)
      * @param {{name: string, test: function}} type
      * @param {boolean} [beforeObjectTest=true]
      *                          If true, the new test will be inserted before
@@ -1548,25 +1650,17 @@
      *                          tests for Object match Array and classes too.
      */
     typed.addType = function (type, beforeObjectTest) {
-      if (!type || typeof type.name !== 'string' || typeof type.test !== 'function') {
-        throw new TypeError('Object with properties {name: string, test: function} expected');
-      }
-
+      var before = 'any'
       if (beforeObjectTest !== false) {
-        for (var i = 0; i < typed.types.length; i++) {
-          if (typed.types[i].name === 'Object') {
-            typed.types.splice(i, 0, type);
-            return
-          }
-        }
+        before = 'Object';
       }
-
-      typed.types.push(type);
+      typed.addTypes([type], before);
     };
 
     /**
      * Add a conversion
-     * @param {{from: string, to: string, convert: function}} conversion
+     *
+     * @param {ConversionDef} conversion
      * @returns {void}
      * @throws {TypeError}
      */
@@ -1577,9 +1671,38 @@
           || typeof conversion.convert !== 'function') {
         throw new TypeError('Object with properties {from: string, to: string, convert: function} expected');
       }
+      if (conversion.to === conversion.from) {
+        throw new SyntaxError(
+          'Illegal to define conversion from "' + conversion.from +
+          '" to itself.');
+      }
 
-      typed.conversions.push(conversion);
+      const to = findType(conversion.to)
+      if (to.conversionsTo.every(function (other) {
+        return other.from !== conversion.from
+      })) {
+        to.conversionsTo.push({
+          from: conversion.from,
+          convert: conversion.convert,
+          index: nConversions++
+        })
+      } else {
+        throw new Error(
+          'There is already a conversion from "' + conversion.from + '" to "' +
+          to.name + '"');
+      }
     };
+
+    /**
+     * Convenience wrapper to call addConversion on each conversion in a list.
+     *
+     @param {ConversionDef[]} conversions
+     @returns {void}
+     @throws {TypeError}
+     */
+    typed.addConversions = function (conversions) {
+      conversions.forEach(typed.addConversion);
+    }
 
     /**
      * Produce the specific signature that a typed function
