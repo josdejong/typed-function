@@ -466,39 +466,27 @@
      * Parse a signature with comma separated parameters,
      * like "number | boolean, ...string"
      * @param {string} signature
-     * @param {function} fn
-     * @param {ConversionDef[]} conversions
-     * @return {Signature | null} signature
+     * @return {Param[]} params
      */
-    function parseSignature (signature, fn, conversions) {
+    function parseSignature (rawSignature) {
       var params = [];
+      var signature = rawSignature.trim()
+      if (signature === '') return params;
 
-      if (signature.trim() !== '') {
-        params = signature
-            .split(',')
-            .map(trim)
-            .map(function (param, index, array) {
-              var parsedParam = parseParam(param, conversions);
-
-              if (parsedParam.restParam && (index !== array.length - 1)) {
-                throw new SyntaxError('Unexpected rest parameter "' + param + '": ' +
-                    'only allowed for the last parameter');
-              }
-
-              return parsedParam;
-          });
+      var rawParams = signature.split(',');
+      for (var i = 0; i < rawParams.length; ++i) {
+        var parsedParam = parseParam(trim(rawParams[i]));
+        if (parsedParam.restParam && (i !== rawParams.length - 1)) {
+          throw new SyntaxError(
+            'Unexpected rest parameter "' + rawParams[i] + '": ' +
+            'only allowed for the last parameter');
+        }
+        // if invalid, short-circuit (all of the types may have been filtered)
+        if (parsedParam.types.length == 0) return null;
+        params.push(parsedParam);
       }
 
-      if (params.some(isInvalidParam)) {
-        // invalid signature: at least one parameter has no types
-        // (they may have been filtered)
-        return null;
-      }
-
-      return {
-        params: params,
-        fn: fn
-      };
+      return params;
     }
 
     /**
@@ -613,30 +601,28 @@
     }
 
     /**
-     * Find the parameter at a specific index of a signature.
+     * Find the parameter at a specific index of a Params list.
      * Handles rest parameters.
-     * @param {Signature} signature
+     * @param {Param[]} params
      * @param {number} index
      * @return {Param | null} Returns the matching parameter when found,
      *                        null otherwise.
      */
-    function getParamAtIndex(signature, index) {
-      return index < signature.params.length
-          ? signature.params[index]
-          : hasRestParam(signature.params)
-              ? last(signature.params)
-              : null
+    function getParamAtIndex(params, index) {
+      return index < params.length
+        ? params[index]
+        : hasRestParam(params) ? last(params) : null
     }
 
     /**
      * Get all type names of a parameter
-     * @param {Signature} signature
+     * @param {Params[]} params
      * @param {number} index
      * @param {boolean} excludeConversions
      * @return {string[]} Returns an array with type names
      */
-    function getExpectedTypeNames (signature, index, excludeConversions) {
-      var param = getParamAtIndex(signature, index);
+    function getExpectedTypeNames (params, index, excludeConversions) {
+      var param = getParamAtIndex(params, index);
       var types = param
           ? excludeConversions
                   ? param.types.filter(isExactType)
@@ -673,7 +659,7 @@
      */
     function mergeExpectedParams(signatures, index) {
       var typeNames = uniq(flatMap(signatures, function (signature) {
-        return getExpectedTypeNames(signature, index, false);
+        return getExpectedTypeNames(signature.params, index, false);
       }));
 
       return (typeNames.indexOf('any') !== -1) ? ['any'] : typeNames;
@@ -696,7 +682,7 @@
       var index;
       for (index = 0; index < args.length; index++) {
         var nextMatchingDefs = matchingSignatures.filter(function (signature) {
-          var test = compileTest(getParamAtIndex(signature, index));
+          var test = compileTest(getParamAtIndex(signature.params, index));
           return (index < signature.params.length || hasRestParam(signature.params)) &&
               test(args[index]);
         });
@@ -757,11 +743,16 @@
         return err;
       }
 
-      err = new TypeError('Arguments of type "' + args.join(', ') +
+      // Generic error
+      var argTypes = []
+      for (var i = 0; i < args.length; ++i) {
+        argTypes.push(findTypeName(args[i]))
+      }
+      err = new TypeError('Arguments of type "' + argTypes.join(', ') +
           '" do not match any of the defined signatures of function ' + _name + '.');
       err.data = {
         category: 'mismatch',
-        actual: args.map(findTypeName)
+        actual: argTypes
       }
       return err;
     }
@@ -1165,27 +1156,27 @@
     }
 
     /**
-     * Test whether two signatures have a conflicting signature
-     * @param {Signature} signature1
-     * @param {Signature} signature2
+     * Test whether two param lists represent conflicting signatures
+     * @param {Param[]} params1
+     * @param {Param[]} params2
      * @return {boolean} Returns true when the signatures conflict, false otherwise.
      */
-    function hasConflictingParams(signature1, signature2) {
-      var ii = Math.max(signature1.params.length, signature2.params.length);
+    function conflicting(params1, params2) {
+      var ii = Math.max(params1.length, params2.length);
 
       for (var i = 0; i < ii; i++) {
-        var typesNames1 = getExpectedTypeNames(signature1, i, true);
-        var typesNames2 = getExpectedTypeNames(signature2, i, true);
+        var typesNames1 = getExpectedTypeNames(params1, i, true);
+        var typesNames2 = getExpectedTypeNames(params2, i, true);
 
         if (!hasOverlap(typesNames1, typesNames2)) {
           return false;
         }
       }
 
-      var len1 = signature1.params.length;
-      var len2 = signature2.params.length;
-      var restParam1 = hasRestParam(signature1.params);
-      var restParam2 = hasRestParam(signature2.params);
+      var len1 = params1.length;
+      var len2 = params2.length;
+      var restParam1 = hasRestParam(params1);
+      var restParam2 = hasRestParam(params2);
 
       return restParam1
           ? restParam2 ? (len1 === len2) : (len2 >= len1)
@@ -1210,33 +1201,33 @@
       }
 
       // Main processing loop for signatures
-      var parsedSignatures = [];
+      var parsedParams = [];
       var originalFunctions = [];
       var signaturesMap = {};
       var signatures = []
       for (var signature in rawSignaturesMap) {
         // A) Parse the signature
-        const parsed = parseSignature(signature, rawSignaturesMap[signature])
-        if (!parsed) continue;
+        const params = parseSignature(signature)
+        if (!params) continue;
         // B) Check for conflicts
-        parsedSignatures.forEach(function (s) {
-          if (hasConflictingParams(s, parsed)) {
+        parsedParams.forEach(function (pp) {
+          if (conflicting(pp, params)) {
             throw new TypeError('Conflicting signatures "' +
-              stringifyParams(s.params) + '" and "' +
-              stringifyParams(parsed.params) + '".');
+              stringifyParams(pp) + '" and "' +
+              stringifyParams(params) + '".');
           }
         })
-        parsedSignatures.push(parsed)
+        parsedParams.push(params)
         // C) Store the provided function and add conversions
         const functionIndex = originalFunctions.length;
-        originalFunctions.push(parsed.fn)
-        const conversionParams = parsed.params.map(expandParam)
+        originalFunctions.push(rawSignaturesMap[signature])
+        const conversionParams = params.map(expandParam)
         // D) Split the signatures and collect them up
-        var params
-        for (params of splitParams(conversionParams)) {
-          signatures.push({params: params, fn: functionIndex})
-          if (params.every(p => !p.hasConversion)) {
-            signaturesMap[stringifyParams(params)] = functionIndex
+        var sp
+        for (sp of splitParams(conversionParams)) {
+          signatures.push({params: sp, fn: functionIndex})
+          if (sp.every(p => !p.hasConversion)) {
+            signaturesMap[stringifyParams(sp)] = functionIndex
           }
         }
       }
@@ -1303,12 +1294,15 @@
       // simple and generic, but also slow
       var iStart = allOk ? 6 : 0;
       var iEnd = signatures.length;
+      // de-reference ahead for execution speed:
+      var tests = signatures.map(s => s.test)
+      var fns = signatures.map(s => s.implementation)
       var generic = function generic() {
         'use strict';
 
         for (var i = iStart; i < iEnd; i++) {
-          if (signatures[i].test(arguments)) {
-            return signatures[i].implementation.apply(this, arguments);
+          if (tests[i](arguments)) {
+            return fns[i].apply(this, arguments);
           }
         }
 
@@ -1396,15 +1390,6 @@
      */
     function notNull(value) {
       return value !== null;
-    }
-
-    /**
-     * Test whether a parameter has no types defined
-     * @param {Param} param
-     * @return {boolean}
-     */
-    function isInvalidParam (param) {
-      return param.types.length === 0;
     }
 
     /**
