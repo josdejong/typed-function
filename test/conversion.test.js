@@ -302,6 +302,22 @@ describe('conversion', function () {
     assert.equal(fn(2, 4, 5), 'numbers');
   });
 
+  it('should only end up with one way to convert a signature', function() {
+    var t2 = typed.create()
+    t2.addConversions([
+      {from: 'number', to: 'string', convert: n => 'N' + n},
+      {from: 'Array', to: 'boolean', convert: A => A.length > 0}
+    ]);
+    var ambiguous = t2({
+      'string, Array': (s, A) => 'one ' + s,
+      'number, boolean': (n, b) => 'two' + n,
+    }); // Could be two ways to apply to 'number, Array'; want only one
+    assert.strictEqual(ambiguous._typedFunctionData.signatures.length, 3)
+    assert.strictEqual(
+      t2.find(ambiguous, 'number, Array').apply(null, [0, [0]]),
+      'two0');
+  });
+
   it('should prefer conversions to any type argument', function() {
     var fn = typed({
       'number': function (a) {

@@ -49,6 +49,21 @@ describe('find', function () {
     assert.strictEqual(typed.find(fn, ''), e);
   });
 
+  it('should match rest params properly', function () {
+    assert.strictEqual(typed.findSignature(fn, 'string, number').fn, b);
+    assert.strictEqual(typed.findSignature(fn, 'string, number, number').fn, b);
+    assert.strictEqual(typed.findSignature(fn, 'string, number, ...number').fn, b);
+  });
+
+  it('should match any params properly', function () {
+    assert.strictEqual(typed.find(fn, 'Array'), d);
+    assert.throws(
+      () => typed.find(fn, 'string, ...any'),
+      /Signature not found/);
+    const fn2 = typed({ '...any': e })
+    assert.strictEqual(typed.findSignature(fn2, '...number|string').fn, e);
+  });
+
   it('should throw an error when not found', function() {
     assert.throws(function () {
       typed.find(fn, 'number, number');
@@ -77,4 +92,38 @@ describe('find', function () {
     assert.strictEqual(t2.find(greet, 'string'), greeting);
   });
 
+  it('should handle non-exact rest parameter matches', function() {
+    const t2 = typed.create();
+    t2.addConversion({
+      from: 'number',
+      to: 'string',
+      convert: n => '' + n + ' much'
+    });
+    const greetAll = A => 'Hi ' + A.join(' and ');
+    const greetRest = t2('greet', { '...string': greetAll });
+    const greetNumberSignature = t2.findSignature(greetRest, 'number');
+    assert.strictEqual(greetNumberSignature.fn, greetAll);
+    assert.strictEqual(
+      greetNumberSignature.implementation.apply(null, [2]),
+      'Hi 2 much');
+    assert.throws(
+      () => t2.find(greetRest, 'number', 'exact'),
+      /Signature not found/);
+    const greetSN = t2.findSignature(greetRest, 'string,number');
+    assert.strictEqual(greetSN.fn, greetAll);
+    assert.strictEqual(
+      greetSN.implementation.apply(null, ['JJ', 2]),
+      'Hi JJ and 2 much');
+    assert.throws(
+      () => t2.find(greetRest, 'string,number', 'exact'),
+      /Signature not found/);
+    const greetNRNS = t2.findSignature(greetRest, 'number,...number|string');
+    assert.strictEqual(greetNRNS.fn, greetAll);
+    assert.strictEqual(
+      greetNRNS.implementation.apply(null, [0, 'JJ', 2]),
+      'Hi 0 much and JJ and 2 much');
+    assert.throws(
+      () => t2.find(greetRest, 'number,...number|string', 'exact'),
+      /Signature not found/);
+  });
 });

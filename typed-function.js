@@ -277,47 +277,72 @@
      *     Returns the matching signature, or throws an error when no signature
      *     is found.
      */
-    // TODO: this is wrong, as it was in develop, does not handle rest params
-    // e.g. findSignature( fn, 'number,number', 'exact' )
-    // should match signature `...number` if it is present in fn.
     function findSignature (fn, signature, exact) {
       if (!isTypedFunction(fn)) {
         throw new TypeError(NOT_TYPED_FUNCTION);
       }
 
-      // normalize input
-      var arr;
-      if (typeof signature === 'string') {
-        arr = signature.split(',');
-        for (var i = 0; i < arr.length; i++) {
-          arr[i] = arr[i].trim();
-        }
-      }
-      else if (Array.isArray(signature)) {
-        arr = signature;
-      }
-      else {
-        throw new TypeError('String array or a comma separated string expected');
-      }
+      // Canonicalize input
+      var stringSignature =
+        Array.isArray(signature) ? signature.join(',') : signature;
+      var params = parseSignature(stringSignature);
+      var canonicalSignature = stringifyParams(params);
 
-      var str = arr.join(',');
-
-      if (!exact || str in fn.signatures) {
+      // First hope we get lucky and exactly match a signature
+      if (!exact || canonicalSignature in fn.signatures) {
         // OK, we can check the internal signatures
-        // We do this via a map for efficiency, but first build the map
-        // if that hasn't happened yet.
-        if (!fn._typedFunctionData.signatureMap) {
-          fn._typedFunctionData.signatureMap =
-            createSignaturesMap(fn._typedFunctionData.signatures)
-        }
-
-        var match = fn._typedFunctionData.signatureMap[str];
+        var match = fn._typedFunctionData.signatureMap.get(canonicalSignature);
         if (match) {
           return match;
         }
       }
 
-      throw new TypeError('Signature not found (signature: ' + (fn.name || 'unnamed') + '(' + arr.join(', ') + '))');
+      // Oh well, we did not; so we have to go back and check the parameters
+      // one by one, in order to catch things like `any` and rest params.
+      // Note here we can assume there is at least one parameter, because
+      // the empty signature would have matched successfully above.
+      var nParams = params.length;
+      var remainingSignatures;
+      if (exact) {
+        remainingSignatures = []
+        var name
+        for (name in fn.signatures) {
+          remainingSignatures.push(fn._typedFunctionData.signatureMap.get(name))
+        }
+      } else {
+        remainingSignatures = fn._typedFunctionData.signatures
+      }
+      for (var i = 0; i < nParams; ++i) {
+        var want = params[i];
+        var filteredSignatures = [];
+        var possibility
+        for (possibility of remainingSignatures) {
+          var have = getParamAtIndex(possibility.params, i);
+          if (!have || (want.restParam && !have.restParam)) {
+            continue;
+          }
+          if (!have.hasAny) {
+            // have to check all of the wanted types are available
+            var haveTypes = paramTypeSet(have);
+            if (want.types.some(wtype => !haveTypes.has(wtype.name))) {
+              continue;
+            }
+          }
+          // OK, this looks good
+          filteredSignatures.push(possibility);
+        }
+        remainingSignatures = filteredSignatures;
+        if (remainingSignatures.length === 0) break;
+      }
+      // Return the first remaining signature that was totally matched:
+      var candidate
+      for (candidate of remainingSignatures) {
+        if (candidate.params.length <= nParams) {
+          return candidate;
+        }
+      }
+
+      throw new TypeError('Signature not found (signature: ' + (fn.name || 'unnamed') + '(' + stringifyParams(params, ', ') + '))');
     }
 
     /**
@@ -376,16 +401,11 @@
     /**
      * Stringify parameters in a normalized way
      * @param {Param[]} params
+     * @param {string} [','] separator
      * @return {string}
      */
-    function stringifyParams (params) {
-      return params
-          .map(function (param) {
-            var typeNames = param.types.map(getTypeName);
-
-            return (param.restParam ? '...' : '') + typeNames.join('|');
-          })
-          .join(',');
+    function stringifyParams (params, separator = ',') {
+      return params.map(p => p.name).join(separator);
     }
 
     /**
@@ -406,10 +426,12 @@
           .filter(notIgnore);
 
       var hasAny = false
+      var paramName = restParam ? '...' : '';
 
       var exactTypes = typeNames.map(function (typeName) {
         var type = findType(typeName);
         hasAny = type.isAny || hasAny;
+        paramName += typeName + '|'
 
         return {
           name: typeName,
@@ -423,6 +445,7 @@
 
       return {
         types: exactTypes,
+        name: paramName.slice(0, -1), // remove trailing '|' from above
         hasAny: hasAny,
         hasConversion: false,
         restParam: restParam
@@ -439,10 +462,12 @@
       var typeNames = param.types.map(t => t.name);
       var matchingConversions = availableConversions(typeNames);
       var hasAny = param.hasAny
+      var newName = param.name
 
       var convertibleTypes = matchingConversions.map(function (conversion) {
         var type = findType(conversion.from);
         hasAny = type.isAny || hasAny;
+        newName += '|' + conversion.from;
 
         return {
           name: conversion.from,
@@ -456,6 +481,7 @@
 
       return {
         types: param.types.concat(convertibleTypes),
+        name: newName,
         hasAny: hasAny,
         hasConversion: convertibleTypes.length > 0,
         restParam: param.restParam
@@ -463,8 +489,24 @@
     }
 
     /**
+     * Return the set of type names in a parameter.
+     * Caches the result for efficiency
+     *
+     * @param {Param} param
+     * @return {Set<string>} typenames
+     */
+    function paramTypeSet (param) {
+      if (!param.typeSet) {
+        param.typeSet = new Set();
+        param.types.forEach(type => param.typeSet.add(type.name));
+      }
+      return param.typeSet;
+    }
+
+    /**
      * Parse a signature with comma separated parameters,
      * like "number | boolean, ...string"
+     *
      * @param {string} signature
      * @return {Param[]} params
      */
@@ -932,7 +974,7 @@
 
       matches = matches.concat([]) // shallow copy the matches
       // Since the types are now in index order, we just want the first
-      // occurence of any from type:
+      // occurrence of any from type:
       var knownTypes = new Set(typeNames);
       for (var i = 1; i < types.length; ++i) {
         var newMatch
@@ -1054,28 +1096,6 @@
     }
 
     /**
-     * Convert an array with signatures into a map with signatures.
-     * This function assumes that union types have already been split in the
-     * given array.
-     * Note that all signatures are included in the map, even ones with
-     * conversions, and the map values are the full internal signature
-     * objects (as returned by `typed.resolve`)
-     *
-     * @param {Signature[]} signatures
-     * @param {boolean} exact
-     * @return {Object.<string, signature-object>}
-     *     Returns a map with signatures as keys and signature-objects as values.
-     */
-    function createSignaturesMap(signatures) {
-      var signaturesMap = {};
-      var signature
-      for (signature of signatures) {
-        signaturesMap[stringifyParams(signature.params)] = signature;
-      }
-      return signaturesMap;
-    }
-
-    /**
      * Split params with union types in to separate params.
      *
      * For example:
@@ -1090,49 +1110,35 @@
      *     // ]
      *
      * @param {Param[]} params
-     * @param {boolean} ignoreConversionTypes
      * @return {Param[]}
      */
-    function splitParams(params, ignoreConversionTypes) {
+    function splitParams(params) {
       function _splitParams(params, index, paramsSoFar) {
         if (index < params.length) {
           var param = params[index]
-          var filteredTypes = ignoreConversionTypes
-              ? param.types.filter(isExactType)
-              : param.types;
-          var resultingParams
+          var resultingParams = []
 
           if (param.restParam) {
             // split the types of a rest parameter in two:
             // one with only exact types, and one with exact types and conversions
-            var exactTypes = filteredTypes.filter(isExactType)
-            if (exactTypes.length < filteredTypes.length) {
-              const exactParam = {
+            var exactTypes = param.types.filter(isExactType)
+            if (exactTypes.length < param.types.length) {
+              resultingParams.push({
                 types: exactTypes,
+                name: '...' + exactTypes.map(t => t.name).join('|'),
                 hasAny: exactTypes.some(t => t.isAny),
                 hasConversion: false,
                 restParam: true
-              }
-              resultingParams = [exactParam, {
-                types: filteredTypes,
-                hasAny: exactTypes.hasAny || filteredTypes.some(t => t.isAny),
-                hasConversion: true,
-                restParam: true
-              }]
-            } else { // None of the filtered types were conversions, so:
-              resultingParams = [{
-                types: filteredTypes,
-                hasAny: filteredTypes.some(t => t.isAny),
-                hasConversion: false,
-                restParam: true
-              }]
+              })
             }
+            resultingParams.push(param);
           }
           else {
             // split all the types of a regular parameter into one type per param
-            resultingParams = filteredTypes.map(function (type) {
+            resultingParams = param.types.map(function (type) {
               return {
                 types: [type],
+                name: type.name,
                 hasAny: type.isAny,
                 hasConversion: type.conversion,
                 restParam: false
@@ -1204,7 +1210,7 @@
       var parsedParams = [];
       var originalFunctions = [];
       var signaturesMap = {};
-      var signatures = []
+      var preliminarySignatures = [] // may have duplicates from conversions
       for (var signature in rawSignaturesMap) {
         // A) Parse the signature
         const params = parseSignature(signature)
@@ -1225,23 +1231,34 @@
         // D) Split the signatures and collect them up
         var sp
         for (sp of splitParams(conversionParams)) {
-          signatures.push({params: sp, fn: functionIndex})
+          var spName = stringifyParams(sp);
+          preliminarySignatures.push(
+            {params: sp, name: spName, fn: functionIndex});
           if (sp.every(p => !p.hasConversion)) {
-            signaturesMap[stringifyParams(sp)] = functionIndex
+            signaturesMap[spName] = functionIndex
           }
         }
       }
 
+      preliminarySignatures.sort(compareSignatures);
+
       // Fill in the proper function for each signature
       var s
-      for (s of signatures) {
-        s.fn = originalFunctions[s.fn]
-      }
       for (s in signaturesMap) {
         signaturesMap[s] = originalFunctions[signaturesMap[s]]
       }
-
-      signatures.sort(compareSignatures);
+      var signatures = []
+      var internalSignatureMap = new Map() // benchmarks faster than object
+      for (s of preliminarySignatures) {
+        // Note it's only safe to eliminate duplicates like this
+        // _after_ the signature sorting step above; otherwise we might
+        // remove the wrong one.
+        if (!internalSignatureMap.has(s.name)) {
+          s.fn = originalFunctions[s.fn]
+          signatures.push(s)
+          internalSignatureMap.set(s.name, s)
+        }
+      }
 
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
       var ok0 = signatures[0] && signatures[0].params.length <= 2 && !hasRestParam(signatures[0].params);
@@ -1341,7 +1358,10 @@
 
       // Store internal data for functions like resolve, find, etc.
       // Also serves as the flag that this is a typed-function
-      fn._typedFunctionData = { signatures: signatures };
+      fn._typedFunctionData = {
+        signatures: signatures,
+        signatureMap: internalSignatureMap
+      };
 
       return fn;
     }
