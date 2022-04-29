@@ -84,7 +84,7 @@
       return typeof x === 'object' && x !== null && x.constructor === Object
     }
 
-    var _types = [
+    const _types = [
       { name: 'number',    test: function (x) { return typeof x === 'number' } },
       { name: 'string',    test: function (x) { return typeof x === 'string' } },
       { name: 'boolean',   test: function (x) { return typeof x === 'boolean' } },
@@ -97,7 +97,7 @@
       { name: 'undefined', test: function (x) { return x === undefined } }
     ];
 
-    var anyType = {
+    const anyType = {
       name: 'any',
       test: ok,
       isAny: true
@@ -108,42 +108,42 @@
     // will only be accessible through the (closures of the) functions supplied
     // as properties of the typed object, not directly.
     // These will be initialized in clear() below
-    var typeMap; // primary store of all types
-    var typeList; // Array of just type names, for the sake of ordering
+    let typeMap; // primary store of all types
+    let typeList; // Array of just type names, for the sake of ordering
 
     // types which need to be ignored
-    var _ignore = [];
+    let _ignore = [];
 
     // And similar data structures for the type conversions:
-    var nConversions = 0;
+    let nConversions = 0;
     // the actual conversions are stored on a property of the destination types
 
     // This is a temporary object, will be replaced with a function at the end
-    var typed = {
+    let typed = {
       ignore: _ignore,
       createCount: 0
     };
 
     /**
-     * Takes a type name or a type object and returns the corresponding
-     * officially registered type object for that type.
-     * @param {string | Type | TypeDef} typeSpec
+     * Takes a type name and returns the corresponding official type object
+     * for that type.
+     *
+     * @param {string} typeSpec
      * @returns {TypeDef} type
      */
-    function findType (typeSpec) {
-      let type = typeof typeSpec === 'string' ?
-        typeMap.get(typeSpec) :
-        typeMap.get(typeSpec.name)
-      if (type) return type;
+    function findType (typeName) {
+      const type = typeMap.get(typeName)
+      if (type) {
+        return type;
+      }
       // Remainder is error handling
-      var name = typeof typeSpec === 'string' ? typeSpec : typeSpec.name;
-      var message = 'Unknown type "' + name + '"';
-      name = name.toLowerCase();
-      var typeName;
-      for (typeName of typeList) {
-        if (typeName.toLowerCase() === name) {
-          message += '. Did you mean "' + typeName + '" ?';
-          break
+      let message = 'Unknown type "' + typeName + '"';
+      const name = typeName.toLowerCase();
+      let otherName;
+      for (otherName of typeList) {
+        if (otherName.toLowerCase() === name) {
+          message += '. Did you mean "' + otherName + '" ?';
+          break;
         }
       }
       throw new TypeError(message);
@@ -163,15 +163,16 @@
      * @param {string} ['any'] before
      */
     function addTypes (types, beforeSpec = 'any') {
-      var beforeIndex =
-        beforeSpec ? findType(beforeSpec).index : typeList.length;
-      var newTypes = []
+      const beforeIndex = beforeSpec
+        ? findType(beforeSpec).index
+        : typeList.length;
+      const newTypes = [];
       for (var i = 0; i < types.length; ++i) {
         if (!types[i] || typeof types[i].name !== 'string' ||
             typeof types[i].test !== 'function') {
           throw new TypeError('Object with properties {name: string, test: function} expected');
         }
-        const typeName = types[i].name
+        const typeName = types[i].name;
         if (typeMap.has(typeName)) {
           throw new TypeError('Duplicate type name "' + typeName + '"');
         }
@@ -185,13 +186,12 @@
         })
       }
       // update the typeList
-      var affectedTypes = typeList.slice(beforeIndex)
+      const affectedTypes = typeList.slice(beforeIndex);
       typeList =
         typeList.slice(0,beforeIndex).concat(newTypes).concat(affectedTypes);
       // Fix the indices
-      var typeName
-      for (typeName of affectedTypes) {
-        typeMap.get(typeName).index += newTypes.length
+      for (var i = beforeIndex + newTypes.length; i < typeList.length; ++i) {
+        typeMap.get(typeList[i]).index = i;
       }
     }
 
@@ -216,7 +216,7 @@
      * Removes all conversions, leaving the types alone.
      */
     function clearConversions() {
-      var typeName
+      let typeName;
       for (typeName of typeList) {
         typeMap.get(typeName).conversionsTo = [];
       }
@@ -230,9 +230,11 @@
      *                  the type test matches the value.
      */
     function findTypeName(value) {
-      var typeName
+      let typeName;
       for (typeName of typeList) {
-        if (typeMap.get(typeName).test(value)) return typeName;
+        if (typeMap.get(typeName).test(value)) {
+          return typeName;
+        }
       }
 
       throw new TypeError('Value has unknown type. Value: ' + value);
@@ -248,18 +250,23 @@
         '_typedFunctionData' in entity;
     }
 
+    const EXACT = { exact: true };
     /**
      * Find a specific signature from a (composed) typed function, for example:
      *
      *   typed.findSignature(fn, ['number', 'string'])
      *   typed.findSignature(fn, 'number, string')
-     *   typed.findSignature(fn, 'number,string', 'exact')
+     *   typed.findSignature(fn, 'number,string', typed.EXACT)
      *
      * This function findSignature will by default return the best match to
      * the given signature, possibly employing type conversions. If the optional
-     * third argument is supplied with a "truthy" value (such as 'exact'),
-     * only exact matches will be returned (i.e. signatures for which `fn` was
-     * directly defined).
+     * third argument is supplied as typed.EXACT (or any object for which
+     * the 'exact' property is true) only exact matches will be returned
+     * (i.e. signatures for which `fn` was directly defined).
+     *
+     * Note that any type matching `any` or one or more instances of TYPE
+     * matching `...TYPE` are considered exact matches in this regard, as
+     * no conversions are used.
      *
      * This function returns a "signature" object, as does `typed.resolve()`,
      * which is a plain object with four keys: `params` (the array of parameters
@@ -270,28 +277,32 @@
      * then calls the originally supplied function).
      *
      * @param {Function} fn                   A typed-function
-     * @param {string | string[]} signature   Signature to be found, can be
-     *                                        an array or a comma separated string.
-     * @param {Boolean} [false] exact         Return only exact matches?
+     * @param {string | string[]} signature
+     *     Signature to be found, can be an array or a comma separated string.
+     * @param {{exact: boolean}} exact
+     *     Should findSignature return only exact matches? (default: no)
      * @return {{ params: Param[], fn: function, test: function, implementation: function }}
      *     Returns the matching signature, or throws an error when no signature
      *     is found.
      */
-    function findSignature (fn, signature, exact) {
+    function findSignature (fn, signature, exactSpec) {
       if (!isTypedFunction(fn)) {
         throw new TypeError(NOT_TYPED_FUNCTION);
       }
 
       // Canonicalize input
-      var stringSignature =
-        Array.isArray(signature) ? signature.join(',') : signature;
-      var params = parseSignature(stringSignature);
-      var canonicalSignature = stringifyParams(params);
+      const exact = exactSpec && exactSpec.exact;
+      const stringSignature = Array.isArray(signature)
+        ? signature.join(',')
+        : signature;
+      const params = parseSignature(stringSignature);
+      const canonicalSignature = stringifyParams(params);
 
       // First hope we get lucky and exactly match a signature
       if (!exact || canonicalSignature in fn.signatures) {
         // OK, we can check the internal signatures
-        var match = fn._typedFunctionData.signatureMap.get(canonicalSignature);
+        const match =
+          fn._typedFunctionData.signatureMap.get(canonicalSignature);
         if (match) {
           return match;
         }
@@ -301,11 +312,11 @@
       // one by one, in order to catch things like `any` and rest params.
       // Note here we can assume there is at least one parameter, because
       // the empty signature would have matched successfully above.
-      var nParams = params.length;
-      var remainingSignatures;
+      const nParams = params.length;
+      let remainingSignatures;
       if (exact) {
         remainingSignatures = []
-        var name
+        let name;
         for (name in fn.signatures) {
           remainingSignatures.push(fn._typedFunctionData.signatureMap.get(name))
         }
@@ -313,17 +324,17 @@
         remainingSignatures = fn._typedFunctionData.signatures
       }
       for (var i = 0; i < nParams; ++i) {
-        var want = params[i];
-        var filteredSignatures = [];
-        var possibility
+        const want = params[i];
+        const filteredSignatures = [];
+        let possibility;
         for (possibility of remainingSignatures) {
-          var have = getParamAtIndex(possibility.params, i);
+          const have = getParamAtIndex(possibility.params, i);
           if (!have || (want.restParam && !have.restParam)) {
             continue;
           }
           if (!have.hasAny) {
             // have to check all of the wanted types are available
-            var haveTypes = paramTypeSet(have);
+            const haveTypes = paramTypeSet(have);
             if (want.types.some(wtype => !haveTypes.has(wtype.name))) {
               continue;
             }
@@ -335,7 +346,7 @@
         if (remainingSignatures.length === 0) break;
       }
       // Return the first remaining signature that was totally matched:
-      var candidate
+      let candidate;
       for (candidate of remainingSignatures) {
         if (candidate.params.length <= nParams) {
           return candidate;
@@ -351,42 +362,44 @@
      *
      *   typed.find(fn, ['number', 'string'])
      *   typed.find(fn, 'number, string')
-     *   typed.find(fn, 'number,string', 'exact')
+     *   typed.find(fn, 'number,string', typed.EXACT)
      *
      * This function find will by default return the best match to
      * the given signature, possibly employing type conversions (and returning
-     * a function that will perform those conversions as needed). If the optional
-     * third argument is supplied with a "truthy" value (such as 'exact'),
-     * only exact matches will be returned (i.e. signatures for which `fn` was
-     * directly defined).
-     *
+     * a function that will perform those conversions as needed). If the
+     * optional third argument is specified as typed.EXACT (or any object for
+     * which the 'exact' property is true), then only exact matches will be
+     * returned (i.e. signatures for which `fn` was directly defined).
      *
      * @param {Function} fn                   A typed-function
-     * @param {string | string[]} signature   Signature to be found, can be
-     *                                        an array or a comma separated string.
-     * @param {Boolean} [false] exact         Return only exact matches?
-     * @return {function}                     Returns the function to call for
-     *                                        the given signature, or throws an
-     *                                        error when no match is found.
+     * @param {string | string[]} signature
+     *     Signature to be found, can be an array or a comma separated string.
+     * @param {{exact: boolean}} exact
+     *     Should find() return only exact matches? (default: no)
+     * @return {function}
+     *     Returns the function to call for the given signature, or throws an
+     *     error if no match is found.
      */
     function find (fn, signature, exact) {
       return findSignature(fn, signature, exact).implementation;
     }
 
     /**
-     * Convert a given value to another data type.
+     * Convert a given value to another data type, specified by type name.
+     *
      * @param {*} value
-     * @param {string | TypeDef} type
+     * @param {string} type
      */
-    function convert (value, typeSpec) {
+    function convert (value, typeName) {
       // check conversion is needed
-      const type = findType(typeSpec);
+      const type = findType(typeName);
       if (type.test(value)) {
         return value;
       }
       const conversions = type.conversionsTo;
       if (conversions.length === 0) {
-        throw new Error('There are no conversions to ' + type.name + ' defined.')
+        throw new Error(
+          'There are no conversions to ' + typeName + ' defined.');
       }
       for (var i = 0; i < conversions.length; i++) {
         const fromType = findType(conversions[i].from);
@@ -395,7 +408,7 @@
         }
       }
 
-      throw new Error('Cannot convert ' + value + ' to ' + type.name);
+      throw new Error('Cannot convert ' + value + ' to ' + typeName);
     }
 
     /**
@@ -414,22 +427,22 @@
      * @return {Param} param
      */
     function parseParam (param) {
-      var restParam = param.indexOf('...') === 0;
-      var types = (!restParam)
+      const restParam = param.indexOf('...') === 0;
+      const types = (!restParam)
           ? param
           : (param.length > 3)
               ? param.slice(3)
               : 'any';
 
-      var typeNames = types.split('|').map(trim)
-          .filter(notEmpty)
-          .filter(notIgnore);
+      const typeNames = types.split('|').map(trim)
+        .filter(notEmpty)
+        .filter(notIgnore);
 
-      var hasAny = false
-      var paramName = restParam ? '...' : '';
+      let hasAny = false;
+      let paramName = restParam ? '...' : '';
 
-      var exactTypes = typeNames.map(function (typeName) {
-        var type = findType(typeName);
+      const exactTypes = typeNames.map(function (typeName) {
+        const type = findType(typeName);
         hasAny = type.isAny || hasAny;
         paramName += typeName + '|'
 
@@ -459,13 +472,13 @@
      * @return {Param} param
      */
     function expandParam (param) {
-      var typeNames = param.types.map(t => t.name);
-      var matchingConversions = availableConversions(typeNames);
-      var hasAny = param.hasAny
-      var newName = param.name
+      const typeNames = param.types.map(t => t.name);
+      const matchingConversions = availableConversions(typeNames);
+      let hasAny = param.hasAny;
+      let newName = param.name;
 
-      var convertibleTypes = matchingConversions.map(function (conversion) {
-        var type = findType(conversion.from);
+      const convertibleTypes = matchingConversions.map(function (conversion) {
+        const type = findType(conversion.from);
         hasAny = type.isAny || hasAny;
         newName += '|' + conversion.from;
 
@@ -511,20 +524,24 @@
      * @return {Param[]} params
      */
     function parseSignature (rawSignature) {
-      var params = [];
-      var signature = rawSignature.trim()
-      if (signature === '') return params;
+      const params = [];
+      const signature = rawSignature.trim()
+      if (signature === '') {
+        return params;
+      }
 
-      var rawParams = signature.split(',');
+      const rawParams = signature.split(',');
       for (var i = 0; i < rawParams.length; ++i) {
-        var parsedParam = parseParam(trim(rawParams[i]));
+        const parsedParam = parseParam(trim(rawParams[i]));
         if (parsedParam.restParam && (i !== rawParams.length - 1)) {
           throw new SyntaxError(
             'Unexpected rest parameter "' + rawParams[i] + '": ' +
             'only allowed for the last parameter');
         }
         // if invalid, short-circuit (all of the types may have been filtered)
-        if (parsedParam.types.length == 0) return null;
+        if (parsedParam.types.length == 0) {
+          return null;
+        }
         params.push(parsedParam);
       }
 
@@ -537,7 +554,7 @@
      * @return {boolean} Returns true when the last parameter is a restParam
      */
     function hasRestParam(params) {
-      var param = last(params)
+      const param = last(params);
       return param ? param.restParam : false;
     }
 
@@ -556,14 +573,14 @@
         return findType(param.types[0].name).test;
       }
       else if (param.types.length === 2) {
-        var test0 = findType(param.types[0].name).test;
-        var test1 = findType(param.types[1].name).test;
+        const test0 = findType(param.types[0].name).test;
+        const test1 = findType(param.types[1].name).test;
         return function or(x) {
           return test0(x) || test1(x);
         }
       }
       else { // param.types.length > 2
-        var tests = param.types.map(function (type) {
+        const tests = param.types.map(function (type) {
           return findType(type.name).test;
         })
         return function or(x) {
@@ -583,14 +600,14 @@
      * @return {function(args: Array<*>) : boolean}
      */
     function compileTests(params) {
-      var tests, test0, test1;
+      let tests, test0, test1;
 
       if (hasRestParam(params)) {
         // variable arguments like '...number'
         tests = initial(params).map(compileTest);
-        var varIndex = tests.length;
-        var lastTest = compileTest(last(params));
-        var testRestParam = function (args) {
+        const varIndex = tests.length;
+        const lastTest = compileTest(last(params));
+        const testRestParam = function (args) {
           for (var i = varIndex; i < args.length; i++) {
             if (!lastTest(args[i])) {
               return false;
@@ -664,8 +681,8 @@
      * @return {string[]} Returns an array with type names
      */
     function getExpectedTypeNames (params, index, excludeConversions) {
-      var param = getParamAtIndex(params, index);
-      var types = param
+      const param = getParamAtIndex(params, index);
+      const types = param
           ? excludeConversions
                   ? param.types.filter(isExactType)
                   : param.types
@@ -700,7 +717,7 @@
      * @return {string[]} Returns an array with available types
      */
     function mergeExpectedParams(signatures, index) {
-      var typeNames = uniq(flatMap(signatures, function (signature) {
+      const typeNames = uniq(flatMap(signatures, function (signature) {
         return getExpectedTypeNames(signature.params, index, false);
       }));
 
@@ -716,15 +733,14 @@
      *                     attached to it in the property `data`
      */
     function createError(name, args, signatures) {
-      var err, expected;
-      var _name = name || 'unnamed';
+      let err, expected;
+      const _name = name || 'unnamed';
 
       // test for wrong type at some index
-      var matchingSignatures = signatures;
-      var index;
-      for (index = 0; index < args.length; index++) {
-        var nextMatchingDefs = matchingSignatures.filter(function (signature) {
-          var test = compileTest(getParamAtIndex(signature.params, index));
+      let matchingSignatures = signatures;
+      for (var index = 0; index < args.length; index++) {
+        const nextMatchingDefs = matchingSignatures.filter(function (signature) {
+          const test = compileTest(getParamAtIndex(signature.params, index));
           return (index < signature.params.length || hasRestParam(signature.params)) &&
               test(args[index]);
         });
@@ -733,7 +749,7 @@
           // no matching signatures anymore, throw error "wrong type"
           expected = mergeExpectedParams(matchingSignatures, index);
           if (expected.length > 0) {
-            var actualType = findTypeName(args[index]);
+            const actualType = findTypeName(args[index]);
 
             err = new TypeError('Unexpected type of argument in function ' + _name +
                 ' (expected: ' + expected.join(' or ') +
@@ -754,8 +770,10 @@
       }
 
       // test for too few arguments
-      var lengths = matchingSignatures.map(function (signature) {
-        return hasRestParam(signature.params) ? Infinity : signature.params.length;
+      const lengths = matchingSignatures.map(function (signature) {
+        return hasRestParam(signature.params)
+          ? Infinity
+          : signature.params.length;
       });
       if (args.length < Math.min.apply(null, lengths)) {
         expected = mergeExpectedParams(matchingSignatures, index);
@@ -772,7 +790,7 @@
       }
 
       // test for too many arguments
-      var maxLength = Math.max.apply(null, lengths);
+      const maxLength = Math.max.apply(null, lengths);
       if (args.length > maxLength) {
         err = new TypeError('Too many arguments in function ' + _name +
             ' (expected: ' + maxLength + ', actual: ' + args.length + ')');
@@ -786,7 +804,7 @@
       }
 
       // Generic error
-      var argTypes = []
+      const argTypes = [];
       for (var i = 0; i < args.length; ++i) {
         argTypes.push(findTypeName(args[i]))
       }
@@ -805,7 +823,7 @@
      * @return {number} Returns the index of the lowest type in typed.types
      */
     function getLowestTypeIndex (param) {
-      var min = typeList.length + 1;
+      let min = typeList.length + 1;
 
       for (var i = 0; i < param.types.length; i++) {
         if (isExactType(param.types[i])) {
@@ -823,7 +841,7 @@
      * @return {number} Returns the lowest index of the conversions of this type
      */
     function getLowestConversionIndex (param) {
-      var min = nConversions + 1;
+      let min = nConversions + 1;
 
       for (var i = 0; i < param.types.length; i++) {
         if (!isExactType(param.types[i])) {
@@ -846,33 +864,53 @@
       // We compare a number of metrics on a param in turn:
       // 1) 'any' parameters are the least preferred
       if (param1.hasAny) {
-        if (!param2.hasAny) return 1
+        if (!param2.hasAny) {
+          return 1;
+        }
       }
-      else if (param2.hasAny) return -1
+      else if (param2.hasAny) {
+        return -1;
+      }
 
       // 2) Prefer non-rest to rest parameters
       if (param1.restParam) {
-        if (!param2.restParam) return 1
-      } else if (param2.restParam) return -1
+        if (!param2.restParam) {
+          return 1;
+        }
+      } else if (param2.restParam) {
+        return -1;
+      }
 
       // 3) Prefer exact type match to conversions
       if (param1.hasConversion) {
-        if (!param2.hasConversion) return 1
-      } else if (param2.hasConversion) return -1
+        if (!param2.hasConversion) {
+          return 1;
+        }
+      } else if (param2.hasConversion) {
+        return -1;
+      }
 
       // 4) Prefer lower type index:
       const typeDiff = getLowestTypeIndex(param1) - getLowestTypeIndex(param2)
-      if (typeDiff < 0) return -1
-      if (typeDiff > 0) return 1
+      if (typeDiff < 0) {
+        return -1;
+      }
+      if (typeDiff > 0) {
+        return 1;
+      }
 
       // 5) Prefer lower conversion index
       const convDiff =
         getLowestConversionIndex(param1) - getLowestConversionIndex(param2)
-      if (convDiff < 0) return -1
-      if (convDiff > 0) return 1
+      if (convDiff < 0) {
+        return -1;
+      }
+      if (convDiff > 0) {
+        return 1;
+      }
 
       // Don't have a basis for preference
-      return 0
+      return 0;
     }
 
     /**
@@ -893,8 +931,12 @@
       // We compare a number of metrics on signatures in turn:
       // 1) An "any rest param" is least preferred
       if (hasRest1 && last1.hasAny) {
-        if (!hasRest2 || !last2.hasAny) return 1
-      } else if (hasRest2 && last2.hasAny) return -1
+        if (!hasRest2 || !last2.hasAny) {
+          return 1;
+        }
+      } else if (hasRest2 && last2.hasAny) {
+        return -1;
+      }
 
       // 2) Minimize the number of 'any' parameters
       let any1 = 0;
@@ -910,49 +952,68 @@
         if (par.hasAny) ++any2;
         if (par.hasConversion) ++conv2;
       }
-      if (any1 !== any2) return any1 - any2;
+      if (any1 !== any2) {
+        return any1 - any2;
+      }
 
       // 3) A conversion rest param is less preferred
       if (hasRest1 && last1.hasConversion) {
-        if (!hasRest2 || !last2.hasConversion) return 1
-      } else if (hasRest2 && last2.hasConversion) return -1
+        if (!hasRest2 || !last2.hasConversion) {
+          return 1;
+        }
+      } else if (hasRest2 && last2.hasConversion) {
+        return -1;
+      }
 
       // 4) Minimize the number of conversions
-      if (conv1 !== conv2) return conv1 - conv2;
+      if (conv1 !== conv2) {
+        return conv1 - conv2;
+      }
 
       // 5) Prefer no rest param
       if (hasRest1) {
-        if (!hasRest2) return 1
-      } else if (hasRest2) return -1
+        if (!hasRest2) {
+          return 1;
+        }
+      } else if (hasRest2) {
+        return -1;
+      }
 
       // 6) Prefer shorter with rest param, longer without
-      const lengthCriterion = (pars1.length - pars2.length) * (hasRest1 ? -1 : 1)
-      if (lengthCriterion !== 0) return lengthCriterion
+      const lengthCriterion =
+        (pars1.length - pars2.length) * (hasRest1 ? -1 : 1)
+      if (lengthCriterion !== 0) {
+        return lengthCriterion;
+      }
 
       // Signatures are identical in each of the above metrics.
       // In particular, they are the same length.
       // We can therefore compare the parameters one by one.
       // First we count which signature has more preferred parameters.
-      const comparisons = []
-      let tc = 0
+      const comparisons = [];
+      let tc = 0;
       for (let i = 0; i < pars1.length; ++i) {
         const thisComparison = compareParams(pars1[i], pars2[i])
         comparisons.push(thisComparison)
         tc += thisComparison
       }
-      if (tc !== 0) return tc
+      if (tc !== 0) {
+        return tc;
+      }
 
       // They have the same number of preferred parameters, so go by the
       // earliest parameter in which we have a preference.
       // In other words, dispatch is driven somewhat more by earlier
       // parameters than later ones.
-      let c
+      let c;
       for (c of comparisons) {
-        if (c !== 0) return c
+        if (c !== 0) {
+          return c;
+        }
       }
 
       // It's a tossup:
-      return 0
+      return 0;
     }
 
     /**
@@ -964,20 +1025,24 @@
      *                        resulting in any given type (if any)
      */
     function availableConversions(typeNames) {
-      if (typeNames.length === 0) return [];
-      var types = typeNames.map(findType);
+      if (typeNames.length === 0) {
+        return [];
+      }
+      const types = typeNames.map(findType);
       if (typeNames.length > 1) {
         types.sort((t1, t2) => t1.index - t2.index);
       }
       let matches = types[0].conversionsTo;
-      if (typeNames.length === 1) return matches;
+      if (typeNames.length === 1) {
+        return matches;
+      }
 
       matches = matches.concat([]) // shallow copy the matches
       // Since the types are now in index order, we just want the first
       // occurrence of any from type:
-      var knownTypes = new Set(typeNames);
+      const knownTypes = new Set(typeNames);
       for (var i = 1; i < types.length; ++i) {
-        var newMatch
+        let newMatch;
         for (newMatch of types[i].conversionsTo) {
           if (!knownTypes.has(newMatch.from)) {
             matches.push(newMatch);
@@ -998,17 +1063,17 @@
      * @return {function} Returns a wrapped function
      */
     function compileArgsPreprocessing(params, fn) {
-      var fnConvert = fn;
+      let fnConvert = fn;
 
       // TODO: can we make this wrapper function smarter/simpler?
 
       if (params.some(p => p.hasConversion)) {
-        var restParam = hasRestParam(params);
-        var compiledConversions = params.map(compileArgConversion)
+        const restParam = hasRestParam(params);
+        const compiledConversions = params.map(compileArgConversion);
 
         fnConvert = function convertArgs() {
-          var args = [];
-          var last = restParam ? arguments.length - 1 : arguments.length;
+          const args = [];
+          const last = restParam ? arguments.length - 1 : arguments.length;
           for (var i = 0; i < last; i++) {
             args[i] = compiledConversions[i](arguments[i]);
           }
@@ -1020,9 +1085,9 @@
         }
       }
 
-      var fnPreprocess = fnConvert;
+      let fnPreprocess = fnConvert;
       if (hasRestParam(params)) {
-        var offset = params.length - 1;
+        const offset = params.length - 1;
 
         fnPreprocess = function preprocessRestParams () {
           return fnConvert.apply(this,
@@ -1040,9 +1105,9 @@
      *
      */
     function compileArgConversion(param) {
-      var test0, test1, conversion0, conversion1;
-      var tests = [];
-      var conversions = [];
+      let test0, test1, conversion0, conversion1;
+      const tests = [];
+      const conversions = [];
 
       param.types.forEach(function (type) {
         if (type.conversion) {
@@ -1115,13 +1180,13 @@
     function splitParams(params) {
       function _splitParams(params, index, paramsSoFar) {
         if (index < params.length) {
-          var param = params[index]
-          var resultingParams = []
+          const param = params[index];
+          let resultingParams = [];
 
           if (param.restParam) {
             // split the types of a rest parameter in two:
             // one with only exact types, and one with exact types and conversions
-            var exactTypes = param.types.filter(isExactType)
+            const exactTypes = param.types.filter(isExactType);
             if (exactTypes.length < param.types.length) {
               resultingParams.push({
                 types: exactTypes,
@@ -1168,21 +1233,21 @@
      * @return {boolean} Returns true when the signatures conflict, false otherwise.
      */
     function conflicting(params1, params2) {
-      var ii = Math.max(params1.length, params2.length);
+      const ii = Math.max(params1.length, params2.length);
 
       for (var i = 0; i < ii; i++) {
-        var typesNames1 = getExpectedTypeNames(params1, i, true);
-        var typesNames2 = getExpectedTypeNames(params2, i, true);
+        const typesNames1 = getExpectedTypeNames(params1, i, true);
+        const typesNames2 = getExpectedTypeNames(params2, i, true);
 
         if (!hasOverlap(typesNames1, typesNames2)) {
           return false;
         }
       }
 
-      var len1 = params1.length;
-      var len2 = params2.length;
-      var restParam1 = hasRestParam(params1);
-      var restParam2 = hasRestParam(params2);
+      const len1 = params1.length;
+      const len2 = params2.length;
+      const restParam1 = hasRestParam(params1);
+      const restParam2 = hasRestParam(params2);
 
       return restParam1
           ? restParam2 ? (len1 === len2) : (len2 >= len1)
@@ -1207,13 +1272,14 @@
       }
 
       // Main processing loop for signatures
-      var parsedParams = [];
-      var originalFunctions = [];
-      var signaturesMap = {};
-      var preliminarySignatures = [] // may have duplicates from conversions
-      for (var signature in rawSignaturesMap) {
+      const parsedParams = [];
+      const originalFunctions = [];
+      const signaturesMap = {};
+      const preliminarySignatures = [] // may have duplicates from conversions
+      let signature;
+      for (signature in rawSignaturesMap) {
         // A) Parse the signature
-        const params = parseSignature(signature)
+        const params = parseSignature(signature);
         if (!params) continue;
         // B) Check for conflicts
         parsedParams.forEach(function (pp) {
@@ -1229,13 +1295,13 @@
         originalFunctions.push(rawSignaturesMap[signature])
         const conversionParams = params.map(expandParam)
         // D) Split the signatures and collect them up
-        var sp
+        let sp;
         for (sp of splitParams(conversionParams)) {
-          var spName = stringifyParams(sp);
+          const spName = stringifyParams(sp);
           preliminarySignatures.push(
             {params: sp, name: spName, fn: functionIndex});
           if (sp.every(p => !p.hasConversion)) {
-            signaturesMap[spName] = functionIndex
+            signaturesMap[spName] = functionIndex;
           }
         }
       }
@@ -1243,12 +1309,12 @@
       preliminarySignatures.sort(compareSignatures);
 
       // Fill in the proper function for each signature
-      var s
+      let s;
       for (s in signaturesMap) {
         signaturesMap[s] = originalFunctions[signaturesMap[s]]
       }
-      var signatures = []
-      var internalSignatureMap = new Map() // benchmarks faster than object
+      const signatures = []
+      const internalSignatureMap = new Map() // benchmarks faster than object
       for (s of preliminarySignatures) {
         // Note it's only safe to eliminate duplicates like this
         // _after_ the signature sorting step above; otherwise we might
@@ -1261,32 +1327,32 @@
       }
 
       // we create a highly optimized checks for the first couple of signatures with max 2 arguments
-      var ok0 = signatures[0] && signatures[0].params.length <= 2 && !hasRestParam(signatures[0].params);
-      var ok1 = signatures[1] && signatures[1].params.length <= 2 && !hasRestParam(signatures[1].params);
-      var ok2 = signatures[2] && signatures[2].params.length <= 2 && !hasRestParam(signatures[2].params);
-      var ok3 = signatures[3] && signatures[3].params.length <= 2 && !hasRestParam(signatures[3].params);
-      var ok4 = signatures[4] && signatures[4].params.length <= 2 && !hasRestParam(signatures[4].params);
-      var ok5 = signatures[5] && signatures[5].params.length <= 2 && !hasRestParam(signatures[5].params);
-      var allOk = ok0 && ok1 && ok2 && ok3 && ok4 && ok5;
+      const ok0 = signatures[0] && signatures[0].params.length <= 2 && !hasRestParam(signatures[0].params);
+      const ok1 = signatures[1] && signatures[1].params.length <= 2 && !hasRestParam(signatures[1].params);
+      const ok2 = signatures[2] && signatures[2].params.length <= 2 && !hasRestParam(signatures[2].params);
+      const ok3 = signatures[3] && signatures[3].params.length <= 2 && !hasRestParam(signatures[3].params);
+      const ok4 = signatures[4] && signatures[4].params.length <= 2 && !hasRestParam(signatures[4].params);
+      const ok5 = signatures[5] && signatures[5].params.length <= 2 && !hasRestParam(signatures[5].params);
+      const allOk = ok0 && ok1 && ok2 && ok3 && ok4 && ok5;
 
       // compile the tests
       for (var i = 0; i < signatures.length; ++i) {
         signatures[i].test = compileTests(signatures[i].params);
       }
 
-      var test00 = ok0 ? compileTest(signatures[0].params[0]) : notOk;
-      var test10 = ok1 ? compileTest(signatures[1].params[0]) : notOk;
-      var test20 = ok2 ? compileTest(signatures[2].params[0]) : notOk;
-      var test30 = ok3 ? compileTest(signatures[3].params[0]) : notOk;
-      var test40 = ok4 ? compileTest(signatures[4].params[0]) : notOk;
-      var test50 = ok5 ? compileTest(signatures[5].params[0]) : notOk;
+      const test00 = ok0 ? compileTest(signatures[0].params[0]) : notOk;
+      const test10 = ok1 ? compileTest(signatures[1].params[0]) : notOk;
+      const test20 = ok2 ? compileTest(signatures[2].params[0]) : notOk;
+      const test30 = ok3 ? compileTest(signatures[3].params[0]) : notOk;
+      const test40 = ok4 ? compileTest(signatures[4].params[0]) : notOk;
+      const test50 = ok5 ? compileTest(signatures[5].params[0]) : notOk;
 
-      var test01 = ok0 ? compileTest(signatures[0].params[1]) : notOk;
-      var test11 = ok1 ? compileTest(signatures[1].params[1]) : notOk;
-      var test21 = ok2 ? compileTest(signatures[2].params[1]) : notOk;
-      var test31 = ok3 ? compileTest(signatures[3].params[1]) : notOk;
-      var test41 = ok4 ? compileTest(signatures[4].params[1]) : notOk;
-      var test51 = ok5 ? compileTest(signatures[5].params[1]) : notOk;
+      const test01 = ok0 ? compileTest(signatures[0].params[1]) : notOk;
+      const test11 = ok1 ? compileTest(signatures[1].params[1]) : notOk;
+      const test21 = ok2 ? compileTest(signatures[2].params[1]) : notOk;
+      const test31 = ok3 ? compileTest(signatures[3].params[1]) : notOk;
+      const test41 = ok4 ? compileTest(signatures[4].params[1]) : notOk;
+      const test51 = ok5 ? compileTest(signatures[5].params[1]) : notOk;
 
       // compile the functions
       for (var i = 0; i < signatures.length; ++i) {
@@ -1294,27 +1360,27 @@
           compileArgsPreprocessing(signatures[i].params, signatures[i].fn);
       }
 
-      var fn0 = ok0 ? signatures[0].implementation : undef;
-      var fn1 = ok1 ? signatures[1].implementation : undef;
-      var fn2 = ok2 ? signatures[2].implementation : undef;
-      var fn3 = ok3 ? signatures[3].implementation : undef;
-      var fn4 = ok4 ? signatures[4].implementation : undef;
-      var fn5 = ok5 ? signatures[5].implementation : undef;
+      const fn0 = ok0 ? signatures[0].implementation : undef;
+      const fn1 = ok1 ? signatures[1].implementation : undef;
+      const fn2 = ok2 ? signatures[2].implementation : undef;
+      const fn3 = ok3 ? signatures[3].implementation : undef;
+      const fn4 = ok4 ? signatures[4].implementation : undef;
+      const fn5 = ok5 ? signatures[5].implementation : undef;
 
-      var len0 = ok0 ? signatures[0].params.length : -1;
-      var len1 = ok1 ? signatures[1].params.length : -1;
-      var len2 = ok2 ? signatures[2].params.length : -1;
-      var len3 = ok3 ? signatures[3].params.length : -1;
-      var len4 = ok4 ? signatures[4].params.length : -1;
-      var len5 = ok5 ? signatures[5].params.length : -1;
+      const len0 = ok0 ? signatures[0].params.length : -1;
+      const len1 = ok1 ? signatures[1].params.length : -1;
+      const len2 = ok2 ? signatures[2].params.length : -1;
+      const len3 = ok3 ? signatures[3].params.length : -1;
+      const len4 = ok4 ? signatures[4].params.length : -1;
+      const len5 = ok5 ? signatures[5].params.length : -1;
 
       // simple and generic, but also slow
-      var iStart = allOk ? 6 : 0;
-      var iEnd = signatures.length;
+      const iStart = allOk ? 6 : 0;
+      const iEnd = signatures.length;
       // de-reference ahead for execution speed:
-      var tests = signatures.map(s => s.test)
-      var fns = signatures.map(s => s.implementation)
-      var generic = function generic() {
+      const tests = signatures.map(s => s.test)
+      const fns = signatures.map(s => s.implementation)
+      const generic = function generic() {
         'use strict';
 
         for (var i = iStart; i < iEnd; i++) {
@@ -1328,7 +1394,7 @@
 
       // create the typed function
       // fast, specialized version. Falls back to the slower, generic one if needed
-      var fn = function fn(arg0, arg1) {
+      const fn = function fn(arg0, arg1) {
         'use strict';
 
         if (arguments.length === len0 && test00(arg0) && test01(arg1)) { return fn0.apply(fn, arguments); }
@@ -1489,7 +1555,7 @@
      * @return {string[]}
      */
     function uniq(arr) {
-      var entries = {}
+      const entries = {}
       for (var i = 0; i < arr.length; i++) {
         entries[arr[i]] = true;
       }
@@ -1515,14 +1581,16 @@
      * @returns { string } updated name
      */
     function checkName (nameSoFar, newName) {
-      if (!nameSoFar) return newName
+      if (!nameSoFar) {
+        return newName;
+      }
       if (newName && newName != nameSoFar) {
         const err = new Error('Function names do not match (expected: ' +
-          nameSoFar + ', actual: ' + newName + ')')
-        err.data = { actual: newName, expected: nameSoFar }
-        throw err
+          nameSoFar + ', actual: ' + newName + ')');
+        err.data = { actual: newName, expected: nameSoFar };
+        throw err;
       }
-      return nameSoFar
+      return nameSoFar;
     }
 
     /**
@@ -1644,6 +1712,7 @@
     typed.convert = convert;
     typed.findSignature = findSignature;
     typed.find = find;
+    typed.EXACT = EXACT;
     typed.isTypedFunction = isTypedFunction;
 
     /**
@@ -1655,7 +1724,7 @@
      *                          tests for Object match Array and classes too.
      */
     typed.addType = function (type, beforeObjectTest) {
-      var before = 'any'
+      let before = 'any';
       if (beforeObjectTest !== false) {
         before = 'Object';
       }
@@ -1725,7 +1794,9 @@
       }
       const sigs = tf._typedFunctionData.signatures;
       for (var i = 0; i < sigs.length; ++i) {
-        if (sigs[i].test(argList)) return sigs[i];
+        if (sigs[i].test(argList)) {
+          return sigs[i];
+        }
       }
       return null;
     }

@@ -84,10 +84,10 @@ describe('find', function () {
     assert.strictEqual(greetNumberSignature.fn, greeting);
     assert.strictEqual(greetNumber(42), 'Hi 42 much');
     assert.throws(
-      () => t2.findSignature(greet, 'number', 'exact'),
+      () => t2.findSignature(greet, 'number', typed.EXACT),
       /Signature not found/);
     assert.throws(
-      () => t2.find(greet, 'number', 'exact'),
+      () => t2.find(greet, 'number', typed.EXACT),
       TypeError);
     assert.strictEqual(t2.find(greet, 'string'), greeting);
   });
@@ -107,7 +107,7 @@ describe('find', function () {
       greetNumberSignature.implementation.apply(null, [2]),
       'Hi 2 much');
     assert.throws(
-      () => t2.find(greetRest, 'number', 'exact'),
+      () => t2.find(greetRest, 'number', typed.EXACT),
       /Signature not found/);
     const greetSN = t2.findSignature(greetRest, 'string,number');
     assert.strictEqual(greetSN.fn, greetAll);
@@ -115,7 +115,7 @@ describe('find', function () {
       greetSN.implementation.apply(null, ['JJ', 2]),
       'Hi JJ and 2 much');
     assert.throws(
-      () => t2.find(greetRest, 'string,number', 'exact'),
+      () => t2.find(greetRest, 'string,number', typed.EXACT),
       /Signature not found/);
     const greetNRNS = t2.findSignature(greetRest, 'number,...number|string');
     assert.strictEqual(greetNRNS.fn, greetAll);
@@ -123,7 +123,7 @@ describe('find', function () {
       greetNRNS.implementation.apply(null, [0, 'JJ', 2]),
       'Hi 0 much and JJ and 2 much');
     assert.throws(
-      () => t2.find(greetRest, 'number,...number|string', 'exact'),
+      () => t2.find(greetRest, 'number,...number|string', typed.EXACT),
       /Signature not found/);
   });
 });
