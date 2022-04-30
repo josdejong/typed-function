@@ -335,9 +335,11 @@ once with different implementations, an error will be thrown.
     and so could be deceived by another object with the same property, although
     the property is chosen so that's unlikely to happen unintentionally.
 
--   `typed.addType(type: {name: string, test: function} [, beforeObjectTest=true]): void`
+-   `typed.addType(type: {name: string, test: function, ignored?: boolean} [, beforeObjectTest=true]): void`
 
-    Add a new type. A type object contains a name and a test function.
+    Add a new type. A type object contains a name and a test function, and
+    optionally an ignored flag which defaults to false and specifies whether
+    tye type should initially be ignored.
     The order of the types determines in which order function arguments are 
     type-checked, so for performance it's important to put the most used types 
     first. All types are added to the Array `typed.types`. 
@@ -371,6 +373,34 @@ once with different implementations, an error will be thrown.
     is similar to `typed.addType` as well, except it should be the name of an
     arbitrary type that has already been added (rather than just a boolean flag)
 
+-   `typed.ignore(name: string newStatus?: boolean): boolean`
+
+    If this function is called with a boolean argument newStatus, sets the
+    type of the given name to be ignored or not, according to newStatus,
+    when creating a typed function or determining the type of a value.
+
+    In any case, returns the ignored status of the type prior to this call.
+
+    This can be useful to filter signatures when creating a typed function.
+    For example:
+
+    ```js
+    // a set with signatures maybe loaded from somewhere
+    var signatures = {
+      'number': function () {...},
+      'string': function () {...}
+    }
+
+    // we want to ignore a specific type
+    const prevStatus = typed.ignore('string', true);
+
+    // the created function fn will only contain the 'number' signature
+    var fn = typed('fn', signatures);
+
+    // go back to the previous status for 'string'
+    typed.ignore('string', prevStatus);
+    ```
+
 -   `typed.clear(): void`
 
     Removes all types and conversions from the typed instance. Note that any
@@ -401,6 +431,12 @@ once with different implementations, an error will be thrown.
     `conversions` array should be an object like the `conversion` argument of
     `typed.addConversion`.
 
+-   `typed.removeConversion(conversion: ConversionDef): void`
+
+    Removes a single existing conversion. An error is thrown if there is no
+    conversion from and to the given types with a strictly equal convert
+    function as supplied in this call.
+
 -   `typed.clearConversions(): void`
 
     Removes all conversions from the typed instance (leaving the types alone).
@@ -416,26 +452,6 @@ once with different implementations, an error will be thrown.
     you want to throw the error that the default handler would have.
 
 ### Properties
-
--   `typed.ignore: Array.<string>`
-
-    An Array with names of types to be ignored when creating a typed function.
-    This can be useful to filter signatures when creating a typed function.
-    For example:
-
-    ```js
-    // a set with signatures maybe loaded from somewhere
-    var signatures = {
-      'number': function () {...},
-      'string': function () {...}
-    }
-
-    // we want to ignore a specific type
-    typed.ignore = ['string'];
-
-    // the created function fn will only contain the 'number' signature 
-    var fn = typed('fn', signatures);
-    ```
 
 -   `typed.onMismatch: function`
 

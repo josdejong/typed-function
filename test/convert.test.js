@@ -22,6 +22,7 @@ describe('convert', function () {
 
   after(function () {
     // cleanup conversions
+    typed.ignore('number', false);
     typed.clearConversions();
   });
 
@@ -82,5 +83,13 @@ describe('convert', function () {
 
     assert.strictEqual(typed2.convert('123.5', 'number'), 123.5)
     assert.strictEqual(typed2.convert('Infinity', 'number'), Infinity)
-  })
+  });
+
+  it('should not use an ignored type in performing a conversion', function () {
+    typed.ignore('number', true);
+    assert.throws(() => typed.convert(2, 'string'), /Cannot convert/);
+    typed.ignore('number', false);
+    assert.strictEqual(typed.convert(2, 'string'), '2');
+    assert.strictEqual(typed.ignore('number'), false);
+  });
 });

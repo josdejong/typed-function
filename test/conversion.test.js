@@ -2,11 +2,15 @@ var assert = require('assert');
 var typed = require('../typed-function');
 var strictEqualArray = require('./strictEqualArray');
 
+function convertBool (b) {
+  return +b;
+}
+
 describe('conversion', function () {
 
   before(function () {
     typed.addConversions([
-      {from: 'boolean', to: 'number', convert: function (x) {return +x;}},
+      {from: 'boolean', to: 'number', convert: convertBool},
       {from: 'boolean', to: 'string', convert: function (x) {return x + '';}},
       {from: 'number',  to: 'string', convert: function (x) {return x + '';}},
       {
@@ -334,14 +338,30 @@ describe('conversion', function () {
     assert.equal(fn('{}'), 'any');
   });
 
+  it('should allow removal of conversions', function () {
+    const inc = typed({number: n => n + 1});
+    assert.strictEqual(inc(true), 2);
+    typed.removeConversion({
+      from: 'boolean',
+      to: 'number',
+      convert: convertBool
+    });
+    assert.throws(() => typed.convert(false, 'number'), /no conversions/);
+    const dec = typed({number: n => n - 1});
+    assert.throws(() => dec(true), /TypeError: Unexpected type/);
+    // But pre-existing functions remain OK:
+    assert.strictEqual(inc(true), 2);
+  });
+
   describe ('ordering', function () {
 
     it('should correctly select the signatures with the least amount of conversions', function () {
-      typed.conversions = [
+      typed.clearConversions();
+      typed.addConversions([
         {from: 'boolean', to: 'number', convert: function (x) {return +x;}},
         {from: 'number',  to: 'string', convert: function (x) {return x + '';}},
         {from: 'boolean', to: 'string', convert: function (x) {return x + '';}}
-      ];
+      ]);
 
       var fn = typed({
         'boolean, boolean': function (a, b) {

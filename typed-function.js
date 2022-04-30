@@ -69,6 +69,7 @@
    * @typedef {{
    *   name: string,
    *   test: function(*) : boolean,
+   *   ignored?: boolean,
    *   isAny?: boolean
    * }} TypeDef
    */
@@ -111,18 +112,12 @@
     let typeMap; // primary store of all types
     let typeList; // Array of just type names, for the sake of ordering
 
-    // types which need to be ignored
-    let _ignore = [];
-
     // And similar data structures for the type conversions:
     let nConversions = 0;
     // the actual conversions are stored on a property of the destination types
 
     // This is a temporary object, will be replaced with a function at the end
-    let typed = {
-      ignore: _ignore,
-      createCount: 0
-    };
+    let typed = { createCount: 0 };
 
     /**
      * Takes a type name and returns the corresponding official type object
@@ -224,15 +219,18 @@
     }
 
     /**
-     * Find a type that matches a value.
+     * Find a type that matches a value. If the optional second argument
+     * 'evenIgnored' is true, will check ignored types as well.
      * @param {*} value
+     * @param {boolean} [false] evenIgnored
      * @return {string} Returns the name of the first type for which
      *                  the type test matches the value.
      */
-    function findTypeName(value) {
+    function findTypeName(value, evenIgnored) {
       let typeName;
       for (typeName of typeList) {
-        if (typeMap.get(typeName).test(value)) {
+        const type = typeMap.get(typeName);
+        if ((evenIgnored || !type.ignored) && type.test(value)) {
           return typeName;
         }
       }
@@ -403,7 +401,7 @@
       }
       for (var i = 0; i < conversions.length; i++) {
         const fromType = findType(conversions[i].from);
-        if (fromType.test(value)) {
+        if (!fromType.ignored && fromType.test(value)) {
           return conversions[i].convert(value);
         }
       }
@@ -434,20 +432,18 @@
               ? param.slice(3)
               : 'any';
 
-      const typeNames = types.split('|').map(trim)
-        .filter(notEmpty)
-        .filter(notIgnore);
+      const typeDefs =
+        types.split('|').map(s => findType(s.trim())).filter(t => !(t.ignored));
 
       let hasAny = false;
       let paramName = restParam ? '...' : '';
 
-      const exactTypes = typeNames.map(function (typeName) {
-        const type = findType(typeName);
+      const exactTypes = typeDefs.map(function (type) {
         hasAny = type.isAny || hasAny;
-        paramName += typeName + '|'
+        paramName += type.name + '|'
 
         return {
-          name: typeName,
+          name: type.name,
           typeIndex: type.index,
           test: type.test,
           isAny: type.isAny,
@@ -532,7 +528,7 @@
 
       const rawParams = signature.split(',');
       for (var i = 0; i < rawParams.length; ++i) {
-        const parsedParam = parseParam(trim(rawParams[i]));
+        const parsedParam = parseParam(rawParams[i].trim());
         if (parsedParam.restParam && (i !== rawParams.length - 1)) {
           throw new SyntaxError(
             'Unexpected rest parameter "' + rawParams[i] + '": ' +
@@ -677,18 +673,14 @@
      * Get all type names of a parameter
      * @param {Params[]} params
      * @param {number} index
-     * @param {boolean} excludeConversions
      * @return {string[]} Returns an array with type names
      */
-    function getExpectedTypeNames (params, index, excludeConversions) {
+    function getTypeSetAtIndex (params, index) {
       const param = getParamAtIndex(params, index);
-      const types = param
-          ? excludeConversions
-                  ? param.types.filter(isExactType)
-                  : param.types
-          : [];
-
-      return types.map(getTypeName);
+      if (!param) {
+        return new Set();
+      }
+      return paramTypeSet(param);
     }
 
     /**
@@ -717,11 +709,16 @@
      * @return {string[]} Returns an array with available types
      */
     function mergeExpectedParams(signatures, index) {
-      const typeNames = uniq(flatMap(signatures, function (signature) {
-        return getExpectedTypeNames(signature.params, index, false);
-      }));
+      const typeSet = new Set();
+      signatures.forEach(signature => {
+        const paramSet = getTypeSetAtIndex(signature.params, index);
+        let name;
+        for (name of paramSet) {
+          typeSet.add(name);
+        }
+      });
 
-      return (typeNames.indexOf('any') !== -1) ? ['any'] : typeNames;
+      return typeSet.has('any') ? ['any'] : Array.from(typeSet);
     }
 
     /**
@@ -736,20 +733,35 @@
       let err, expected;
       const _name = name || 'unnamed';
 
-      // test for wrong type at some index
+      // test for wrong type at some index; be on the lookout for ignored types
       let matchingSignatures = signatures;
+      let usesIgnored = false;
       for (var index = 0; index < args.length; index++) {
-        const nextMatchingDefs = matchingSignatures.filter(function (signature) {
-          const test = compileTest(getParamAtIndex(signature.params, index));
-          return (index < signature.params.length || hasRestParam(signature.params)) &&
-              test(args[index]);
+        const nextMatchingDefs = [];
+        matchingSignatures.forEach(signature => {
+          const param = getParamAtIndex(signature.params, index);
+          if (!usesIgnored && param) {
+            let type;
+            for (type of paramTypeSet(param)) {
+              if (findType(type).ignored) {
+                usesIgnored = true;
+                break;
+              }
+            }
+          }
+          const test = compileTest(param);
+          if ((index < signature.params.length
+               || hasRestParam(signature.params)) &&
+              test(args[index])) {
+            nextMatchingDefs.push(signature);
+          }
         });
 
         if (nextMatchingDefs.length === 0) {
           // no matching signatures anymore, throw error "wrong type"
           expected = mergeExpectedParams(matchingSignatures, index);
           if (expected.length > 0) {
-            const actualType = findTypeName(args[index]);
+            const actualType = findTypeName(args[index], usesIgnored);
 
             err = new TypeError('Unexpected type of argument in function ' + _name +
                 ' (expected: ' + expected.join(' or ') +
@@ -806,7 +818,7 @@
       // Generic error
       const argTypes = [];
       for (var i = 0; i < args.length; ++i) {
-        argTypes.push(findTypeName(args[i]))
+        argTypes.push(findTypeName(args[i]), usesIgnored)
       }
       err = new TypeError('Arguments of type "' + argTypes.join(', ') +
           '" do not match any of the defined signatures of function ' + _name + '.');
@@ -1236,10 +1248,17 @@
       const ii = Math.max(params1.length, params2.length);
 
       for (var i = 0; i < ii; i++) {
-        const typesNames1 = getExpectedTypeNames(params1, i, true);
-        const typesNames2 = getExpectedTypeNames(params2, i, true);
-
-        if (!hasOverlap(typesNames1, typesNames2)) {
+        const typeSet1 = getTypeSetAtIndex(params1, i);
+        const typeSet2 = getTypeSetAtIndex(params2, i);
+        let overlap = false;
+        let name;
+        for (name of typeSet2) {
+          if (typeSet1.has(name)) {
+            overlap = true;
+            break;
+          }
+        }
+        if (!overlap) {
           return false;
         }
       }
@@ -1443,42 +1462,6 @@
     }
 
     /**
-     * Test whether a type should be NOT be ignored
-     * @param {string} typeName
-     * @return {boolean}
-     */
-    function notIgnore(typeName) {
-      return typed.ignore.indexOf(typeName) === -1;
-    }
-
-    /**
-     * trim a string
-     * @param {string} str
-     * @return {string}
-     */
-    function trim(str) {
-      return str.trim();
-    }
-
-    /**
-     * Test whether a string is not empty
-     * @param {string} str
-     * @return {boolean}
-     */
-    function notEmpty(str) {
-      return !!str;
-    }
-
-    /**
-     * test whether a value is not strict equal to null
-     * @param {*} value
-     * @return {boolean}
-     */
-    function notNull(value) {
-      return value !== null;
-    }
-
-    /**
      * Return all but the last items of an array
      * @param {Array} arr
      * @return {Array}
@@ -1508,32 +1491,6 @@
     }
 
     /**
-     * Test whether an array contains some item
-     * @param {Array} array
-     * @param {*} item
-     * @return {boolean} Returns true if array contains item, false if not.
-     */
-    function contains(array, item) {
-      return array.indexOf(item) !== -1;
-    }
-
-    /**
-     * Test whether two arrays have overlapping items
-     * @param {Array} array1
-     * @param {Array} array2
-     * @return {boolean} Returns true when at least one item exists in both arrays
-     */
-    function hasOverlap(array1, array2) {
-      for (var i = 0; i < array1.length; i++) {
-        if (contains(array2, array1[i])) {
-          return true;
-        }
-      }
-
-      return false;
-    }
-
-    /**
      * Return the first item from an array for which test(arr[i]) returns true
      * @param {Array} arr
      * @param {function} test
@@ -1547,19 +1504,6 @@
         }
       }
       return undefined;
-    }
-
-    /**
-     * Filter unique items of an array with strings
-     * @param {string[]} arr
-     * @return {string[]}
-     */
-    function uniq(arr) {
-      const entries = {}
-      for (var i = 0; i < arr.length; i++) {
-        entries[arr[i]] = true;
-      }
-      return Object.keys(entries);
     }
 
     /**
@@ -1700,7 +1644,6 @@
     }
 
     typed.create = create;
-    typed.ignore = _ignore;
     typed.createCount = saveTyped.createCount;
     typed.onMismatch = _onMismatch;
     typed.throwMismatchError = _onMismatch;
@@ -1732,13 +1675,32 @@
     };
 
     /**
-     * Add a conversion
+     * Set/retrieve whether a type is being ignored.
+     * If the optional second argument `newStatus` is supplied then
+     * the ignored status of the type with the given name is set to that,
+     * and in any case the ignored status of that type prior to the call is
+     * returned.
      *
-     * @param {ConversionDef} conversion
-     * @returns {void}
-     * @throws {TypeError}
+     * @param {string} typeName
+     * @param {[boolean]} [newStatus]
      */
-    typed.addConversion = function (conversion) {
+    typed.ignore = function (typeName, newStatus) {
+      const type = findType(typeName);
+      const retval = type.ignored;
+      if (typeof newStatus !== 'undefined') {
+        type.ignored = newStatus;
+      }
+      return retval;
+    }
+
+    /**
+     * Verify that the ConversionDef conversion has a valid format.
+     *
+     * @param {conversionDef} conversion
+     * @return {void}
+     * @throws {TypeError|SyntaxError}
+     */
+    function _validateConversion (conversion) {
       if (!conversion
           || typeof conversion.from !== 'string'
           || typeof conversion.to !== 'string'
@@ -1750,6 +1712,17 @@
           'Illegal to define conversion from "' + conversion.from +
           '" to itself.');
       }
+    }
+
+    /**
+     * Add a conversion
+     *
+     * @param {ConversionDef} conversion
+     * @returns {void}
+     * @throws {TypeError}
+     */
+    typed.addConversion = function (conversion) {
+      _validateConversion(conversion)
 
       const to = findType(conversion.to)
       if (to.conversionsTo.every(function (other) {
@@ -1776,6 +1749,33 @@
      */
     typed.addConversions = function (conversions) {
       conversions.forEach(typed.addConversion);
+    }
+
+    /**
+     * Remove the specified conversion. The format is the same as for
+     * addConversion, and the convert function must match or an error
+     * is thrown.
+     *
+     * @param {{from: string, to: string, convert: function}} conversion
+     * @returns {void}
+     * @throws {TypeError|SyntaxError|Error}
+     */
+    typed.removeConversion = function (conversion) {
+      _validateConversion(conversion);
+      const to = findType(conversion.to);
+      const existingConversion =
+        findInArray(to.conversionsTo, c => (c.from === conversion.from))
+      if (!existingConversion) {
+        throw new Error(
+          'Attempt to remove nonexistent conversion from ' + conversion.from +
+          ' to ' + conversion.to);
+      }
+      if (existingConversion.convert !== conversion.convert) {
+        throw new Error(
+          'Conversion to remove does not match existing conversion');
+      }
+      const index = to.conversionsTo.indexOf(existingConversion);
+      to.conversionsTo.splice(index, 1);
     }
 
     /**

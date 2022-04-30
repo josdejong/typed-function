@@ -104,6 +104,11 @@ describe('construction', function() {
     assert.equal(fn('hi'), 'string');
   });
 
+  it('should ignore whitespace when creating a typed function with one argument', function() {
+    var fn = typed({' ... string ': A => 'string'});
+    assert.equal(fn('hi'), 'string');
+  });
+
   it('should create a typed function with two arguments', function() {
     var fn = typed({
       'string, boolean': function () {
@@ -282,9 +287,9 @@ describe('construction', function() {
     }, /Error: Unknown type "foo"/);
   });
 
-  it('should ignore types from typed.ignore', function() {
+  it('should ignore types marked so by typed.ignore', function() {
     var typed2 = typed.create();
-    typed2.ignore = ['string'];
+    typed2.ignore('string', true);
 
     var fn = typed2({
       'number': function () {},
