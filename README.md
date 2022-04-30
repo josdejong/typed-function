@@ -327,6 +327,53 @@ once with different implementations, an error will be thrown.
     var f = typed.find(fn, 'number, string', 'exact');
     ```
 
+-   `typed.referTo(...string, callback: (resolvedFunctions: ...function) => function)`
+
+    Within the definition of a typed-function, resolve references to one or
+    multiple signatures of the typed-function itself. This looks like:
+
+    ```
+    typed.referTo(signature1, signature2, ..., function callback(fn1, fn2, ...) {
+      // ... use the resolved signatures fn1, fn2, ...
+    });
+    ```
+
+    Example usage:
+
+    ```js
+    const fn = typed({
+      'number': function (value) {
+        return 'Input was a number: ' + value;
+      },
+      'boolean': function (value) {
+        return 'Input was a boolean: ' + value;
+      },
+      'string': typed.referTo('number', 'boolean', (fnNumber, fnBoolean) => {
+        return function fnString(value) {
+          // here we use the signatures of the typed-function directly:
+          if (value === 'true') {
+            return fnBoolean(true);
+          }
+          if (value === 'false') {
+            return fnBoolean(false);
+          }
+          return fnNumber(parseFloat(value));
+        }
+      })
+    });
+    ```
+
+    See also `typed.referToSelf(callback)`.
+
+-   `typed.referToSelf(callback: (self) => function)`
+
+    Refer to the typed-function itself. This can be used for recursive calls.
+    Calls to self will incur the overhead of fully re-dispatching the
+    typed-function. If the signature that needs to be invoked is already known,
+    you can use `typed.referTo(...)` instead for better performance.
+
+    > In `typed-function@2` it was possible to use `this(...)` to reference the typed-function itself. In `typed-function@v3`, such usage is replaced with the `typed.referTo(...)` and `typed.referToSelf(...)` methods. Typed-functions are unbound in `typed-function@v3` and can be bound to another context if needed.
+
 -   `typed.isTypedFunction(entity: any): boolean`
 
     Return true if the given entity appears to be a typed function
@@ -484,8 +531,8 @@ once with different implementations, an error will be thrown.
 
     Finally note that this handler fires whenever _any_ typed function call
     does not match any of its signatures. You can in effect define such a
-    "handler" for a single typed function by simply specifying an implementation
-    for the `...` signature:
+    "handler" for a _single_ typed function by simply specifying an
+    implementation for the `...` signature:
 
     ```
     const lenOrNothing = typed({
@@ -495,6 +542,15 @@ once with different implementations, an error will be thrown.
     console.log(lenOrNothing('Hello, world!')) // Output: 13
     console.log(lenOrNothing(57, 'varieties')) // Output: 0
     ```
+
+-   `typed.warnAgainstDeprecatedThis: boolean`
+
+    Since `typed-function` v3, self-referencing a typed function using
+    `this(...)` or `this.signatures` has been deprecated and replaced with
+    the functions `typed.referTo` and `typed.referToSelf`. By default, all
+    function bodies will be scanned against this deprecated usage pattern and
+    an error will be thrown when encountered. To disable this validation step,
+    change this option to `false`.
 
 ### Recursion
 

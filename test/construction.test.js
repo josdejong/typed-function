@@ -375,17 +375,220 @@ describe('construction', function() {
     assert.strictEqual(typed.createCount - saveCount, 1);
   });
 
-  it('should allow a function to be defined recursively', function () {
+  it('should allow a function refer to itself', function () {
     var fn = typed({
       'number': function (value) {
         return 'number:' + value;
       },
-      'string': function (value) {
-        return this(parseInt(value, 10));
-      }
+      'string': typed.referToSelf((self) => {
+        return function (value) {
+          assert.strictEqual(self, fn)
+
+          return self(parseInt(value, 10));
+        }
+      })
     });
 
     assert.equal(fn('2'), 'number:2');
-  })
+  });
+
+  it('should allow to resolve multiple function signatures with referTo', function () {
+    var fnNumber = function (value) {
+      return 'number:' + value;
+    }
+
+    var fnBoolean = function (value) {
+      return 'boolean:' + value;
+    }
+
+    var fn = typed({
+      'number': fnNumber,
+      'boolean': fnBoolean,
+      'string': typed.referTo('number', 'boolean', (fnNumberResolved, fnBooleanResolved) => {
+        assert.strictEqual(fnNumberResolved, fnNumber)
+        assert.strictEqual(fnBooleanResolved, fnBoolean)
+
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number:2');
+  });
+
+  it('should resolve referTo signatures on the resolved signatures, not exact matches', function () {
+    var fnNumberOrBoolean = function (value) {
+      return 'number or boolean:' + value;
+    }
+
+    var fn = typed({
+      'number|boolean': fnNumberOrBoolean,
+      'string': typed.referTo('number', (fnNumberResolved) => {
+        assert.strictEqual(fnNumberResolved, fnNumberOrBoolean)
+
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number or boolean:2');
+  });
+
+  it('should throw an exception when a signature is not found with referTo', function () {
+    assert.throws(() => {
+      typed({
+        'string': typed.referTo('number', (fnNumberResolved) => {
+          return function fnString(value) {
+            return fnNumberResolved(parseInt(value, 10));
+          }
+        })
+      });
+    }, /Error:.*reference.*signature "number"/)
+  });
+
+  it('should allow forward references with referTo', function () {
+    const forward = typed({
+      'string': typed.referTo('number', (fnNumberResolved) => {
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      }),
+      // Forward reference: we define `number` after we use it in `string`
+      'number': typed.referTo(() => {
+        return value => 'number:' + value;
+      })
+    })
+    assert.strictEqual(forward('10'), 'number:10')
+  });
+
+  it('should throw an exception in case of circular referTo', () => {
+    assert.throws(
+      () => { typed({
+        string: typed.referTo('number', fN => s => fN(s.length)),
+        number: typed.referTo('string', fS => n => fS(n.toString()))
+      })},
+      SyntaxError)
+  });
+
+  it('should throw an exception when a signature in referTo is not a string', function () {
+    assert.throws(() => {
+      typed.referTo(123, () => {});
+    }, /TypeError: Signatures must be strings/);
+
+    assert.throws(() => {
+      typed.referTo('number', 123, () => {});
+    }, /TypeError: Signatures must be strings/);
+  });
+
+  it('should throw an exception when the last argument of referTo is not a callback function', function () {
+    assert.throws(() => {
+      typed.referTo('number');
+    }, /TypeError: Callback function expected as last argument/);
+  });
+
+  it('should throw an exception when the first argument of referToSelf is not a callback function', function () {
+    assert.throws(() => {
+      typed.referToSelf(123);
+    }, /TypeError: Callback function expected as first argument/);
+  });
+
+  it('should have correct context `this` when resolving reference function signatures', function () {
+    // to make this work, in all functions we must use regular functions and no arrow functions,
+    // and we need to use .call or .apply, passing the `this` context along
+    var fnNumber = function (value) {
+      return 'number:' + value + ', this.value:' + this.value;
+    }
+
+    var fn = typed({
+      'number': typed.referTo(function () {
+        // created as a "reference" function just for the unit test...
+        return fnNumber
+      }),
+      'string': typed.referTo('number', function (fnNumberResolved) {
+        assert.strictEqual(fnNumberResolved, fnNumber)
+
+        return function fnString(value) {
+          return fnNumberResolved.call(this, parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number:2, this.value:undefined');
+
+    // verify the reference function has the right context
+    var obj = {
+      value: 42,
+      fn
+    }
+    assert.equal(obj.fn('2'), 'number:2, this.value:42');
+  });
+
+  it('should pass this function context', () => {
+    var getProperty = typed({
+      'string': function (key) {
+        return this[key];
+      }
+    });
+
+    assert.equal(getProperty('value'), undefined)
+
+    var obj = {
+      value: 42,
+      getProperty
+    };
+
+    assert.equal(obj.getProperty('value'), 42);
+
+    var boundGetProperty = getProperty.bind({ otherValue: 123 });
+    assert.equal(boundGetProperty('otherValue'), 123);
+  });
+
+  it('should throw a deprecation warning when self reference via `this(...)` is used', () => {
+    assert.throws(() => {
+      typed({
+        'number': function (value) {
+          return value * value;
+        },
+        'string': function (value) {
+          return this(parseFloat(value));
+        }
+      });
+    }, /SyntaxError: Using `this` to self-reference a function is deprecated since typed-function@3\. Use typed\.referTo and typed\.referToSelf instead\./);
+  });
+
+  it('should not throw a deprecation warning on `this(...)` when the warning is turned off', () => {
+    var typed2 = typed.create();
+    typed2.warnAgainstDeprecatedThis = false;
+
+    var deprecatedSquare = typed2({
+      'number': function (value) {
+        return value * value;
+      },
+      'string': function (value) {
+        return this(parseFloat(value));
+      }
+    });
+
+    assert.equal(deprecatedSquare(3), 9);
+
+    assert.throws(() => {
+      deprecatedSquare('3');
+    }, /TypeError: this is not a function/);
+  });
+
+  it('should throw a deprecation warning when self reference via `this.signatures` is used', () => {
+    assert.throws(() => {
+      var square = typed({
+        'number': function (value) {
+          return value * value;
+        },
+        'string': function (value) {
+          return this.signatures['number'](parseFloat(value));
+        }
+      });
+    }, /SyntaxError: Using `this` to self-reference a function is deprecated since typed-function@3\. Use typed\.referTo and typed\.referToSelf instead\./);
+  });
 
 });
