@@ -1426,10 +1426,14 @@
       const preliminarySignatures = [] // may have duplicates from conversions
       let signature;
       for (signature in rawSignaturesMap) {
-        // A) Parse the signature
+        // A) Protect against polluted Object prototype:
+        if (!Object.prototype.hasOwnProperty.call(rawSignaturesMap, signature)) {
+          continue;
+        }
+        // B) Parse the signature
         const params = parseSignature(signature);
         if (!params) continue;
-        // B) Check for conflicts
+        // C) Check for conflicts
         parsedParams.forEach(function (pp) {
           if (conflicting(pp, params)) {
             throw new TypeError('Conflicting signatures "' +
@@ -1438,11 +1442,11 @@
           }
         })
         parsedParams.push(params)
-        // C) Store the provided function and add conversions
+        // D) Store the provided function and add conversions
         const functionIndex = originalFunctions.length;
         originalFunctions.push(rawSignaturesMap[signature])
         const conversionParams = params.map(expandParam)
-        // D) Split the signatures and collect them up
+        // E) Split the signatures and collect them up
         let sp;
         for (sp of splitParams(conversionParams)) {
           const spName = stringifyParams(sp);
@@ -1463,7 +1467,9 @@
       // Fill in the proper function for each signature
       let s;
       for (s in signaturesMap) {
-        signaturesMap[s] = resolvedFunctions[signaturesMap[s]]
+        if (Object.prototype.hasOwnProperty.call(signaturesMap, s)) {
+          signaturesMap[s] = resolvedFunctions[signaturesMap[s]]
+        }
       }
       const signatures = []
       const internalSignatureMap = new Map() // benchmarks faster than object
@@ -1773,7 +1779,11 @@
           if (key in dest) {
             if (source[key] !== dest[key]) {
               const err = new Error('Signature "' + key + '" is defined twice')
-              err.data = { signature: key }
+              err.data = {
+                signature: key,
+                sourceFunction: source[key],
+                destFunction: dest[key]
+              }
               throw err
             }
             // else: both signatures point to the same function, that's fine
