@@ -22,7 +22,6 @@ describe('convert', function () {
 
   after(function () {
     // cleanup conversions
-    typed.ignore('number', false);
     typed.clearConversions();
   });
 
@@ -90,13 +89,5 @@ describe('convert', function () {
 
     const check2 = typed2({boolean: () => 'yes'})
     assert.throws(() => check2('x'), /TypeError:.*identifier.?|.?string/)
-  });
-
-  it('should not use an ignored type in performing a conversion', function () {
-    typed.ignore('number', true);
-    assert.throws(() => typed.convert(2, 'string'), /Cannot convert/);
-    typed.ignore('number', false);
-    assert.strictEqual(typed.convert(2, 'string'), '2');
-    assert.strictEqual(typed.ignore('number'), false);
   });
 });

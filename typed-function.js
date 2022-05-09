@@ -69,7 +69,6 @@
    * @typedef {{
    *   name: string,
    *   test: function(*) : boolean,
-   *   ignored?: boolean,
    *   isAny?: boolean
    * }} TypeDef
    */
@@ -399,7 +398,7 @@
       }
       for (var i = 0; i < conversions.length; i++) {
         const fromType = findType(conversions[i].from);
-        if (!fromType.ignored && fromType.test(value)) {
+        if (fromType.test(value)) {
           return conversions[i].convert(value);
         }
       }
@@ -430,8 +429,7 @@
               ? param.slice(3)
               : 'any';
 
-      const typeDefs =
-        types.split('|').map(s => findType(s.trim())).filter(t => !(t.ignored));
+      const typeDefs = types.split('|').map(s => findType(s.trim()))
 
       let hasAny = false;
       let paramName = restParam ? '...' : '';
@@ -734,22 +732,12 @@
       let err, expected;
       const _name = name || 'unnamed';
 
-      // test for wrong type at some index; be on the lookout for ignored types
+      // test for wrong type at some index
       let matchingSignatures = signatures;
-      let usesIgnored = false;
       for (var index = 0; index < args.length; index++) {
         const nextMatchingDefs = [];
         matchingSignatures.forEach(signature => {
           const param = getParamAtIndex(signature.params, index);
-          if (!usesIgnored && param) {
-            let type;
-            for (type of paramTypeSet(param)) {
-              if (findType(type).ignored) {
-                usesIgnored = true;
-                break;
-              }
-            }
-          }
           const test = compileTest(param);
           if ((index < signature.params.length
                || hasRestParam(signature.params)) &&
@@ -1890,25 +1878,6 @@
       }
       typed.addTypes([type], before);
     };
-
-    /**
-     * Set/retrieve whether a type is being ignored.
-     * If the optional second argument `newStatus` is supplied then
-     * the ignored status of the type with the given name is set to that,
-     * and in any case the ignored status of that type prior to the call is
-     * returned.
-     *
-     * @param {string} typeName
-     * @param {[boolean]} [newStatus]
-     */
-    typed.ignore = function (typeName, newStatus) {
-      const type = findType(typeName);
-      const retval = type.ignored;
-      if (typeof newStatus !== 'undefined') {
-        type.ignored = newStatus;
-      }
-      return retval;
-    }
 
     /**
      * Verify that the ConversionDef conversion has a valid format.
