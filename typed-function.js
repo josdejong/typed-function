@@ -219,23 +219,20 @@
     }
 
     /**
-     * Find a type that matches a value. If the optional second argument
-     * 'evenIgnored' is true, will check ignored types as well.
+     * Find the type names that match a value.
      * @param {*} value
-     * @param {boolean} [false] evenIgnored
-     * @return {string} Returns the name of the first type for which
+     * @return {string[]} Array of names of types for which
      *                  the type test matches the value.
      */
-    function findTypeName(value, evenIgnored) {
-      let typeName;
-      for (typeName of typeList) {
-        const type = typeMap.get(typeName);
-        if ((evenIgnored || !type.ignored) && type.test(value)) {
-          return typeName;
-        }
+    function findTypeNames(value) {
+      const matches = typeList.filter(name => {
+        const type = typeMap.get(name);
+        return !type.isAny && type.test(value);
+      });
+      if (matches.length) {
+        return matches;
       }
-
-      throw new TypeError('Value has unknown type. Value: ' + value);
+      return ['any'];
     }
 
     /**
@@ -765,16 +762,16 @@
           // no matching signatures anymore, throw error "wrong type"
           expected = mergeExpectedParams(matchingSignatures, index);
           if (expected.length > 0) {
-            const actualType = findTypeName(args[index], usesIgnored);
+            const actualTypes = findTypeNames(args[index]);
 
             err = new TypeError('Unexpected type of argument in function ' + _name +
                 ' (expected: ' + expected.join(' or ') +
-                ', actual: ' + actualType + ', index: ' + index + ')');
+                ', actual: ' + actualTypes.join(' | ') + ', index: ' + index + ')');
             err.data = {
               category: 'wrongType',
               fn: _name,
               index: index,
-              actual: actualType,
+              actual: actualTypes,
               expected: expected
             }
             return err;
@@ -822,7 +819,7 @@
       // Generic error
       const argTypes = [];
       for (var i = 0; i < args.length; ++i) {
-        argTypes.push(findTypeName(args[i]), usesIgnored)
+        argTypes.push(findTypeNames(args[i]).join('|'))
       }
       err = new TypeError('Arguments of type "' + argTypes.join(', ') +
           '" do not match any of the defined signatures of function ' + _name + '.');

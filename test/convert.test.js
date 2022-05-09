@@ -68,6 +68,10 @@ describe('convert', function () {
       {
         name: 'string',
         test: x => typeof x === 'string'
+      },
+      {
+        name: 'boolean',
+        test: x => typeof x === 'boolean'
       }
     ])
 
@@ -83,6 +87,9 @@ describe('convert', function () {
 
     assert.strictEqual(typed2.convert('123.5', 'number'), 123.5)
     assert.strictEqual(typed2.convert('Infinity', 'number'), Infinity)
+
+    const check2 = typed2({boolean: () => 'yes'})
+    assert.throws(() => check2('x'), /TypeError:.*identifier.?|.?string/)
   });
 
   it('should not use an ignored type in performing a conversion', function () {

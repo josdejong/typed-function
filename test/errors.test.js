@@ -154,18 +154,4 @@ describe('errors', function () {
     assert.throws(function () {fn2(true)},    /TypeError: Unexpected type of argument in function unnamed \(expected: string or number, actual: boolean, index: 0\)/);
     assert.throws(function () {fn2(2, true)}, /TypeError: Unexpected type of argument in function unnamed \(expected: string or number, actual: boolean, index: 1\)/);
   });
-
-  it('should not mention ignored types in an error ... (1)', function () {
-    const t2 = typed.create();
-    t2.ignore('number', true);
-    const tf = t2({'string': s => 'yes'});
-    assert.throws(() => tf(2), /Unexpected type.*actual:.any.*index:.0/);
-  });
-
-  it(' ... unless they are used in the function (1)', function () {
-    const t2 = typed.create();
-    const tf = t2({'number,string': (n,s) => 'both'});
-    t2.ignore('number', true);
-    assert.throws(() => tf(2, 2), /Unexpected type.*actual:.number.*index:.1/);
-  });
 });
