@@ -248,23 +248,23 @@
         '_typedFunctionData' in entity;
     }
 
-    const EXACT = { exact: true };
     /**
      * Find a specific signature from a (composed) typed function, for example:
      *
      *   typed.findSignature(fn, ['number', 'string'])
      *   typed.findSignature(fn, 'number, string')
-     *   typed.findSignature(fn, 'number,string', typed.EXACT)
+     *   typed.findSignature(fn, 'number,string', {exact: true})
      *
      * This function findSignature will by default return the best match to
-     * the given signature, possibly employing type conversions. If the optional
-     * third argument is supplied as typed.EXACT (or any object for which
-     * the 'exact' property is true) only exact matches will be returned
-     * (i.e. signatures for which `fn` was directly defined).
+     * the given signature, possibly employing type conversions.
      *
-     * Note that any type matching `any` or one or more instances of TYPE
-     * matching `...TYPE` are considered exact matches in this regard, as
-     * no conversions are used.
+     * The (optional) third argument is a plain object giving options
+     * controlling the signature search. Currently the only implemented
+     * option is `exact`: if specified as true (default is false), only
+     * exact matches will be returned (i.e. signatures for which `fn` was
+     * directly defined). Note that a (possibly different) type matching
+     * `any`, or one or more instances of TYPE matching `...TYPE` are
+     * considered exact matches in this regard, as no conversions are used.
      *
      * This function returns a "signature" object, as does `typed.resolve()`,
      * which is a plain object with four keys: `params` (the array of parameters
@@ -277,8 +277,7 @@
      * @param {Function} fn                   A typed-function
      * @param {string | string[]} signature
      *     Signature to be found, can be an array or a comma separated string.
-     * @param {{exact: boolean}} exact
-     *     Should findSignature return only exact matches? (default: no)
+     * @param {object} options  Controls the signature search as documented
      * @return {{ params: Param[], fn: function, test: function, implementation: function }}
      *     Returns the matching signature, or throws an error when no signature
      *     is found.
@@ -360,20 +359,22 @@
      *
      *   typed.find(fn, ['number', 'string'])
      *   typed.find(fn, 'number, string')
-     *   typed.find(fn, 'number,string', typed.EXACT)
+     *   typed.find(fn, 'number,string', {exact: true})
      *
      * This function find will by default return the best match to
      * the given signature, possibly employing type conversions (and returning
-     * a function that will perform those conversions as needed). If the
-     * optional third argument is specified as typed.EXACT (or any object for
-     * which the 'exact' property is true), then only exact matches will be
-     * returned (i.e. signatures for which `fn` was directly defined).
+     * a function that will perform those conversions as needed). The
+     * (optional) third argument is a plain object giving options contolling
+     * the signature search. Currently only the option `exact` is implemented,
+     * which defaults to "false". If `exact` is specified as true, then only
+     * exact matches will be returned (i.e. signatures for which `fn` was
+     * directly defined). Uses of `any` and `...TYPE` are considered exact if
+     * no conversions are necessary to apply the corresponding function.
      *
      * @param {Function} fn                   A typed-function
      * @param {string | string[]} signature
      *     Signature to be found, can be an array or a comma separated string.
-     * @param {{exact: boolean}} exact
-     *     Should find() return only exact matches? (default: no)
+     * @param {object} options  Controls the signature match as documented
      * @return {function}
      *     Returns the function to call for the given signature, or throws an
      *     error if no match is found.
@@ -1874,7 +1875,6 @@
     typed.convert = convert;
     typed.findSignature = findSignature;
     typed.find = find;
-    typed.EXACT = EXACT;
     typed.isTypedFunction = isTypedFunction;
     typed.warnAgainstDeprecatedThis = true;
 
