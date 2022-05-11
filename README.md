@@ -251,15 +251,17 @@ once with different implementations, an error will be thrown.
 -   `typed.convert(value: *, type: string) : *`
 
     Convert a value to another type. Only applicable when conversions have
-    been defined in `typed.conversions` (see section [Properties](#properties)). 
+    been added with `typed.addConversion()` and/or `typed.addConversion()`
+    (see below in the method list).
     Example:
     
     ```js
-    typed.conversions.push({
+    typed.addConversion({
       from: 'number',
       to: 'string',
       convert: function (x) {
         return +x;
+      }
     });
     
     var str = typed.convert(2.3, 'string'); // '2.3' 
@@ -300,24 +302,25 @@ once with different implementations, an error will be thrown.
     (such as bookkeeping or additional custom error checking) between
     signature selection and execution dispatch.
 
--   `typed.findSignature(fn: typed-function, signature: string | Array, exact: boolean) : signature-object`
+-   `typed.findSignature(fn: typed-function, signature: string | Array, options: object) : signature-object`
 
     Find the signature object (as returned by `typed.resolve` above), but
     based on the specification of a signature (given either as a
     comma-separated string of parameter types, or an Array of strings giving
     the parameter types), rather than based on an example argument list.
 
-    The optional third argument, which defaults to false, specifies whether
-    to limit the search to exact type matches, i.e. signatures for which the
-    implementation was directly defined when the typed-function was created
-    (as opposed to signatures that require a type conversion).
+    The optional third argument, is a plain object giving options controlling
+    the search. Currently, the only implemented option is `exact`, which if
+    true (defaults to false), limits the search to exact type matches,
+    i.e. signatures for which no conversion functions need to be called in
+    order to apply the function.
 
     Throws an error if the signature is not found.
 
--   `typed.find(fn: typed-function, signature: string | Array, exact: boolean) : function`
+-   `typed.find(fn: typed-function, signature: string | Array, options: object) : function`
 
     Convenience method that returns just the implementation from the
-    signature object produced by `typed.findSignature(fn, signature, exact)`.
+    signature object produced by `typed.findSignature(fn, signature, options)`.
     
     For example:
     
@@ -382,14 +385,13 @@ once with different implementations, an error will be thrown.
     and so could be deceived by another object with the same property, although
     the property is chosen so that's unlikely to happen unintentionally.
 
--   `typed.addType(type: {name: string, test: function, ignored?: boolean} [, beforeObjectTest=true]): void`
+-   `typed.addType(type: {name: string, test: function, [, beforeObjectTest=true]): void`
 
-    Add a new type. A type object contains a name and a test function, and
-    optionally an ignored flag which defaults to false and specifies whether
-    tye type should initially be ignored.
+    Add a new type. A type object contains a name and a test function.
     The order of the types determines in which order function arguments are 
     type-checked, so for performance it's important to put the most used types 
-    first. All types are added to the Array `typed.types`. 
+    first. Also, if one type is contained in another, it should likely precede
+    it in the type order so that it won't be masked in type testing.
     
     Example:
     
@@ -428,7 +430,7 @@ once with different implementations, an error will be thrown.
 
 -   `typed.addConversion(conversion: {from: string, to: string, convert: function}) : void`
 
-    Add a new conversion. Conversions are added to the Array `typed.conversions`.
+    Add a new conversion.
     
     ```js
     typed.addConversion({

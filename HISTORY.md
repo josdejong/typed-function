@@ -9,8 +9,8 @@ Breaking changes:
 
 - Fix #14: conversions now have preference over `any`. Thanks @gwhitney.
 
-- The properties `typed.types` and `typed.conversions` are now private. 
-    Instead of adding and removing types and conversions directly on those
+- The properties `typed.types` and `typed.conversions` have been removed.
+    Instead of adding and removing types and conversions with those
     arrays, use the methods `addType`, `addTypes`, `addConversion`, 
     `addConversions`, `removeConversion`, `clear`, `clearConversions`.
 
@@ -50,8 +50,9 @@ Breaking changes:
     })
     ```
   
--   The option `type.ignore` is removed. If you need it, see if you can create 
-    a new `typed` instance without the types that you want to ignore.
+-   The property `typed.ignore` is removed. If you need it, see if you can
+    create a new `typed` instance without the types that you want to ignore, or
+    filter the signatures passed to `typed()` by hand.
 
 Non-breaking changes:
 
@@ -60,8 +61,7 @@ Non-breaking changes:
     - `typed.referToSelf(callback: (self) => function)`
     - `typed.isTypedFunction(entity: any): boolean`
     - `typed.resolve(fn: typed-function, argList: Array<any>): signature-object`
-    - `typed.find(fn: typed-function, signature: string | Array, exact: boolean) : function`
-    - `typed.findSignature(fn: typed-function, signature: string | Array, exact: boolean) : signature-object`
+    - `typed.findSignature(fn: typed-function, signature: string | Array, options: object) : signature-object`
     - `typed.addType(type: {name: string, test: function, ignored?: boolean} [, beforeObjectTest=true]): void`
     - `typed.addTypes(types: TypeDef[] [, before = 'any']): void`
     - `typed.clear(): void`
@@ -73,8 +73,13 @@ Non-breaking changes:
     the constructor to not use typed-function itself (#142). Thanks @gwhitney.
 -   Extended the benchmark script and added counting of creation of typed
     functions (#146).
--   Fixes in `typed.find()` now correctly handling cases with rest parameters. 
+-   Fixes and extensions to `typed.find()` now correctly handling cases with
+    rest or `any` parameters and matches requiring conversions; adds an
+    `options` argument to control whether matches with conversions are allowed.
     Thanks @gwhitney.
+-   Fix to `typed.convert()`: Will now find a conversion even in presence of
+    overlapping types.
+-   Reports all matching types in runtime errors, not just the first one.
 -   Improved documentation. Thanks @gwhitney. 
 
 
