@@ -1,13 +1,81 @@
 # History
 
 
-## not yet published, version 2.1.1
+## not yet published, version 3.0.0
 
-- Refactored the `typed` constructor to be more flexible, accepting a
-  combination of multiple typed functions or objects. And internally refactored
-  the constructor to not use typed-function itself (#142). Thanks @gwhitney.
-- Extended the benchmark script and added counting of creation of typed
-  functions (#146).
+!!! BE CAREFUL: BREAKING CHANGES !!!
+
+Breaking changes:
+
+- Fix #14: conversions now have preference over `any`. Thanks @gwhitney.
+
+- The properties `typed.types` and `typed.conversions` are now private. 
+    Instead of adding and removing types and conversions directly on those
+    arrays, use the methods `addType`, `addTypes`, `addConversion`, 
+    `addConversions`, `removeConversion`, `clear`, `clearConversions`.
+
+- The `this` variable is no longer bound to the typed function itself but is 
+    unbound. Instead, use `typed.referTo(...)` and `typed.referToSelf(...)`.
+
+    By default, all function bodies will be scanned against the deprecated 
+    usage pattern of `this`, and an error will be thrown when encountered. To 
+    disable this validation step, set `typed.warnAgainstDeprecatedThis = false`.
+
+    Example:
+ 
+    ```js
+    // old:
+    const square = typed({
+      'number': x => x * x,
+      'string': x => this(parseFloat(x))
+    })
+  
+    // new:
+    const square = typed({
+      'number': x => x * x,
+      'string': typed.referToSelf(function (self) {
+        // using self is not optimal, if possible,  
+        // refer to a specific signature instead, 
+        // see next example
+        return x => self(parseFloat(x))
+      })
+    })
+
+    // optimized new:
+    const square = typed({
+      'number': x => x * x,
+      'string': typed.referTo('number', function (squareNumber) {
+        return x => sqrtNumber(parseFloat(x))
+      })
+    })
+    ```
+  
+-   The option `type.ignore` is removed. If you need it, see if you can create 
+    a new `typed` instance without the types that you want to ignore.
+
+Non-breaking changes:
+
+-   Implemented new static functions, Thanks @gwhitney:
+    - `typed.referTo(...string, callback: (resolvedFunctions: ...function) => function)`
+    - `typed.referToSelf(callback: (self) => function)`
+    - `typed.isTypedFunction(entity: any): boolean`
+    - `typed.resolve(fn: typed-function, argList: Array<any>): signature-object`
+    - `typed.find(fn: typed-function, signature: string | Array, exact: boolean) : function`
+    - `typed.findSignature(fn: typed-function, signature: string | Array, exact: boolean) : signature-object`
+    - `typed.addType(type: {name: string, test: function, ignored?: boolean} [, beforeObjectTest=true]): void`
+    - `typed.addTypes(types: TypeDef[] [, before = 'any']): void`
+    - `typed.clear(): void`
+    - `typed.addConversions(conversions: ConversionDef[]): void`
+    - `typed.removeConversion(conversion: ConversionDef): void`
+    - `typed.clearConversions(): void`
+-   Refactored the `typed` constructor to be more flexible, accepting a
+    combination of multiple typed functions or objects. And internally refactored
+    the constructor to not use typed-function itself (#142). Thanks @gwhitney.
+-   Extended the benchmark script and added counting of creation of typed
+    functions (#146).
+-   Fixes in `typed.find()` now correctly handling cases with rest parameters. 
+    Thanks @gwhitney.
+-   Improved documentation. Thanks @gwhitney. 
 
 
 ## 2022-03-11, version 2.1.0
