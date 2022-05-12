@@ -1,7 +1,5 @@
 # typed-function
 
-** Version 3 in development **
-
 [![Version](https://img.shields.io/npm/v/typed-function.svg)](https://www.npmjs.com/package/typed-function)
 [![Downloads](https://img.shields.io/npm/dm/typed-function.svg)](https://www.npmjs.com/package/typed-function)
 [![Build Status](https://github.com/josdejong/typed-function/workflows/Node.js%20CI/badge.svg)](https://github.com/josdejong/typed-function/actions)
