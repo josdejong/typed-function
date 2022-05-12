@@ -1,5 +1,7 @@
 # typed-function
 
+** Version 3 in development **
+
 [![Version](https://img.shields.io/npm/v/typed-function.svg)](https://www.npmjs.com/package/typed-function)
 [![Downloads](https://img.shields.io/npm/dm/typed-function.svg)](https://www.npmjs.com/package/typed-function)
 [![Build Status](https://github.com/josdejong/typed-function/workflows/Node.js%20CI/badge.svg)](https://github.com/josdejong/typed-function/actions)
@@ -160,6 +162,37 @@ The following type expressions are supported:
 - Variable arguments: `...number`
 - Any type: `any`
 
+### Dispatch
+
+When a typed function is called, an implementation with a matching signature
+is called, where conversions may be applied to actual arguments in order to
+find a match.
+
+Among all matching signatures, the one to execute is chosen by the following
+preferences, in order of priority:
+
+* one that does not have an `...any` parameter
+* one with the fewest `any` parameters
+* one that does not use conversions to match a rest parameter
+* one with the fewest conversions needed to match overall
+* one with no rest parameter
+* If there's a rest parameter, the one with the most non-rest parameters
+* The one with the largest number of preferred parameters
+* The one with the earliest preferred parameter
+
+When this process gets to the point of comparing individual parameters,
+the preference between parameters is determined by the following, in
+priority order:
+
+* All specific types are preferred to the 'any' type
+* All directly matching types are preferred to conversions
+* Types earlier in the list of known types are preferred
+* Among conversions, ones earlier in the list are preferred
+
+If none of these aspects produces a preference, then in those contexts in
+which Array.sort is stable, the order implementations were listed when
+the typed-function was created breaks the tie. Otherwise the dispatch may
+select any of the "tied" implementations.
 
 ## API
 
@@ -190,20 +223,45 @@ as long as any that have names agree with one another.
 If the same signature is specified by the collection of arguments more than
 once with different implementations, an error will be thrown.
 
-### Methods
+#### Properties and methods of a typed function `fn`
+
+-   `fn.name : string`
+
+    The name of the typed function, if one was assigned at creation; otherwise,
+    the value of this property is the empty string.
+
+-   `fn.signatures : Object.<string, function>`
+
+    The value of this property is a plain object. Its keys are the string
+    signatures on which this typed function `fn` is directly defined
+    (without conversions). The value for each key is the function `fn`
+    will call when its arguments match that signature. This property may
+    differ from the similar object used to create the typed function,
+    in that the originally provided signatures are parsed into a canonical,
+    more usable form: union types are split into their constituents where
+    possible, whitespace in the signature strings is removed, etc.
+
+-   `fn.toString() : string`
+
+    Returns human-readable code showing exactly what the function does.
+    Mostly for debugging purposes.
+
+### Methods of the typed package
 
 -   `typed.convert(value: *, type: string) : *`
 
     Convert a value to another type. Only applicable when conversions have
-    been defined in `typed.conversions` (see section [Properties](#properties)). 
+    been added with `typed.addConversion()` and/or `typed.addConversion()`
+    (see below in the method list).
     Example:
     
     ```js
-    typed.conversions.push({
+    typed.addConversion({
       from: 'number',
       to: 'string',
       convert: function (x) {
         return +x;
+      }
     });
     
     var str = typed.convert(2.3, 'string'); // '2.3' 
@@ -221,25 +279,119 @@ once with different implementations, an error will be thrown.
     This would allow you, for example, to have two different type hierarchies
     for different purposes.
 
--   `typed.find(fn: typed-function, signature: string | Array) : function | null`
+-   `typed.resolve(fn: typed-function, argList: Array<any>): signature-object`
 
-    Find a specific signature from a typed function. The function currently
-    only finds exact matching signatures.
+    Find the specific signature and implementation that the typed function
+    `fn` will call if invoked on the argument list `argList`. Returns null if
+    there is no matching signature. The returned signature object has
+    properties `params`, `test`, `fn`, and `implementation`. The difference
+    between the last two properties is that `fn` is the original function
+    supplied at typed-function creation time, whereas `implementation` is
+    ready to be called on this specific argList, in that it will first
+    perform any necessary conversions and gather arguments up into "rest"
+    parameters as needed.
+
+    Thus, in the case that arguments `a0`,`a1`,`a2` (say) do match one of
+    the signatures of this typed function `fn`, then `fn(a0, a1, a2)`
+    (in a context in which `this` will be, say, `t`) does exactly the same
+    thing as
+
+    `typed.resolve(fn, [a0,a1,a2]).implementation.apply(t, [a0,a1,a2])`.
+
+    But `resolve` is useful if you want to interpose any other operation
+    (such as bookkeeping or additional custom error checking) between
+    signature selection and execution dispatch.
+
+-   `typed.findSignature(fn: typed-function, signature: string | Array, options: object) : signature-object`
+
+    Find the signature object (as returned by `typed.resolve` above), but
+    based on the specification of a signature (given either as a
+    comma-separated string of parameter types, or an Array of strings giving
+    the parameter types), rather than based on an example argument list.
+
+    The optional third argument, is a plain object giving options controlling
+    the search. Currently, the only implemented option is `exact`, which if
+    true (defaults to false), limits the search to exact type matches,
+    i.e. signatures for which no conversion functions need to be called in
+    order to apply the function.
+
+    Throws an error if the signature is not found.
+
+-   `typed.find(fn: typed-function, signature: string | Array, options: object) : function`
+
+    Convenience method that returns just the implementation from the
+    signature object produced by `typed.findSignature(fn, signature, options)`.
     
     For example:
     
     ```js
     var fn = typed(...);
     var f = typed.find(fn, ['number', 'string']);
-    var f = typed.find(fn, 'number, string');
+    var f = typed.find(fn, 'number, string', 'exact');
     ```
 
--   `typed.addType(type: {name: string, test: function} [, beforeObjectTest=true]): void`
+-   `typed.referTo(...string, callback: (resolvedFunctions: ...function) => function)`
+
+    Within the definition of a typed-function, resolve references to one or
+    multiple signatures of the typed-function itself. This looks like:
+
+    ```
+    typed.referTo(signature1, signature2, ..., function callback(fn1, fn2, ...) {
+      // ... use the resolved signatures fn1, fn2, ...
+    });
+    ```
+
+    Example usage:
+
+    ```js
+    const fn = typed({
+      'number': function (value) {
+        return 'Input was a number: ' + value;
+      },
+      'boolean': function (value) {
+        return 'Input was a boolean: ' + value;
+      },
+      'string': typed.referTo('number', 'boolean', (fnNumber, fnBoolean) => {
+        return function fnString(value) {
+          // here we use the signatures of the typed-function directly:
+          if (value === 'true') {
+            return fnBoolean(true);
+          }
+          if (value === 'false') {
+            return fnBoolean(false);
+          }
+          return fnNumber(parseFloat(value));
+        }
+      })
+    });
+    ```
+
+    See also `typed.referToSelf(callback)`.
+
+-   `typed.referToSelf(callback: (self) => function)`
+
+    Refer to the typed-function itself. This can be used for recursive calls.
+    Calls to self will incur the overhead of fully re-dispatching the
+    typed-function. If the signature that needs to be invoked is already known,
+    you can use `typed.referTo(...)` instead for better performance.
+
+    > In `typed-function@2` it was possible to use `this(...)` to reference the typed-function itself. In `typed-function@v3`, such usage is replaced with the `typed.referTo(...)` and `typed.referToSelf(...)` methods. Typed-functions are unbound in `typed-function@v3` and can be bound to another context if needed.
+
+-   `typed.isTypedFunction(entity: any): boolean`
+
+    Return true if the given entity appears to be a typed function
+    (created by any instance of typed-function), and false otherwise. It
+    tests for the presence of a particular property on the entity,
+    and so could be deceived by another object with the same property, although
+    the property is chosen so that's unlikely to happen unintentionally.
+
+-   `typed.addType(type: {name: string, test: function, [, beforeObjectTest=true]): void`
 
     Add a new type. A type object contains a name and a test function.
     The order of the types determines in which order function arguments are 
     type-checked, so for performance it's important to put the most used types 
-    first. All types are added to the Array `typed.types`. 
+    first. Also, if one type is contained in another, it should likely precede
+    it in the type order so that it won't be masked in type testing.
     
     Example:
     
@@ -263,9 +415,22 @@ once with different implementations, an error will be thrown.
     `typed-function` would never reach the new type. When `beforeObjectTest`
     is `false`, the new type will be added at the end of all tests.
 
+-   `typed.addTypes(types: TypeDef[] [, before = 'any']): void`
+
+    Adds an list of new types. Each entry of the `types` array is an object
+    like the `type` argument to `typed.addType`. The optional `before` argument
+    is similar to `typed.addType` as well, except it should be the name of an
+    arbitrary type that has already been added (rather than just a boolean flag)
+
+-   `typed.clear(): void`
+
+    Removes all types and conversions from the typed instance. Note that any
+    typed-functions created before a call to `clear` will still operate, but
+    they may prouce unintelligible messages in case of type mismatch errors.
+
 -   `typed.addConversion(conversion: {from: string, to: string, convert: function}) : void`
 
-    Add a new conversion. Conversions are added to the Array `typed.conversions`.
+    Add a new conversion.
     
     ```js
     typed.addConversion({
@@ -281,6 +446,22 @@ once with different implementations, an error will be thrown.
     best to add all of your desired automatic conversions before defining any
     typed functions.
 
+-   `typed.addConversions(conversions: ConversionDef[]): void`
+
+    Convenience method that adds a list of conversions. Each element in the
+    `conversions` array should be an object like the `conversion` argument of
+    `typed.addConversion`.
+
+-   `typed.removeConversion(conversion: ConversionDef): void`
+
+    Removes a single existing conversion. An error is thrown if there is no
+    conversion from and to the given types with a strictly equal convert
+    function as supplied in this call.
+
+-   `typed.clearConversions(): void`
+
+    Removes all conversions from the typed instance (leaving the types alone).
+
 -   `typed.createError(name: string, args: Array.<any>, signatures: Array.<Signature>): TypeError`
 
     Generates a custom error object reporting the problem with calling
@@ -292,65 +473,6 @@ once with different implementations, an error will be thrown.
     you want to throw the error that the default handler would have.
 
 ### Properties
-
--   `typed.types: Array.<{name: string, test: function}>`
-
-    Array with types. Each object contains a type name and a test function.
-    The order of the types determines in which order function arguments are 
-    type-checked, so for performance it's important to put the most used types 
-    first. Custom types can be added like:
-
-    ```js
-    function Person(...) {
-      ...
-    }
-    
-    Person.prototype.isPerson = true;
-
-    typed.types.push({
-      name: 'Person',
-      test: function (x) {
-        return x && x.isPerson === true;
-      }
-    });
-    ```
-
--   `typed.conversions: Array.<{from: string, to: string, convert: function}>`
-
-    An Array with built-in conversions. Empty by default. Can be used to define
-    conversions from `boolean` to `number`. For example:
-
-    ```js
-    typed.conversions.push({
-      from: 'boolean',
-      to: 'number',
-      convert: function (x) {
-        return +x;
-    });
-    ```
-
-    Also note the `addConversion()` method above for simply adding a single
-    conversion at a time.
-    
--   `typed.ignore: Array.<string>`
-
-    An Array with names of types to be ignored when creating a typed function.
-    This can be useful to filter signatures when creating a typed function.
-    For example:
-
-    ```js
-    // a set with signatures maybe loaded from somewhere
-    var signatures = {
-      'number': function () {...},
-      'string': function () {...}
-    }
-
-    // we want to ignore a specific type
-    typed.ignore = ['string'];
-
-    // the created function fn will only contain the 'number' signature 
-    var fn = typed('fn', signatures);
-    ```
 
 -   `typed.onMismatch: function`
 
@@ -383,8 +505,8 @@ once with different implementations, an error will be thrown.
 
     Finally note that this handler fires whenever _any_ typed function call
     does not match any of its signatures. You can in effect define such a
-    "handler" for a single typed function by simply specifying an implementation
-    for the `...` signature:
+    "handler" for a _single_ typed function by simply specifying an
+    implementation for the `...` signature:
 
     ```
     const lenOrNothing = typed({
@@ -394,6 +516,15 @@ once with different implementations, an error will be thrown.
     console.log(lenOrNothing('Hello, world!')) // Output: 13
     console.log(lenOrNothing(57, 'varieties')) // Output: 0
     ```
+
+-   `typed.warnAgainstDeprecatedThis: boolean`
+
+    Since `typed-function` v3, self-referencing a typed function using
+    `this(...)` or `this.signatures` has been deprecated and replaced with
+    the functions `typed.referTo` and `typed.referToSelf`. By default, all
+    function bodies will be scanned against this deprecated usage pattern and
+    an error will be thrown when encountered. To disable this validation step,
+    change this option to `false`.
 
 ### Recursion
 
@@ -415,31 +546,17 @@ console.log(sqrt('9')); // output: 3
 ```
 
 
-### Output
-
-The functions generated with `typed({...})` have:
-
-- A function `toString`. Returns well readable code which can be used to see
-  what the function exactly does. Mostly for debugging purposes.
-- A property `signatures`, which holds a map with the (normalized)
-  signatures as key and the original sub-functions as value.
-- A property `name` containing the name of the typed function, if it was
-  assigned one at creation, or an empty string.
-
-
 ## Roadmap
 
-### Version 2
+### Version 4
 
-- Be able to turn off exception throwing.
 - Extend function signatures:
   - Optional arguments like `'[number], array'` or like `number=, array`
   - Nullable arguments like `'?Object'`
-- Create a good benchmark, to get insight in the overhead.
 - Allow conversions to fail (for example string to number is not always
   possible). Call this `fallible` or `optional`?
 
-### Version 3
+### Version 5
 
 - Extend function signatures:
   - Constants like `'"linear" | "cubic"'`, `'0..10'`, etc.

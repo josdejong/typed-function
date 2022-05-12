@@ -104,6 +104,11 @@ describe('construction', function() {
     assert.equal(fn('hi'), 'string');
   });
 
+  it('should ignore whitespace when creating a typed function with one argument', function() {
+    var fn = typed({' ... string ': A => 'string'});
+    assert.equal(fn('hi'), 'string');
+  });
+
   it('should create a typed function with two arguments', function() {
     var fn = typed({
       'string, boolean': function () {
@@ -179,7 +184,7 @@ describe('construction', function() {
     var typed2 = typed.create();
     function Person() {}
 
-    typed1.types.push({
+    typed1.addType({
       name: 'Person',
       test: function (x) {
         return x instanceof Person;
@@ -187,16 +192,16 @@ describe('construction', function() {
     });
 
     assert.strictEqual(typed.create, typed1.create);
-    assert.notStrictEqual(typed.types, typed1.types);
-    assert.notStrictEqual(typed.conversions, typed1.conversions);
+    assert.notStrictEqual(typed.addTypes, typed1.addTypes);
+    assert.notStrictEqual(typed.addConversion, typed1.addConversion);
 
     assert.strictEqual(typed.create, typed2.create);
-    assert.notStrictEqual(typed.types, typed2.types);
-    assert.notStrictEqual(typed.conversions, typed2.conversions);
+    assert.notStrictEqual(typed.addTypes, typed2.addTypes);
+    assert.notStrictEqual(typed.addConversion, typed2.addConversion);
 
     assert.strictEqual(typed1.create, typed2.create);
-    assert.notStrictEqual(typed1.types, typed2.types);
-    assert.notStrictEqual(typed1.conversions, typed2.conversions);
+    assert.notStrictEqual(typed1.addTypes, typed2.addTypes);
+    assert.notStrictEqual(typed1.addConversion, typed2.addConversion);
 
     typed1({
       'Person': function (p) {return 'Person'}
@@ -220,14 +225,9 @@ describe('construction', function() {
       }
     };
 
-    var objectEntry = typed2.types.find(function (entry) {
-      return entry.name === 'Object';
-    });
-    var objectIndex = typed2.types.indexOf(objectEntry);
-
+    var objectIndex = typed2._findType('Object').index;
     typed2.addType(newType);
-
-    assert.strictEqual(typed2.types[objectIndex], newType);
+    assert.strictEqual(typed2._findType('Person').index, objectIndex);
   });
 
   it('should add a type using addType at the end (after Object)', function() {
@@ -243,7 +243,9 @@ describe('construction', function() {
 
     typed2.addType(newType, false);
 
-    assert.strictEqual(typed2.types[typed2.types.length - 1], newType);
+    assert.strictEqual(
+      typed2._findType('Person').index,
+      typed2._findType('any').index - 1);
   });
 
   it('should throw an error when passing an invalid type to addType', function() {
@@ -283,24 +285,6 @@ describe('construction', function() {
         }
       });
     }, /Error: Unknown type "foo"/);
-  });
-
-  it('should ignore types from typed.ignore', function() {
-    var typed2 = typed.create();
-    typed2.ignore = ['string'];
-
-    var fn = typed2({
-      'number': function () {},
-      'number, number': function () {},
-
-      'string, number': function () {},
-      'number, string': function () {},
-      'boolean | string, boolean': function () {},
-      'any, ...string': function () {},
-      'string': function () {}
-    });
-
-    assert.deepEqual(Object.keys(fn.signatures).sort(), ['boolean,boolean', 'number', 'number,number']);
   });
 
   it('should give a hint when composing with a wrongly cased type', function() {
@@ -349,21 +333,22 @@ describe('construction', function() {
   });
 
   it('should correctly order signatures', function () {
-    var fn = typed({
-      'boolean': function (a) {
-        return 'boolean';
-      },
-      'string': function (a) {
-        return 'string';
-      },
-      'number': function (a) {
-        return 'number';
-      }
-    });
+    const t2 = typed.create()
+    t2.clear()
+    t2.addTypes([
+      {name: 'foo', test: x => x[0] === 1},
+      {name: 'bar', test: x => x[1] === 1},
+      {name: 'baz', test: x => x[2] === 1}
+    ])
+    var fn = t2({
+      baz: a => 'isbaz',
+      bar: a => 'isbar',
+      foo: a => 'isfoo'
+    })
 
-    // TODO: this is tricky, object keys do not officially have a guaranteed order
-    assert.deepEqual(Object.keys(fn.signatures),
-        ['number', 'string', 'boolean']);
+    assert.strictEqual(fn([1,1,1]), 'isfoo')
+    assert.strictEqual(fn([0,1,1]), 'isbar')
+    assert.strictEqual(fn([0,0,1]), 'isbaz')
   });
 
   it('should increment the count of typed functions', function () {
@@ -372,17 +357,220 @@ describe('construction', function() {
     assert.strictEqual(typed.createCount - saveCount, 1);
   });
 
-  it('should allow a function to be defined recursively', function () {
+  it('should allow a function refer to itself', function () {
     var fn = typed({
       'number': function (value) {
         return 'number:' + value;
       },
-      'string': function (value) {
-        return this(parseInt(value, 10));
-      }
+      'string': typed.referToSelf((self) => {
+        return function (value) {
+          assert.strictEqual(self, fn)
+
+          return self(parseInt(value, 10));
+        }
+      })
     });
 
     assert.equal(fn('2'), 'number:2');
-  })
+  });
+
+  it('should allow to resolve multiple function signatures with referTo', function () {
+    var fnNumber = function (value) {
+      return 'number:' + value;
+    }
+
+    var fnBoolean = function (value) {
+      return 'boolean:' + value;
+    }
+
+    var fn = typed({
+      'number': fnNumber,
+      'boolean': fnBoolean,
+      'string': typed.referTo('number', 'boolean', (fnNumberResolved, fnBooleanResolved) => {
+        assert.strictEqual(fnNumberResolved, fnNumber)
+        assert.strictEqual(fnBooleanResolved, fnBoolean)
+
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number:2');
+  });
+
+  it('should resolve referTo signatures on the resolved signatures, not exact matches', function () {
+    var fnNumberOrBoolean = function (value) {
+      return 'number or boolean:' + value;
+    }
+
+    var fn = typed({
+      'number|boolean': fnNumberOrBoolean,
+      'string': typed.referTo('number', (fnNumberResolved) => {
+        assert.strictEqual(fnNumberResolved, fnNumberOrBoolean)
+
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number or boolean:2');
+  });
+
+  it('should throw an exception when a signature is not found with referTo', function () {
+    assert.throws(() => {
+      typed({
+        'string': typed.referTo('number', (fnNumberResolved) => {
+          return function fnString(value) {
+            return fnNumberResolved(parseInt(value, 10));
+          }
+        })
+      });
+    }, /Error:.*reference.*signature "number"/)
+  });
+
+  it('should allow forward references with referTo', function () {
+    const forward = typed({
+      'string': typed.referTo('number', (fnNumberResolved) => {
+        return function fnString(value) {
+          return fnNumberResolved(parseInt(value, 10));
+        }
+      }),
+      // Forward reference: we define `number` after we use it in `string`
+      'number': typed.referTo(() => {
+        return value => 'number:' + value;
+      })
+    })
+    assert.strictEqual(forward('10'), 'number:10')
+  });
+
+  it('should throw an exception in case of circular referTo', () => {
+    assert.throws(
+      () => { typed({
+        string: typed.referTo('number', fN => s => fN(s.length)),
+        number: typed.referTo('string', fS => n => fS(n.toString()))
+      })},
+      SyntaxError)
+  });
+
+  it('should throw an exception when a signature in referTo is not a string', function () {
+    assert.throws(() => {
+      typed.referTo(123, () => {});
+    }, /TypeError: Signatures must be strings/);
+
+    assert.throws(() => {
+      typed.referTo('number', 123, () => {});
+    }, /TypeError: Signatures must be strings/);
+  });
+
+  it('should throw an exception when the last argument of referTo is not a callback function', function () {
+    assert.throws(() => {
+      typed.referTo('number');
+    }, /TypeError: Callback function expected as last argument/);
+  });
+
+  it('should throw an exception when the first argument of referToSelf is not a callback function', function () {
+    assert.throws(() => {
+      typed.referToSelf(123);
+    }, /TypeError: Callback function expected as first argument/);
+  });
+
+  it('should have correct context `this` when resolving reference function signatures', function () {
+    // to make this work, in all functions we must use regular functions and no arrow functions,
+    // and we need to use .call or .apply, passing the `this` context along
+    var fnNumber = function (value) {
+      return 'number:' + value + ', this.value:' + this.value;
+    }
+
+    var fn = typed({
+      'number': typed.referTo(function () {
+        // created as a "reference" function just for the unit test...
+        return fnNumber
+      }),
+      'string': typed.referTo('number', function (fnNumberResolved) {
+        assert.strictEqual(fnNumberResolved, fnNumber)
+
+        return function fnString(value) {
+          return fnNumberResolved.call(this, parseInt(value, 10));
+        }
+      })
+    });
+
+    assert.equal(fn('2'), 'number:2, this.value:undefined');
+
+    // verify the reference function has the right context
+    var obj = {
+      value: 42,
+      fn
+    }
+    assert.equal(obj.fn('2'), 'number:2, this.value:42');
+  });
+
+  it('should pass this function context', () => {
+    var getProperty = typed({
+      'string': function (key) {
+        return this[key];
+      }
+    });
+
+    assert.equal(getProperty('value'), undefined)
+
+    var obj = {
+      value: 42,
+      getProperty
+    };
+
+    assert.equal(obj.getProperty('value'), 42);
+
+    var boundGetProperty = getProperty.bind({ otherValue: 123 });
+    assert.equal(boundGetProperty('otherValue'), 123);
+  });
+
+  it('should throw a deprecation warning when self reference via `this(...)` is used', () => {
+    assert.throws(() => {
+      typed({
+        'number': function (value) {
+          return value * value;
+        },
+        'string': function (value) {
+          return this(parseFloat(value));
+        }
+      });
+    }, /SyntaxError: Using `this` to self-reference a function is deprecated since typed-function@3\. Use typed\.referTo and typed\.referToSelf instead\./);
+  });
+
+  it('should not throw a deprecation warning on `this(...)` when the warning is turned off', () => {
+    var typed2 = typed.create();
+    typed2.warnAgainstDeprecatedThis = false;
+
+    var deprecatedSquare = typed2({
+      'number': function (value) {
+        return value * value;
+      },
+      'string': function (value) {
+        return this(parseFloat(value));
+      }
+    });
+
+    assert.equal(deprecatedSquare(3), 9);
+
+    assert.throws(() => {
+      deprecatedSquare('3');
+    }, /TypeError: this is not a function/);
+  });
+
+  it('should throw a deprecation warning when self reference via `this.signatures` is used', () => {
+    assert.throws(() => {
+      var square = typed({
+        'number': function (value) {
+          return value * value;
+        },
+        'string': function (value) {
+          return this.signatures['number'](parseFloat(value));
+        }
+      });
+    }, /SyntaxError: Using `this` to self-reference a function is deprecated since typed-function@3\. Use typed\.referTo and typed\.referToSelf instead\./);
+  });
 
 });

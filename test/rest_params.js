@@ -141,17 +141,17 @@ describe('rest parameters', function () {
     assert.equal(fn(2, 3), '...number');
     assert.equal(fn(2), '...number');
     assert.equal(fn({}), 'Object');
-    assert.deepEqual(Object.keys(fn.signatures), [
-      'Object',
-      '...number'
-    ]);
+
+    assert.equal(Object.keys(fn.signatures).length, 2);
+    assert.ok('Object' in fn.signatures);
+    assert.ok('...number' in fn.signatures);
   });
 
   it('should split rest params with conversions in two and order them correctly', function() {
     var typed2 = typed.create()
-    typed2.conversions = [
+    typed2.addConversion(
       {from: 'string', to: 'number', convert: function (x) {return parseFloat(x)}}
-    ];
+    );
 
     var fn = typed2({
       '...number': function (values) {
