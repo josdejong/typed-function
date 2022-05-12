@@ -50,9 +50,10 @@ Breaking changes:
     })
     ```
   
--   The property `typed.ignore` is removed. If you need it, see if you can
+- The property `typed.ignore` is removed. If you need it, see if you can
     create a new `typed` instance without the types that you want to ignore, or
     filter the signatures passed to `typed()` by hand.
+- Drop official support for Nodejs 12. 
 
 Non-breaking changes:
 
