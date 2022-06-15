@@ -66,6 +66,19 @@ export interface TypedFunction {
   (...args: any[]): any // TODO fix
   _typedFunctionData: any
   signatures: Signature[]
+  createCount: number
+}
+
+export interface TypedFunction {
+  (...args: any[]): any // TODO fix
+  _typedFunctionData: any
+  signatures: Signature[]
+  createCount: number
+}
+
+export interface LegacyTypedFunction {
+  (...args: any[]): any;
+  signature: string;
 }
 
 export interface TypedReference {
@@ -78,11 +91,12 @@ export interface TypedReference {
   }
 }
 
-export type TestFunction = (x: any) => boolean
+export type TypedReferenceMap = Record<string, TypedReference>
 
-class TypedFunctionTypeError extends TypeError {
+export type TestFunction = (x: any) => boolean
+export class TypedFunctionTypeError extends TypeError {
   data: {
-    category: "wrongType" | 'tooFewArgs' | 'tooManyArgs' | 'mismatch'
+    category: "wrongType" | "tooFewArgs" | "tooManyArgs" | "mismatch"
     fn?: string
     index?: number
     actual?: string[]
@@ -91,7 +105,7 @@ class TypedFunctionTypeError extends TypeError {
   } | null = null
 }
 
-class TypedFunctionError extends Error {
+export class TypedFunctionError extends Error {
   data: {
     signature?: string
     actual?: string
@@ -135,7 +149,7 @@ function create() {
     {
       name: "Function",
       test: function (x: any): x is Function {
-        return typeof x === "function"
+        return isFunction(x)
       },
       conversionsTo: [],
     },
@@ -191,7 +205,7 @@ function create() {
   // the actual conversions are stored on a property of the destination types
 
   // This is a temporary object, will be replaced with a function at the end
-  let typed = { createCount: 0 }
+  let typed: TypedFunction = { createCount: 0 }
 
   /**
    * Takes a type name and returns the corresponding official type object
@@ -316,7 +330,16 @@ function create() {
    */
   function isTypedFunction(entity: any): entity is TypedFunction {
     return (
-      entity && typeof entity === "function" && "_typedFunctionData" in entity
+      entity && isFunction(y) && "_typedFunctionData" in entity
+    )
+  }
+
+  /**
+   * Check if an entity is a typed function created by any instance
+   */
+   function isLegacyTypedFunction(entity: any): entity is LegacyTypedFunction {
+    return (
+      entity && isFunction(entity) && "signature" in entity
     )
   }
 
@@ -625,8 +648,6 @@ function create() {
   /**
    * Create a type test for a single parameter, which can have one or multiple
    * types.
-   * @param {Param} param
-   * @return {function(x: *) : boolean} Returns a test function
    */
   function compileTest(param: Param): TestFunction {
     if (!param || param.types.length === 0) {
@@ -669,7 +690,7 @@ function create() {
       tests = initial(params).map(compileTest)
       const varIndex = tests.length
       const lastTest = compileTest(last(params))
-      const testRestParam = function (args) {
+      const testRestParam = function (args: any[]) {
         for (var i = varIndex; i < args.length; i++) {
           if (!lastTest(args[i])) {
             return false
@@ -721,8 +742,7 @@ function create() {
   /**
    * Find the parameter at a specific index of a Params list.
    * Handles rest parameters.
-   * @return Returns the matching parameter when found,
-   *                        null otherwise.
+   * @return Returns the matching parameter when found, null otherwise.
    */
   function getParamAtIndex(params: Param[], index: number) {
     return index < params.length
@@ -756,7 +776,10 @@ function create() {
    * all available types on a specific argument index.
    * @return Returns an array with available types
    */
-  function mergeExpectedParams(signatures: Signature[], index: number): string[] {
+  function mergeExpectedParams(
+    signatures: Signature[],
+    index: number
+  ): string[] {
     const typeSet = new Set<string>()
     signatures.forEach((signature) => {
       const paramSet = getTypeSetAtIndex(signature.params, index)
@@ -777,9 +800,9 @@ function create() {
    * @return Returns a type error with additional data
    *                     attached to it in the property `data`
    */
-  function createError(
+  function createError<TArg>(
     name: string,
-    args: any[],
+    args: TArg[],
     signatures: Signature[]
   ): TypedFunctionTypeError {
     let err, expected
@@ -914,7 +937,7 @@ function create() {
   /**
    * Find the lowest index of the conversion of all types of the parameter
    * having a conversion
-   * @return {number} Returns the lowest index of the conversions of this type
+   * @return Returns the lowest index of the conversions of this type
    */
   function getLowestConversionIndex(param: Param) {
     let min = nConversions + 1
@@ -1118,13 +1141,20 @@ function create() {
     return matches
   }
 
+  interface CompileFn {
+    compileArgsPreprocessing(): any
+  }
+
   /**
    * Preprocess arguments before calling the original function:
    * - if needed convert the parameters
    * - in case of rest parameters, move the rest parameters into an Array
    * @return Returns a wrapped function
    */
-  function compileArgsPreprocessing(params: Param[], fn: () => any) {
+  function compileArgsPreprocessing(
+    params: Param[],
+    fn: (...args: any[]) => any
+  ) {
     let fnConvert = fn
 
     // TODO: can we make this wrapper function smarter/simpler?
@@ -1133,7 +1163,7 @@ function create() {
       const restParam = hasRestParam(params)
       const compiledConversions = params.map(compileArgConversion)
 
-      fnConvert = function convertArgs() {
+      fnConvert = function convertArgs(this: (args: any[]) => any) {
         const args = []
         const last = restParam ? arguments.length - 1 : arguments.length
         for (var i = 0; i < last; i++) {
@@ -1164,9 +1194,7 @@ function create() {
 
   /**
    * Compile conversion for a parameter to the right type
-   * @param {Param} param
-   * @return {function} Returns the wrapped function that will convert arguments
-   *
+   * @return Returns the wrapped function that will convert arguments
    */
   function compileArgConversion(param: Param) {
     let test0: TestFunction
@@ -1243,7 +1271,11 @@ function create() {
    *     // ]
    */
   function splitParams(params: Param[]) {
-    function _splitParams(params: Param[], index: number, paramsSoFar: Param[]) {
+    function _splitParams(
+      params: Param[],
+      index: number,
+      paramsSoFar: Param[]
+    ) {
       if (index < params.length) {
         const param = params[index]
         let resultingParams = []
@@ -1333,9 +1365,6 @@ function create() {
    * Helper function for `resolveReferences` that returns a copy of
    * functionList wihe any prior resolutions cleared out, in case we are
    * recycling signatures from a prior typed function construction.
-   *
-   * @param {Array.<function|typed-reference>} functionList
-   * @return {Array.<function|typed-reference>}
    */
   function clearResolutions(functionList: TypedReference[]) {
     return functionList.map((fn) => {
@@ -1355,7 +1384,11 @@ function create() {
    * the list of resolutions, or a false-y value if they don't all
    * resolve in a valid way (yet).
    */
-  function collectResolutions(references: string[], functionList: TypedReference[], signatureMap: Record<string, TypedReference>): TypedReference[] | false {
+  function collectResolutions(
+    references: string[],
+    functionList: TypedReference[],
+    signatureMap: TypedReferenceMap
+  ): TypedReference[] | false {
     const resolvedReferences: TypedReference[] = []
 
     let reference
@@ -1381,10 +1414,14 @@ function create() {
    * given signature should be mapped to (for use in resolving typed.referTo)
    * and self provides the destions of a typed.referToSelf.
    *
-   * @param self  The typed-function itself
+   * @param  self The typed-function itself
    * @return The list of resolved functions
    */
-  function resolveReferences(functionList: TypedReference[], signatureMap:  Record<string, TypedReference>, self: TypedFunction) {
+  function resolveReferences(
+    functionList: TypedReference[],
+    signatureMap: TypedReferenceMap,
+    self: TypedFunction
+  ) {
     let resolvedFunctions = clearResolutions(functionList)
     let leftUnresolved = true
     while (leftUnresolved) {
@@ -1433,9 +1470,8 @@ function create() {
    * usage like `this(...)` or `this.signatures`. This self-referencing is
    * deprecated since typed-function v3. It has been replaced with
    * the functions typed.referTo and typed.referToSelf.
-   * @param {Object.<string, function>} signaturesMap
    */
-  function validateDeprecatedThis(signaturesMap) {
+  function validateDeprecatedThis(signaturesMap: TypedReferenceMap) {
     // TODO: remove this deprecation warning logic some day (it's introduced in v3)
 
     // match occurrences like 'this(' and 'this.signatures'
@@ -1456,15 +1492,14 @@ function create() {
 
   /**
    * Create a typed function
-   * @param {String} name               The name for the typed function
-   * @param {Object.<string, function>} signaturesMap
-   *                                    An object with one or
-   *                                    multiple signatures as key, and the
-   *                                    function corresponding to the
-   *                                    signature as value.
-   * @return {function}  Returns the created typed function.
+   * @param name           The name for the typed function
+   * @param rawSignaturesMap An object with one or multiple signatures as key, and the function corresponding to the signature as value.
+   * @return               Returns the created typed function.
    */
-  function createTypedFunction(name, rawSignaturesMap) {
+  function createTypedFunction(
+    name: string,
+    rawSignaturesMap: TypedReferenceMap
+  ) {
     typed.createCount++
 
     if (Object.keys(rawSignaturesMap).length === 0) {
@@ -1689,51 +1724,45 @@ function create() {
 
   /**
    * Action to take on mismatch
-   * @param {string} name      Name of function that was attempted to be called
-   * @param {Array} args       Actual arguments to the call
-   * @param {Array} signatures Known signatures of the named typed-function
    */
-  function _onMismatch(name, args, signatures) {
+  function _onMismatch<TArg>(
+    name: string,
+    args: TArg[],
+    signatures: Signature[]
+  ) {
     throw createError(name, args, signatures)
   }
 
   /**
    * Return all but the last items of an array or function Arguments
-   * @param {Array | Arguments} arr
-   * @return {Array}
    */
-  function initial(arr) {
+  function initial<TItem>(arr: TItem[]): TItem[] {
     return slice(arr, 0, arr.length - 1)
   }
 
   /**
    * return the last item of an array or function Arguments
-   * @param {Array | Arguments} arr
-   * @return {*}
    */
-  function last(arr) {
+  function last<TItem>(arr: TItem[]): TItem {
     return arr[arr.length - 1]
   }
 
   /**
    * Slice an array or function Arguments
-   * @param {Array | Arguments | IArguments} arr
-   * @param {number} start
-   * @param {number} [end]
-   * @return {Array}
    */
-  function slice(arr, start, end) {
+  function slice<TItem>(
+    arr: TItem[],
+    start: number | undefined,
+    end: number | undefined
+  ) {
     return Array.prototype.slice.call(arr, start, end)
   }
 
   /**
    * Return the first item from an array for which test(arr[i]) returns true
-   * @param {Array} arr
-   * @param {function} test
-   * @return {* | undefined} Returns the first matching item
-   *                         or undefined when there is no match
+   * @return Returns the first matching item or undefined when there is no match
    */
-  function findInArray(arr, test) {
+  function findInArray<TItem>(arr: TItem[], test: (item: TItem) => boolean) {
     for (var i = 0; i < arr.length; i++) {
       if (test(arr[i])) {
         return arr[i]
@@ -1745,11 +1774,11 @@ function create() {
   /**
    * Flat map the result invoking a callback for every item in an array.
    * https://gist.github.com/samgiles/762ee337dff48623e729
-   * @param {Array} arr
-   * @param {function} callback
-   * @return {Array}
    */
-  function flatMap(arr, callback) {
+  function flatMap<TItem>(
+    arr: TItem[],
+    callback: (value: TItem, index: number, array: TItem[]) => any
+  ) {
     return Array.prototype.concat.apply([], arr.map(callback))
   }
 
@@ -1783,9 +1812,6 @@ function create() {
 
   /**
    * Create a reference callback to the typed-function itself
-   *
-   * @param {(self: function) => function} callback
-   * @returns {{referToSelf: { callback: function }}}
    */
   function referToSelf(callback: (self: Function) => Function): TypedReference {
     if (typeof callback !== "function") {
@@ -1795,19 +1821,28 @@ function create() {
     return { referToSelf: { callback: callback } }
   }
 
+  function isObject(x: any): x is Object {
+    return typeof x === "object"
+  }
+
+  function isArray(x: any): x is Array<any> {
+    return Array.isArray(x)
+  }
+
+  function isFunction(x: any): x is Function {
+    return typeof x === "function"
+  }
+
   /**
    * Test whether something is a referTo object, holding a list with reference
    * signatures and a callback.
-   *
-   * @param {Object | function} objectOrFn
-   * @returns {boolean}
    */
-  function isReferTo(objectOrFn) {
+  function isReferTo(objectOrFn: TypedReference) {
     return (
       objectOrFn &&
-      typeof objectOrFn.referTo === "object" &&
-      Array.isArray(objectOrFn.referTo.references) &&
-      typeof objectOrFn.referTo.callback === "function"
+      isObject(objectOrFn.referTo) &&
+      isArray(objectOrFn.referTo.references) &&
+      isFunction(objectOrFn.referTo.callback)
     )
   }
 
@@ -1815,7 +1850,9 @@ function create() {
    * Test whether something is a referToSelf object, holding a callback where
    * to pass `self`.
    */
-  function isReferToSelf(objectOrFn: { referToSelf: { callback: any } | Object }) {
+  function isReferToSelf(objectOrFn: {
+    referToSelf: { callback: any } | Object
+  }) {
     if (!objectOrFn) return false
 
     if (typeof objectOrFn.referToSelf === "object") return true
@@ -1828,7 +1865,10 @@ function create() {
    * an error in case (C).
    * @returns updated name
    */
-  function checkName(nameSoFar: string | undefined, newName: string | undefined) {
+  function checkName(
+    nameSoFar: string | undefined,
+    newName: string | undefined
+  ) {
     if (!nameSoFar) {
       return newName
     }
@@ -1849,17 +1889,15 @@ function create() {
   /**
    * Retrieve the implied name from an object with signature keys
    * and function values, checking whether all value names match
-   *
-   * @param { {string: function} } obj
    */
-  function getObjectName(obj: Record<string, Function>) {
+  function getObjectName(obj: Record<string, TypedFunction | LegacyTypedFunction>) {
     let name
     for (let key in obj) {
       // Only pay attention to own properties, and only if their values
       // are typed functions or functions with a signature property
       if (
         obj.hasOwnProperty(key) &&
-        (isTypedFunction(obj[key]) || typeof obj[key].signature === "string")
+        (isTypedFunction(obj[key]) || isLegacyTypedFunction(obj[key]))
       ) {
         name = checkName(name, obj[key].name)
       }
@@ -1871,13 +1909,18 @@ function create() {
    * Copy all of the signatures from the second argument into the first,
    * which is modified by side effect, checking for conflicts
    */
-  function mergeSignatures(dest: Record<string, Signature>, source: Record<string, Signature>) {
+  function mergeSignatures(
+    dest: Record<string, Signature>,
+    source: Record<string, Signature>
+  ) {
     let key
     for (key in source) {
       if (source.hasOwnProperty(key)) {
         if (key in dest) {
           if (source[key] !== dest[key]) {
-            const err = new TypedFunctionError('Signature "' + key + '" is defined twice')
+            const err = new TypedFunctionError(
+              'Signature "' + key + '" is defined twice'
+            )
             err.data = {
               signature: key,
               sourceFunction: source[key],
@@ -1921,7 +1964,7 @@ function create() {
       const item = arguments[i]
       let theseSignatures = {}
       let thisName
-      if (typeof item === "function") {
+      if (isFunction(m)) {
         thisName = item.name
         if (typeof item.signature === "string") {
           // Case 1: Ordinary function with a string 'signature' property
@@ -1977,13 +2020,9 @@ function create() {
 
   /**
    * add a type (convenience wrapper for typed.addTypes)
-   * @param {{name: string, test: function}} type
-   * @param {boolean} [beforeObjectTest=true]
-   *                          If true, the new test will be inserted before
-   *                          the test with name 'Object' (if any), since
-   *                          tests for Object match Array and classes too.
+   * @param beforeObjectTest If true, the new test will be inserted before the test with name 'Object' (if any), since tests for Object match Array and classes too.
    */
-  typed.addType = function (type, beforeObjectTest) {
+  typed.addType = function (type: Signature, beforeObjectTest = true) {
     let before = "any"
     if (beforeObjectTest !== false) {
       before = "Object"
@@ -1993,12 +2032,8 @@ function create() {
 
   /**
    * Verify that the ConversionDef conversion has a valid format.
-   *
-   * @param {conversionDef} conversion
-   * @return {void}
-   * @throws {TypeError|SyntaxError}
    */
-  function _validateConversion(conversion) {
+  function _validateConversion(conversion: ConversionDef) {
     if (
       !conversion ||
       typeof conversion.from !== "string" ||
@@ -2018,12 +2053,8 @@ function create() {
 
   /**
    * Add a conversion
-   *
-   * @param {ConversionDef} conversion
-   * @returns {void}
-   * @throws {TypeError}
    */
-  typed.addConversion = function (conversion) {
+  typed.addConversion = function (conversion: ConversionDef) {
     _validateConversion(conversion)
 
     const to = findType(conversion.to)
@@ -2050,12 +2081,8 @@ function create() {
 
   /**
      * Convenience wrapper to call addConversion on each conversion in a list.
-     *
-     @param {ConversionDef[]} conversions
-     @returns {void}
-     @throws {TypeError}
      */
-  typed.addConversions = function (conversions) {
+  typed.addConversions = function (conversions: ConversionDef[]) {
     conversions.forEach(typed.addConversion)
   }
 
@@ -2063,12 +2090,8 @@ function create() {
    * Remove the specified conversion. The format is the same as for
    * addConversion, and the convert function must match or an error
    * is thrown.
-   *
-   * @param {{from: string, to: string, convert: function}} conversion
-   * @returns {void}
-   * @throws {TypeError|SyntaxError|Error}
    */
-  typed.removeConversion = function (conversion) {
+  typed.removeConversion = function (conversion: ConversionDef) {
     _validateConversion(conversion)
     const to = findType(conversion.to)
     const existingConversion = findInArray(
@@ -2096,11 +2119,8 @@ function create() {
    * object with properties 'params', 'test', 'fn', and 'implementation'.
    * This last property is a function that converts params as necessary
    * and then calls 'fn'. Returns null if there is no matching signature.
-   * @param {typed-function} tf
-   * @param {any[]} argList
-   * @returns {{params: string, test: function, fn: function, implementation: function}}
    */
-  typed.resolve = function (tf, argList) {
+  typed.resolve = function (tf: TypedFunction, argList: any[]) {
     if (!isTypedFunction(tf)) {
       throw new TypeError(NOT_TYPED_FUNCTION)
     }
