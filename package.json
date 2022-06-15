@@ -31,8 +31,9 @@
   "comment": "brace-expansion is installed because an old insecure version is used by one of the dev depencencies (under istanbul)",
   "main": "typed-function.js",
   "scripts": {
-    "build": "uglifyjs typed-function.js -o typed-function.min.js -c -m",
+    "build": "tsc typed-function.ts && uglifyjs /typed-function.js",
     "test": "mocha test --recursive",
+    "check-types": "tsc --noEmit --incremental false",
     "coverage": "nyc _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\"",
     "prepublishOnly": "npm test && npm run build"
   },
