@@ -1324,18 +1324,21 @@
      */
     function resolveReferences(functionList, signatureMap, self) {
       let resolvedFunctions = clearResolutions(functionList);
+      let isResolved = new Array(resolvedFunctions.length).fill(false);
       let leftUnresolved = true;
       while (leftUnresolved) {
         leftUnresolved = false;
         let nothingResolved = true;
         for (var i = 0; i < resolvedFunctions.length; ++i) {
-          const fn = resolvedFunctions[i]
+          if (isResolved[i]) continue;
+          const fn = resolvedFunctions[i];
 
           if (isReferToSelf(fn)) {
             resolvedFunctions[i] = fn.referToSelf.callback(self);
             // Preserve reference in case signature is reused someday:
             resolvedFunctions[i].referToSelf = fn.referToSelf;
-            nothingResolved = false
+            isResolved[i] = true;
+            nothingResolved = false;
           } else if (isReferTo(fn)) {
             const resolvedReferences = collectResolutions(
               fn.referTo.references, resolvedFunctions, signatureMap);
@@ -1344,6 +1347,7 @@
                 fn.referTo.callback.apply(this, resolvedReferences);
               // Preserve reference in case signature is reused someday:
               resolvedFunctions[i].referTo = fn.referTo;
+              isResolved[i] = true;
               nothingResolved = false;
             } else {
               leftUnresolved = true;
