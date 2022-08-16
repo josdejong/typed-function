@@ -593,7 +593,7 @@ To generate the minified version of the library, run:
    `./test/browser.html`  and `./test/browser.min.html` in your browser. 
 5. Commit the changes
 6. Merge `develop` into `master`, and push `master`
-7. Create a git tag, and pus this
+7. Create a git tag, and push this
 8. publish the library:
     ```
     npm publish
