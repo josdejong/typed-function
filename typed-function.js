@@ -1877,7 +1877,7 @@
      */
     typed.addType = function (type, beforeObjectTest) {
       let before = 'any';
-      if (beforeObjectTest !== false) {
+      if (beforeObjectTest !== false && typeMap.has('Object')) {
         before = 'Object';
       }
       typed.addTypes([type], before);
