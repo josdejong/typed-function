@@ -248,6 +248,13 @@ describe('construction', function() {
       typed2._findType('any').index - 1);
   });
 
+  it('should add a type using addType (no object)', function() {
+    const typed3 = typed.create();
+    typed3.clear();
+    typed3.addType({name: 'number', test: n => typeof n === 'number'});
+    assert.strictEqual(typed3._findType('number').index, 0)
+  });
+
   it('should throw an error when passing an invalid type to addType', function() {
     var typed2 = typed.create();
     var errMsg = /TypeError: Object with properties {name: string, test: function} expected/;
