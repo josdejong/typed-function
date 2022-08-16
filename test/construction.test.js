@@ -445,9 +445,19 @@ describe('construction', function() {
     assert.strictEqual(forward('10'), 'number:10')
   });
 
-  it('should throw an exception in case of circular referTo', () => {
+  it('should throw an exception in case of circular referTo', function () {
     assert.throws(
       () => { typed({
+        string: typed.referTo('number', fN => s => fN(s.length)),
+        number: typed.referTo('string', fS => n => fS(n.toString()))
+      })},
+      SyntaxError)
+  });
+
+  it('should throw with circular referTo and direct referToSelf', function () {
+    assert.throws(
+      () => { typed({
+        boolean: typed.referToSelf(self => b => b ? self(1) : self('false')),
         string: typed.referTo('number', fN => s => fN(s.length)),
         number: typed.referTo('string', fS => n => fS(n.toString()))
       })},
