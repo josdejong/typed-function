@@ -1,6 +1,14 @@
 # History
 
 
+## 2022-08-16, version 3.0.1
+
+- Fix #157: `typed()` can enter infinite loop when there is both `referToSelf`  
+  and `referTo` functions involved (#158). Thanks @gwhitney.
+- Fix #155: `typed.addType()` fails if there is no `Object` type (#159).
+  Thanks @gwhitney.
+
+
 ## 2022-05-12, version 3.0.0
 
 !!! BE CAREFUL: BREAKING CHANGES !!!
