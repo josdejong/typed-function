@@ -1,5 +1,5 @@
-var assert = require('assert')
-var typed = require('../typed-function')
+import assert from 'assert';
+import typed from '../src/typed-function.mjs';
 
 describe('resolve', function () {
 
@@ -28,7 +28,7 @@ describe('resolve', function () {
       [[1]],
       ['x', [1], 'z', 'w']
     ]
-    for (example of examples) {
+    for (let example of examples) {
       assert.strictEqual(
         typed.resolve(fn, example).implementation.apply(null, example),
         fn.apply(fn, example)

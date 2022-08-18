@@ -1,4 +1,4 @@
-var typed = require('../typed-function');
+import typed from '../src/typed-function.mjs';
 
 // create a typed function with a variable number of arguments
 var sum = typed({

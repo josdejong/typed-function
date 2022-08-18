@@ -1,4 +1,4 @@
-var typed = require('../typed-function');
+import typed from '../src/typed-function.mjs';
 
 // create a couple of typed functions
 var fn1 = typed({

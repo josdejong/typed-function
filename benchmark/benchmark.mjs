@@ -13,10 +13,10 @@
 //
 //     browserify -o benchmark/benchmark.bundle.js benchmark/benchmark.js
 //
-const assert = require('assert');
-const Benchmark = require('benchmark');
-const padRight = require('pad-right');
-const typed = require('../typed-function');
+import assert from 'assert';
+import Benchmark from 'benchmark';
+import padRight from 'pad-right';
+import typed from '../src/typed-function.mjs';
 
 // expose on window when using bundled in a browser
 if (typeof window !== 'undefined') {

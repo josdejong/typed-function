@@ -1,6 +1,5 @@
-// test parse
-var assert = require('assert');
-var typed = require('../typed-function');
+import assert from 'assert';
+import typed from '../src/typed-function.mjs';
 
 describe('construction', function() {
 
@@ -497,7 +496,7 @@ describe('construction', function() {
     // to make this work, in all functions we must use regular functions and no arrow functions,
     // and we need to use .call or .apply, passing the `this` context along
     var fnNumber = function (value) {
-      return 'number:' + value + ', this.value:' + this.value;
+      return 'number:' + value + ', this.value:' + (this && this.value);
     }
 
     var fn = typed({
@@ -527,7 +526,7 @@ describe('construction', function() {
   it('should pass this function context', () => {
     var getProperty = typed({
       'string': function (key) {
-        return this[key];
+        return this && this[key];
       }
     });
 

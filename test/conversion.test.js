@@ -1,6 +1,6 @@
-var assert = require('assert');
-var typed = require('../typed-function');
-var strictEqualArray = require('./strictEqualArray');
+import assert from 'assert';
+import typed from '../src/typed-function.mjs';
+import { strictEqualArray } from './strictEqualArray.mjs';
 
 function convertBool (b) {
   return +b;

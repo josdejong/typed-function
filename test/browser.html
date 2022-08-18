@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <title>browser test</title>
-  <script src="../typed-function.js"></script>
 </head>
 <body>
-<script>
+<script type="module">
+  import typed from '../src/typed-function.mjs'
+
   // create a typed function
   var fn1 = typed({
     'number, string': function (a, b) {
@@ -14,7 +15,9 @@
   });
 
   // use the function
-  document.write(fn1(2, 'foo') + '<br>'); // outputs 'a is a number, b is a string'
+  // outputs 'a is a number, b is a string'
+  const result = fn1(2, 'foo')
+  document.body.appendChild(document.createTextNode(result))
 </script>
 </body>
 </html>

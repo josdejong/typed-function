@@ -1,5 +1,5 @@
-var assert = require('assert');
-var typed = require('../typed-function');
+import assert from 'assert';
+import typed from '../src/typed-function.mjs';
 
 describe('convert', function () {
 

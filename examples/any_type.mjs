@@ -1,7 +1,7 @@
-var typed = require('../typed-function');
+import typed from '../src/typed-function.mjs';
 
 // create a typed function with an any type argument
-var log = typed({
+const log = typed({
   'string, any': function (event, data) {
     console.log('event: ' + event + ', data: ' + JSON.stringify(data));
   }

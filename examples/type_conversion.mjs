@@ -1,8 +1,7 @@
-var typed = require('../typed-function');
+import typed from '../src/typed-function.mjs';
 
 // define type conversions that we want to support order is important.
-// There is also an utility function typed.addConversion(conversion) for this.
-typed.conversions = [
+typed.addConversions([
   {
     from: 'boolean',
     to: 'number',
@@ -24,7 +23,7 @@ typed.conversions = [
       return x + '';
     }
   }
-];
+]);
 
 // create a typed function with multiple signatures
 //
