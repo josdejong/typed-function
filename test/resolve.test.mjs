@@ -1,8 +1,7 @@
-import assert from 'assert';
-import typed from '../src/typed-function.mjs';
+import assert from 'assert'
+import typed from '../src/typed-function.mjs'
 
 describe('resolve', function () {
-
   before(() => typed.addConversion({
     from: 'boolean', to: 'string', convert: x => '' + x
   }))
@@ -11,8 +10,8 @@ describe('resolve', function () {
 
   it('should choose the signature that direct execution would', () => {
     const fn = typed({
-      'number': n => 'b ' + n,
-      'boolean': b => b ? 'c' : 'd',
+      number: n => 'b ' + n,
+      boolean: b => b ? 'c' : 'd',
       'number, string': (n, s) => 'e ' + n + ' ' + s,
       '...string': a => 'f ' + a.length,
       '...': a => 'g ' + a.length
@@ -28,7 +27,7 @@ describe('resolve', function () {
       [[1]],
       ['x', [1], 'z', 'w']
     ]
-    for (let example of examples) {
+    for (const example of examples) {
       assert.strictEqual(
         typed.resolve(fn, example).implementation.apply(null, example),
         fn.apply(fn, example)

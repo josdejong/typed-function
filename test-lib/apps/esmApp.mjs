@@ -1,11 +1,11 @@
 import typed from '../../lib/esm/typed-function.js'
 
 // create a typed function
-var fn1 = typed({
+const fn1 = typed({
   'number, string': function (a, b) {
-    return 'a is a number, b is a string';
+    return 'a is a number, b is a string'
   }
-});
+})
 
 // use the function
 // outputs 'a is a number, b is a string'

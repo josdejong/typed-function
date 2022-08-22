@@ -1,9 +1,9 @@
-import assert from 'assert';
-import typed from '../src/typed-function.mjs';
+import assert from 'assert'
+import typed from '../src/typed-function.mjs'
 
 describe('onMismatch handler', () => {
   const square = typed('square', {
-    number: x => x*x,
+    number: x => x * x,
     string: s => s + s
   })
 
@@ -20,10 +20,10 @@ describe('onMismatch handler', () => {
       myErrorLog.push(typed.createError(name, args, signatures))
       return null
     }
-    square({the: 'circle'})
+    square({ the: 'circle' })
     square(7)
     square('me')
-    square(1,2)
+    square(1, 2)
     assert.strictEqual(myErrorLog.length, 2)
     assert('data' in myErrorLog[0])
   })

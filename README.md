@@ -572,6 +572,19 @@ To test the library, run:
     npm test
 
 
+## Code style
+
+The library is using the [standard](https://github.com/standard/standard) coding style.
+
+To test the code style, run:
+
+    npm run lint
+
+To automatically fix most of the styling issues, run:
+
+    npm run format
+
+
 ## Minify
 
 To generate the minified version of the library, run:
@@ -586,11 +599,10 @@ To generate the minified version of the library, run:
 3. Test and build:
     ```
     npm install
-    npm run build
-    npm test
+    npm run build-and-test
     ```
-4. Verify whether the bundle and minified bundle works correctly by opening
-   `./test/browser.html`  and `./test/browser.min.html` in your browser. 
+4. Verify whether the generated output works correctly by opening
+   `./test/browserEsmBuild.html` in your browser. 
 5. Commit the changes
 6. Merge `develop` into `master`, and push `master`
 7. Create a git tag, and push this
