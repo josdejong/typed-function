@@ -80,7 +80,7 @@ Here are some usage examples. More examples are available in the
 [/examples](/examples) folder.
 
 ```js
-var typed = require('typed-function');
+import typed from 'typed-function'
 
 // create a typed function
 var fn1 = typed({
@@ -117,9 +117,10 @@ var fn4 = typed({
 });
 
 // create a typed function from a plain function with signature
-function fnPlain(a, b) {
+function fnPlain (a, b) {
   return 'a is a number, b is a string';
 }
+
 fnPlain.signature = 'number, string';
 var fn5 = typed(fnPlain);
 
@@ -130,8 +131,7 @@ console.log(fn4(2));             // outputs 'a is a number'
 // calling the function with a non-supported type signature will throw an error
 try {
   fn2('hello', 'world');
-}
-catch (err) {
+} catch (err) {
   console.log(err.toString());
   // outputs:  TypeError: Unexpected type of argument.
   //           Expected: number or boolean, actual: string, index: 1.
@@ -268,10 +268,10 @@ once with different implementations, an error will be thrown.
 -   `typed.create() : function`
 
     Create a new, isolated instance of typed-function. Example:
-    
+
     ```js
-    var typed = require('typed-function');  // default instance
-    var typed2 = typed.create();            // a second instance
+    import typed from 'typed-function.mjs';  // default instance
+    const typed2 = typed.create();           // a second instance
     ```
 
     This would allow you, for example, to have two different type hierarchies
@@ -572,6 +572,19 @@ To test the library, run:
     npm test
 
 
+## Code style
+
+The library is using the [standard](https://github.com/standard/standard) coding style.
+
+To test the code style, run:
+
+    npm run lint
+
+To automatically fix most of the styling issues, run:
+
+    npm run format
+
+
 ## Minify
 
 To generate the minified version of the library, run:
@@ -586,11 +599,10 @@ To generate the minified version of the library, run:
 3. Test and build:
     ```
     npm install
-    npm run build
-    npm test
+    npm run build-and-test
     ```
-4. Verify whether the bundle and minified bundle works correctly by opening
-   `./test/browser.html`  and `./test/browser.min.html` in your browser. 
+4. Verify whether the generated output works correctly by opening
+   `./test/browserEsmBuild.html` in your browser. 
 5. Commit the changes
 6. Merge `develop` into `master`, and push `master`
 7. Create a git tag, and push this

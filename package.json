@@ -4,6 +4,7 @@
   "description": "Type checking for JavaScript functions",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
   "contributors": [
+    "Glen Whitney (https://github.com/gwhitney)",
     "Luke Gumbley (https://github.com/luke-gumbley)"
   ],
   "homepage": "https://github.com/josdejong/typed-function",
@@ -18,24 +19,37 @@
     "compose",
     "types"
   ],
-  "dependencies": {},
-  "devDependencies": {
-    "benchmark": "2.1.4",
-    "brace-expansion": "2.0.1",
-    "nyc": "15.1.0",
-    "mocha": "10.0.0",
-    "pad-right": "0.2.2",
-    "uglify-js": "3.16.3"
-  },
-  "comment": "brace-expansion is installed because an old insecure version is used by one of the dev depencencies (under istanbul)",
-  "main": "typed-function.js",
+  "type": "module",
+  "main": "lib/esm/typed-function.js",
   "scripts": {
-    "build": "uglifyjs typed-function.js -o typed-function.min.js -c -m",
     "test": "mocha test --recursive",
+    "test:lib": "mocha test test-lib --recursive",
+    "build": "babel src --out-dir lib/esm --source-maps --config-file ./babel.config.json",
+    "build-and-test": "npm run lint && npm run build && npm run test:lib",
+    "lint": "eslint --cache src/**/*.mjs test/**/*.mjs test-lib/**/*.mjs",
+    "format": "npm run lint -- --fix",
     "coverage": "nyc _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\"",
-    "prepublishOnly": "npm test && npm run build"
+    "prepublishOnly": "npm run build-and-test"
   },
   "engines": {
     "node": ">= 14"
-  }
+  },
+  "devDependencies": {
+    "@babel/cli": "7.18.10",
+    "@babel/preset-env": "7.18.10",
+    "benchmark": "2.1.4",
+    "eslint": "8.22.0",
+    "eslint-config-standard": "17.0.0",
+    "eslint-plugin-import": "2.26.0",
+    "eslint-plugin-n": "15.2.5",
+    "eslint-plugin-promise": "6.0.0",
+    "mocha": "10.0.0",
+    "nyc": "15.1.0",
+    "pad-right": "0.2.2"
+  },
+  "files": [
+    "README.md",
+    "LICENSE.md",
+    "lib"
+  ]
 }
