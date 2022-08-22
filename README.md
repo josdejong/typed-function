@@ -572,9 +572,9 @@ To test the library, run:
     npm test
 
 
-## Code style
+## Code style and linting
 
-The library is using the [standard](https://github.com/standard/standard) coding style.
+The library is using the [standardjs](https://standardjs.com/) coding style.
 
 To test the code style, run:
 
@@ -583,13 +583,6 @@ To test the code style, run:
 To automatically fix most of the styling issues, run:
 
     npm run format
-
-
-## Minify
-
-To generate the minified version of the library, run:
-
-    npm run minify
 
 
 ## Publish

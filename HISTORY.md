@@ -1,6 +1,31 @@
 # History
 
 
+## 2022-08-22, version 4.0.0
+
+!!! BE CAREFUL: BREAKING CHANGES !!!
+
+-   Breaking change: the code is converted into ES modules, and the library
+    now outputs ES modules only instead of an UMD module. 
+    -   If you're using `typed-function` inside and ES modules project, 
+        all will just keep working like before:
+        ```js
+        import typed from 'typed-function'
+        ```
+    -   If you're using `typed-function` in a CommonJS project, you'll have to 
+        import the library using a dynamic import:
+        ```js
+        const typed = (await import('typed-function')).default
+        ```
+    -   If you're importing `typed-function` straight into a browser page,
+        you can load it as a module there:
+        ```html
+        <script type="module">
+          import typed from 'typed-function/lib/esm/typed-function.js'
+        </script>
+        ```
+
+
 ## 2022-08-16, version 3.0.1
 
 - Fix #157: `typed()` can enter infinite loop when there is both `referToSelf`  
