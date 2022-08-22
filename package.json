@@ -19,21 +19,29 @@
     "compose",
     "types"
   ],
-  "dependencies": {},
-  "devDependencies": {
-    "benchmark": "2.1.4",
-    "nyc": "15.1.0",
-    "mocha": "10.0.0",
-    "pad-right": "0.2.2"
-  },
   "type": "module",
-  "main": "src/typed-function.mjs",
+  "main": "lib/esm/typed-function.js",
   "scripts": {
     "test": "mocha test --recursive",
+    "test:lib": "mocha test test-lib --recursive",
+    "build": "babel src --out-dir lib/esm --source-maps --config-file ./babel.config.json",
     "coverage": "nyc _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\"",
     "prepublishOnly": "npm test && npm run build"
   },
   "engines": {
     "node": ">= 14"
-  }
+  },
+  "devDependencies": {
+    "@babel/cli": "7.18.10",
+    "@babel/preset-env": "7.18.10",
+    "benchmark": "2.1.4",
+    "mocha": "10.0.0",
+    "nyc": "15.1.0",
+    "pad-right": "0.2.2"
+  },
+  "files": [
+    "README.md",
+    "LICENSE.md",
+    "lib"
+  ]
 }
