@@ -25,8 +25,9 @@
     "test": "mocha test --recursive",
     "test:lib": "mocha test test-lib --recursive",
     "build": "babel src --out-dir lib/esm --source-maps --config-file ./babel.config.json",
+    "build-and-test": "npm run build && npm run test:lib",
     "coverage": "nyc _mocha -- test --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\"",
-    "prepublishOnly": "npm test && npm run build"
+    "prepublishOnly": "npm run build-and-test"
   },
   "engines": {
     "node": ">= 14"
