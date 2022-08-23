@@ -1,4 +1,4 @@
-import typed from '../../lib/esm/typed-function.js'
+import typed from '../../lib/esm/typed-function.mjs'
 
 // create a typed function
 const fn1 = typed({
