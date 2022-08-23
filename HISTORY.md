@@ -1,6 +1,12 @@
 # History
 
 
+## 2022-08-23, version 4.1.0
+
+- Publish an UMD version of the library, like in v3.0.0. It is still necessary.
+  The UMD version can be used in CommonJS applications and in the browser.
+
+
 ## 2022-08-22, version 4.0.0
 
 !!! BE CAREFUL: BREAKING CHANGES !!!
