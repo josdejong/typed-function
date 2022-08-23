@@ -27,7 +27,7 @@
         you can load it as a module there:
         ```html
         <script type="module">
-          import typed from 'typed-function/lib/esm/typed-function.js'
+          import typed from 'typed-function/lib/esm/typed-function.mjs'
         </script>
         ```
 
