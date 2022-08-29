@@ -45,7 +45,7 @@
     "benchmark": "2.1.4",
     "cpy-cli": "4.2.0",
     "del-cli": "5.0.0",
-    "eslint": "8.22.0",
+    "eslint": "8.23.0",
     "eslint-config-standard": "17.0.0",
     "eslint-plugin-import": "2.26.0",
     "eslint-plugin-n": "15.2.5",
