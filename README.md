@@ -249,7 +249,7 @@ once with different implementations, an error will be thrown.
 -   `typed.convert(value: *, type: string) : *`
 
     Convert a value to another type. Only applicable when conversions have
-    been added with `typed.addConversion()` and/or `typed.addConversion()`
+    been added with `typed.addConversion()` and/or `typed.addConversions()`
     (see below in the method list).
     Example:
     
