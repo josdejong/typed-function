@@ -1,7 +1,7 @@
 # History
 
 
-## 2022-09-13, version 4.1.1
+## 2023-09-13, version 4.1.1
 
 - Fix #168: add a `"license": "MIT"` field to the `package.json` file.
 
