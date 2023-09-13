@@ -1,6 +1,11 @@
 # History
 
 
+## 2022-09-13, version 4.1.1
+
+- Fix #168: add a `"license": "MIT"` field to the `package.json` file.
+
+
 ## 2022-08-23, version 4.1.0
 
 - Publish an UMD version of the library, like in v3.0.0. It is still necessary.
