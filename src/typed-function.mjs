@@ -1878,7 +1878,7 @@ function create () {
 
     if (existing) {
       if (options && options.override) {
-        to.conversionsTo.splice(existing.index, 1)
+        typed.removeConversion({ from: existing.from, to: conversion.to, convert: existing.convert })
       } else {
         throw new Error(
           'There is already a conversion from "' + conversion.from + '" to "' +

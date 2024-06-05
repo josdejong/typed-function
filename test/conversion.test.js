@@ -101,6 +101,11 @@ describe('conversion', function () {
   it('should override a conversion using addConversions', function () {
     const typed2 = typed.create()
 
+    // we add an unrelated conversion to ensure we cannot misuse the internal .index 
+    // (which is more like an auto incrementing id)
+    const conversionUnrelated = { from: 'string', to: 'boolean', convert: () => 'c' }
+    typed2.addConversion(conversionUnrelated)
+
     const conversionA = { from: 'number', to: 'string', convert: () => 'a' }
     const conversionB = { from: 'number', to: 'string', convert: () => 'b' }
 
