@@ -1,6 +1,11 @@
 # History
 
 
+## 2024-06-05, version 4.2.1
+
+- Fix a bug in the new `override` option of method `addConversion`.
+
+
 ## 2024-06-05, version 4.2.0
 
 - Extend methods `addConversion` and `addConversions` with a new option 
