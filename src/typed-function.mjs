@@ -141,7 +141,7 @@ function create () {
     const newTypes = []
     for (let i = 0; i < types.length; ++i) {
       if (!types[i] || typeof types[i].name !== 'string' ||
-          typeof types[i].test !== 'function') {
+        typeof types[i].test !== 'function') {
         throw new TypeError('Object with properties {name: string, test: function} expected')
       }
       const typeName = types[i].name
@@ -703,8 +703,8 @@ function create () {
         const param = getParamAtIndex(signature.params, index)
         const test = compileTest(param)
         if ((index < signature.params.length ||
-             hasRestParam(signature.params)) &&
-            test(args[index])) {
+          hasRestParam(signature.params)) &&
+          test(args[index])) {
           nextMatchingDefs.push(signature)
         }
       })
@@ -716,8 +716,8 @@ function create () {
           const actualTypes = findTypeNames(args[index])
 
           err = new TypeError('Unexpected type of argument in function ' + _name +
-              ' (expected: ' + expected.join(' or ') +
-              ', actual: ' + actualTypes.join(' | ') + ', index: ' + index + ')')
+            ' (expected: ' + expected.join(' or ') +
+            ', actual: ' + actualTypes.join(' | ') + ', index: ' + index + ')')
           err.data = {
             category: 'wrongType',
             fn: _name,
@@ -741,8 +741,8 @@ function create () {
     if (args.length < Math.min.apply(null, lengths)) {
       expected = mergeExpectedParams(matchingSignatures, index)
       err = new TypeError('Too few arguments in function ' + _name +
-          ' (expected: ' + expected.join(' or ') +
-          ', index: ' + args.length + ')')
+        ' (expected: ' + expected.join(' or ') +
+        ', index: ' + args.length + ')')
       err.data = {
         category: 'tooFewArgs',
         fn: _name,
@@ -756,7 +756,7 @@ function create () {
     const maxLength = Math.max.apply(null, lengths)
     if (args.length > maxLength) {
       err = new TypeError('Too many arguments in function ' + _name +
-          ' (expected: ' + maxLength + ', actual: ' + args.length + ')')
+        ' (expected: ' + maxLength + ', actual: ' + args.length + ')')
       err.data = {
         category: 'tooManyArgs',
         fn: _name,
@@ -772,7 +772,7 @@ function create () {
       argTypes.push(findTypeNames(args[i]).join('|'))
     }
     err = new TypeError('Arguments of type "' + argTypes.join(', ') +
-        '" do not match any of the defined signatures of function ' + _name + '.')
+      '" do not match any of the defined signatures of function ' + _name + '.')
     err.data = {
       category: 'mismatch',
       actual: argTypes
@@ -1704,8 +1704,8 @@ function create () {
       // Only pay attention to own properties, and only if their values
       // are typed functions or functions with a signature property
       if (Object.prototype.hasOwnProperty.call(obj, key) &&
-          (isTypedFunction(obj[key]) ||
-           typeof obj[key].signature === 'string')) {
+        (isTypedFunction(obj[key]) ||
+          typeof obj[key].signature === 'string')) {
         name = checkName(name, obj[key].name)
       }
     }
@@ -1850,9 +1850,9 @@ function create () {
    */
   function _validateConversion (conversion) {
     if (!conversion ||
-        typeof conversion.from !== 'string' ||
-        typeof conversion.to !== 'string' ||
-        typeof conversion.convert !== 'function') {
+      typeof conversion.from !== 'string' ||
+      typeof conversion.to !== 'string' ||
+      typeof conversion.convert !== 'function') {
       throw new TypeError('Object with properties {from: string, to: string, convert: function} expected')
     }
     if (conversion.to === conversion.from) {
@@ -1866,37 +1866,43 @@ function create () {
    * Add a conversion
    *
    * @param {ConversionDef} conversion
+   * @param {{override: boolean}} [options]
    * @returns {void}
    * @throws {TypeError}
    */
-  typed.addConversion = function (conversion) {
+  typed.addConversion = function (conversion, options = { override: false }) {
     _validateConversion(conversion)
 
     const to = findType(conversion.to)
-    if (to.conversionsTo.every(function (other) {
-      return other.from !== conversion.from
-    })) {
-      to.conversionsTo.push({
-        from: conversion.from,
-        convert: conversion.convert,
-        index: nConversions++
-      })
-    } else {
-      throw new Error(
-        'There is already a conversion from "' + conversion.from + '" to "' +
-        to.name + '"')
+    const existing = to.conversionsTo.find((other) => other.from === conversion.from)
+
+    if (existing) {
+      if (options && options.override) {
+        to.conversionsTo.splice(existing.index, 1)
+      } else {
+        throw new Error(
+          'There is already a conversion from "' + conversion.from + '" to "' +
+          to.name + '"')
+      }
     }
+
+    to.conversionsTo.push({
+      from: conversion.from,
+      convert: conversion.convert,
+      index: nConversions++
+    })
   }
 
   /**
    * Convenience wrapper to call addConversion on each conversion in a list.
    *
-   @param {ConversionDef[]} conversions
-   @returns {void}
-   @throws {TypeError}
+   * @param {ConversionDef[]} conversions
+   * @param {{override: boolean}} [options]
+   * @returns {void}
+   * @throws {TypeError}
    */
-  typed.addConversions = function (conversions) {
-    conversions.forEach(typed.addConversion)
+  typed.addConversions = function (conversions, options) {
+    conversions.forEach(conversion => typed.addConversion(conversion, options))
   }
 
   /**

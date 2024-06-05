@@ -1,7 +1,7 @@
 import assert from 'assert'
 import typed from '../src/typed-function.mjs'
 
-function convertBool (b) {
+function convertBool(b) {
   return +b
 }
 
@@ -61,16 +61,72 @@ describe('conversion', function () {
       conversion.convert)
   })
 
+  it('should throw an error when a conversion already existing when using addConversion', function () {
+    const typed2 = typed.create()
+
+    const conversionA = { from: 'number', to: 'string', convert: () => 'a' }
+    const conversionB = { from: 'number', to: 'string', convert: () => 'b' }
+
+
+    typed2.addConversion(conversionA)
+
+    assert.throws(() => {
+      typed2.addConversion(conversionB)
+    }, /There is already a conversion/)
+
+    assert.throws(() => {
+      typed2.addConversion(conversionB, { override: false })
+    }, /There is already a conversion/)
+  })
+
+  it('should override a conversion using addConversion', function () {
+    const typed2 = typed.create()
+
+    const conversionA = { from: 'number', to: 'string', convert: () => 'a' }
+    const conversionB = { from: 'number', to: 'string', convert: () => 'b' }
+
+    typed2.addConversion(conversionA)
+    assert.strictEqual(typed2._findType('string').conversionsTo.length, 1)
+    assert.strictEqual(
+      typed2._findType('string').conversionsTo[0].convert,
+      conversionA.convert)
+
+    typed2.addConversion(conversionB, { override: true })
+    assert.strictEqual(typed2._findType('string').conversionsTo.length, 1)
+    assert.strictEqual(
+      typed2._findType('string').conversionsTo[0].convert,
+      conversionB.convert)
+  })
+
+  it('should override a conversion using addConversions', function () {
+    const typed2 = typed.create()
+
+    const conversionA = { from: 'number', to: 'string', convert: () => 'a' }
+    const conversionB = { from: 'number', to: 'string', convert: () => 'b' }
+
+    typed2.addConversion(conversionA)
+    assert.strictEqual(typed2._findType('string').conversionsTo.length, 1)
+    assert.strictEqual(
+      typed2._findType('string').conversionsTo[0].convert,
+      conversionA.convert)
+
+    typed2.addConversions([conversionB], { override: true })
+    assert.strictEqual(typed2._findType('string').conversionsTo.length, 1)
+    assert.strictEqual(
+      typed2._findType('string').conversionsTo[0].convert,
+      conversionB.convert)
+  })
+
   it('should throw an error when passing an invalid conversion object to addConversion', function () {
     const typed2 = typed.create()
     const errMsg = /TypeError: Object with properties \{from: string, to: string, convert: function} expected/
 
     assert.throws(function () { typed2.addConversion({}) }, errMsg)
     assert.throws(function () { typed2.addConversion({ from: 'number', to: 'string' }) }, errMsg)
-    assert.throws(function () { typed2.addConversion({ from: 'number', convert: function () {} }) }, errMsg)
-    assert.throws(function () { typed2.addConversion({ to: 'string', convert: function () {} }) }, errMsg)
-    assert.throws(function () { typed2.addConversion({ from: 2, to: 'string', convert: function () {} }) }, errMsg)
-    assert.throws(function () { typed2.addConversion({ from: 'number', to: 2, convert: function () {} }) }, errMsg)
+    assert.throws(function () { typed2.addConversion({ from: 'number', convert: function () { } }) }, errMsg)
+    assert.throws(function () { typed2.addConversion({ to: 'string', convert: function () { } }) }, errMsg)
+    assert.throws(function () { typed2.addConversion({ from: 2, to: 'string', convert: function () { } }) }, errMsg)
+    assert.throws(function () { typed2.addConversion({ from: 'number', to: 2, convert: function () { } }) }, errMsg)
     assert.throws(function () { typed2.addConversion({ from: 'number', to: 'string', convert: 'foo' }) }, errMsg)
   })
 

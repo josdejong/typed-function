@@ -426,7 +426,7 @@ once with different implementations, an error will be thrown.
     typed-functions created before a call to `clear` will still operate, but
     they may prouce unintelligible messages in case of type mismatch errors.
 
--   `typed.addConversion(conversion: {from: string, to: string, convert: function}) : void`
+-   `typed.addConversion(conversion: {from: string, to: string, convert: function}, options?: { override: boolean }) : void`
 
     Add a new conversion.
     
@@ -444,7 +444,7 @@ once with different implementations, an error will be thrown.
     best to add all of your desired automatic conversions before defining any
     typed functions.
 
--   `typed.addConversions(conversions: ConversionDef[]): void`
+-   `typed.addConversions(conversions: ConversionDef[], options?: { override: boolean }): void`
 
     Convenience method that adds a list of conversions. Each element in the
     `conversions` array should be an object like the `conversion` argument of
