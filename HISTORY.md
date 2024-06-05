@@ -1,6 +1,12 @@
 # History
 
 
+## 2024-06-05, version 4.2.0
+
+- Extend methods `addConversion` and `addConversions` with a new option 
+  `{ override: boolean }` to allow overriding an existing conversion.
+
+
 ## 2023-09-13, version 4.1.1
 
 - Fix #168: add a `"license": "MIT"` field to the `package.json` file.
