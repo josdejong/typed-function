@@ -378,7 +378,7 @@ describe('conversion', function () {
     assert.strictEqual(ambiguous._typedFunctionData.signatures.length, 3)
     assert.strictEqual(
       t2.find(ambiguous, 'number, Array')(0, [0]),
-      'two0')
+      'one N0')
   })
 
   it('should prefer conversions to any type argument', function () {
@@ -458,6 +458,7 @@ describe('conversion', function () {
     it('should select the signatures with the conversion with the lowest index (1)', function () {
       typed.clearConversions()
       typed.addConversions([
+        { from: 'boolean', to: 'Object', convert: function (x) { return { x } } },
         { from: 'boolean', to: 'string', convert: function (x) { return x + '' } },
         { from: 'boolean', to: 'number', convert: function (x) { return x + 0 } }
       ])
@@ -476,6 +477,17 @@ describe('conversion', function () {
       assert.equal(Object.keys(fn.signatures).length, 2)
       assert.ok('number' in fn.signatures)
       assert.ok('string' in fn.signatures)
+
+      const fn2 = typed({
+        'number | string': a => a
+      })
+
+      assert.strictEqual(fn2(true), 'true')
+
+      const fn3 = typed({
+        'number | Object | string': a => a
+      })
+      assert.deepStrictEqual(fn3(true), { x: true })
     })
 
     it('should select the signatures with the conversion with the lowest index (2)', function () {
