@@ -1,6 +1,12 @@
 # History
 
 
+## 2024-11-26, version 4.2.2
+
+- Fix: #170 choose lowest-index type conversion and sort signatures 
+  transitively (#171). Thanks @gwhitney.
+
+
 ## 2024-06-05, version 4.2.1
 
 - Fix a bug in the new `override` option of method `addConversion`.
