@@ -781,7 +781,7 @@ function create () {
   }
 
   /**
-   * Find the lowest index of all exact types of a parameter (no conversions)
+   * Find the lowest index of all types of a parameter
    * @param {Param} param
    * @return {number} Returns the index of the lowest type in typed.types
    */
@@ -789,9 +789,7 @@ function create () {
     let min = typeList.length + 1
 
     for (let i = 0; i < param.types.length; i++) {
-      if (isExactType(param.types[i])) {
-        min = Math.min(min, param.types[i].typeIndex)
-      }
+      min = Math.min(min, param.types[i].typeIndex)
     }
 
     return min
@@ -816,59 +814,67 @@ function create () {
   }
 
   /**
-   * Compare two params
+   * Compare two params. The return value is a number that is
+   * negative when param1 should be considered first, positive
+   * when param2 should be considered first, and zero when the
+   * params are indistinguishable. Primarily as a debugging aid,
+   * the value is always less than one in absolute value, and
+   * a smaller absolute value indicates a less important distinction
+   * between the parameters.
    * @param {Param} param1
    * @param {Param} param2
-   * @return {number} returns -1 when param1 must get a lower
-   *                  index than param2, 1 when the opposite,
-   *                  or zero when both are equal
+   * @return {number} negative, positive, or zero depending on whether
+   *                  param1 should be ordered before, after, or equivalently
+   *                  to param2
    */
   function compareParams (param1, param2) {
     // We compare a number of metrics on a param in turn:
     // 1) 'any' parameters are the least preferred
     if (param1.hasAny) {
       if (!param2.hasAny) {
-        return 1
+        return 0.1
       }
     } else if (param2.hasAny) {
-      return -1
+      return -0.1
     }
 
     // 2) Prefer non-rest to rest parameters
     if (param1.restParam) {
       if (!param2.restParam) {
-        return 1
+        return 0.01
       }
     } else if (param2.restParam) {
-      return -1
+      return -0.01
     }
 
-    // 3) Prefer exact type match to conversions
-    if (param1.hasConversion) {
-      if (!param2.hasConversion) {
-        return 1
-      }
-    } else if (param2.hasConversion) {
-      return -1
-    }
-
-    // 4) Prefer lower type index:
+    // 3) Prefer lower type index:
     const typeDiff = getLowestTypeIndex(param1) - getLowestTypeIndex(param2)
     if (typeDiff < 0) {
-      return -1
+      return -0.001
     }
     if (typeDiff > 0) {
-      return 1
+      return 0.001
+    }
+
+    // 4) Prefer exact type match to conversions, with a strength that
+    //    grows with the conversion index
+    const conv1 = getLowestConversionIndex(param1)
+    const conv2 = getLowestConversionIndex(param2)
+    if (param1.hasConversion) {
+      if (!param2.hasConversion) {
+        return (1 + conv1) * 0.000001
+      }
+    } else if (param2.hasConversion) {
+      return -(1 + conv2) * 0.000001
     }
 
     // 5) Prefer lower conversion index
-    const convDiff =
-      getLowestConversionIndex(param1) - getLowestConversionIndex(param2)
+    const convDiff = conv1 - conv2
     if (convDiff < 0) {
-      return -1
+      return -0.0000001
     }
     if (convDiff > 0) {
-      return 1
+      return 0.0000001
     }
 
     // Don't have a basis for preference
@@ -876,12 +882,17 @@ function create () {
   }
 
   /**
-   * Compare two signatures
+   * Compare two signatures. The result is a number that is negative
+   * when the first signature should be preferred to the second, positive
+   * when the second signature should be preferred, and zero in case the
+   * two signatures are essentially equivalent. Primarily as a debugging
+   * aid, a larger absolute value indicates a more "important" difference.
+   *
    * @param {Signature} signature1
    * @param {Signature} signature2
-   * @return {number} returns a negative number when param1 must get a lower
-   *                  index than param2, a positive number when the opposite,
-   *                  or zero when both are equal
+   * @return {number} returns a negative number when signature1 must get a
+   *                  lower index than signature2, a positive number when the
+   *                  opposite holds, or zero when both are equivalent.
    */
   function compareSignatures (signature1, signature2) {
     const pars1 = signature1.params
@@ -894,10 +905,10 @@ function create () {
     // 1) An "any rest param" is least preferred
     if (hasRest1 && last1.hasAny) {
       if (!hasRest2 || !last2.hasAny) {
-        return 1
+        return 10000000
       }
     } else if (hasRest2 && last2.hasAny) {
-      return -1
+      return -10000000
     }
 
     // 2) Minimize the number of 'any' parameters
@@ -915,35 +926,35 @@ function create () {
       if (par.hasConversion) ++conv2
     }
     if (any1 !== any2) {
-      return any1 - any2
+      return (any1 - any2) * 1000000
     }
 
     // 3) A conversion rest param is less preferred
     if (hasRest1 && last1.hasConversion) {
       if (!hasRest2 || !last2.hasConversion) {
-        return 1
+        return 100000
       }
     } else if (hasRest2 && last2.hasConversion) {
-      return -1
+      return -100000
     }
 
     // 4) Minimize the number of conversions
     if (conv1 !== conv2) {
-      return conv1 - conv2
+      return (conv1 - conv2) * 10000
     }
 
     // 5) Prefer no rest param
     if (hasRest1) {
       if (!hasRest2) {
-        return 1
+        return 1000
       }
     } else if (hasRest2) {
-      return -1
+      return -1000
     }
 
     // 6) Prefer shorter with rest param, longer without
     const lengthCriterion =
-      (pars1.length - pars2.length) * (hasRest1 ? -1 : 1)
+      (pars1.length - pars2.length) * (hasRest1 ? -100 : 100)
     if (lengthCriterion !== 0) {
       return lengthCriterion
     }
@@ -960,7 +971,7 @@ function create () {
       tc += thisComparison
     }
     if (tc !== 0) {
-      return tc
+      return ((tc < 0) ? -10 : 10) + tc
     }
 
     // They have the same number of preferred parameters, so go by the
@@ -968,10 +979,13 @@ function create () {
     // In other words, dispatch is driven somewhat more by earlier
     // parameters than later ones.
     let c
+    let bonus = 9
+    const decrement = bonus / (comparisons.length + 1)
     for (c of comparisons) {
       if (c !== 0) {
-        return c
+        return ((c < 0) ? -bonus : bonus) + c
       }
+      bonus -= decrement
     }
 
     // It's a tossup:
@@ -991,26 +1005,33 @@ function create () {
       return []
     }
     const types = typeNames.map(findType)
-    if (typeNames.length > 1) {
-      types.sort((t1, t2) => t1.index - t2.index)
-    }
-    let matches = types[0].conversionsTo
-    if (typeNames.length === 1) {
-      return matches
+    if (typeNames.length === 1) return types[0].conversionsTo
+
+    // Here, for each type that occurs as the from-type of any conversion
+    // to any of the types found, we must select the conversion of
+    // lowest index from that type. So first collect the types.
+    const knownTypes = new Set(typeNames)
+    const convertibleTypes = new Set()
+    for (let i = 0; i < types.length; ++i) {
+      for (const match of types[i].conversionsTo) {
+        if (!knownTypes.has(match.from)) convertibleTypes.add(match.from)
+      }
     }
 
-    matches = matches.concat([]) // shallow copy the matches
-    // Since the types are now in index order, we just want the first
-    // occurrence of any from type:
-    const knownTypes = new Set(typeNames)
-    for (let i = 1; i < types.length; ++i) {
-      let newMatch
-      for (newMatch of types[i].conversionsTo) {
-        if (!knownTypes.has(newMatch.from)) {
-          matches.push(newMatch)
-          knownTypes.add(newMatch.from)
+    // Now get the lowest-index conversion for each type
+    const matches = []
+    for (const typeName of convertibleTypes) {
+      let bestIndex = nConversions + 1
+      let bestConversion = null
+      for (let i = 0; i < types.length; ++i) {
+        for (const match of types[i].conversionsTo) {
+          if (match.from === typeName && match.index < bestIndex) {
+            bestIndex = match.index
+            bestConversion = match
+          }
         }
       }
+      matches.push(bestConversion)
     }
 
     return matches
@@ -1022,17 +1043,20 @@ function create () {
    * - in case of rest parameters, move the rest parameters into an Array
    * @param {Param[]} params
    * @param {function} fn
-   * @return {function} Returns a wrapped function
+   * @return {function} Returns fn or a wrapped function if needed. If it
+   *                    has conversions, the function will be named to indicate
+   *                    what conversions are occurring.
    */
   function compileArgsPreprocessing (params, fn) {
     let fnConvert = fn
 
     // TODO: can we make this wrapper function smarter/simpler?
 
+    let name = ''
     if (params.some(p => p.hasConversion)) {
       const restParam = hasRestParam(params)
       const compiledConversions = params.map(compileArgConversion)
-
+      name = compiledConversions.map(conv => conv.name).join(';')
       fnConvert = function convertArgs () {
         const args = []
         const last = restParam ? arguments.length - 1 : arguments.length
@@ -1056,7 +1080,7 @@ function create () {
           slice(arguments, 0, offset).concat([slice(arguments, offset)]))
       }
     }
-
+    if (name) Object.defineProperty(fnPreprocess, 'name', { value: name })
     return fnPreprocess
   }
 
@@ -1070,37 +1094,37 @@ function create () {
     let test0, test1, conversion0, conversion1
     const tests = []
     const conversions = []
-
+    let name = ''
     param.types.forEach(function (type) {
       if (type.conversion) {
+        name += type.conversion.from + '~>' + type.conversion.to + ','
         tests.push(findType(type.conversion.from).test)
         conversions.push(type.conversion.convert)
       }
     })
+    if (name) name = name.slice(0, -1)
+    else name = 'pass'
 
     // create optimized conversion functions depending on the number of conversions
+    let convertor = arg => arg
     switch (conversions.length) {
-      case 0:
-        return function convertArg (arg) {
-          return arg
-        }
-
+      case 0: break
       case 1:
         test0 = tests[0]
         conversion0 = conversions[0]
-        return function convertArg (arg) {
+        convertor = function convertArg (arg) {
           if (test0(arg)) {
             return conversion0(arg)
           }
           return arg
         }
-
+        break
       case 2:
         test0 = tests[0]
         test1 = tests[1]
         conversion0 = conversions[0]
         conversion1 = conversions[1]
-        return function convertArg (arg) {
+        convertor = function convertArg (arg) {
           if (test0(arg)) {
             return conversion0(arg)
           }
@@ -1109,9 +1133,9 @@ function create () {
           }
           return arg
         }
-
+        break
       default:
-        return function convertArg (arg) {
+        convertor = function convertArg (arg) {
           for (let i = 0; i < conversions.length; i++) {
             if (tests[i](arg)) {
               return conversions[i](arg)
@@ -1120,6 +1144,8 @@ function create () {
           return arg
         }
     }
+    Object.defineProperty(convertor, 'name', { value: name })
+    return convertor
   }
 
   /**
@@ -1888,6 +1914,7 @@ function create () {
 
     to.conversionsTo.push({
       from: conversion.from,
+      to: to.name,
       convert: conversion.convert,
       index: nConversions++
     })
