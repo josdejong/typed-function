@@ -420,6 +420,14 @@ once with different implementations, an error will be thrown.
     is similar to `typed.addType` as well, except it should be the name of an
     arbitrary type that has already been added (rather than just a boolean flag)
 
+-   `typed.getTypes(): TypeDef[]`
+
+    Returns a snapshot of all registered types in type-checking order, including
+    the fallback `any` type. Each definition contains `name`, `test`, and the
+    optional `isAny` flag. The returned array and definition objects are copies;
+    editing them does not change the registered types. The test functions are
+    shared with the registered definitions.
+
 -   `typed.clear(): void`
 
     Removes all types and conversions from the typed instance. Note that any
@@ -449,6 +457,14 @@ once with different implementations, an error will be thrown.
     Convenience method that adds a list of conversions. Each element in the
     `conversions` array should be an object like the `conversion` argument of
     `typed.addConversion`.
+
+-   `typed.getConversions(): ConversionDef[]`
+
+    Returns a snapshot of all registered conversions in registration order.
+    Each definition contains `from`, `to`, and `convert`. The returned array
+    and definition objects are copies; editing them does not change the
+    registered conversions. The conversion functions are shared with the
+    registered definitions.
 
 -   `typed.removeConversion(conversion: ConversionDef): void`
 
