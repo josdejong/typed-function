@@ -196,6 +196,28 @@ function create () {
   }
 
   /**
+   * Return a snapshot of the registered type definitions in type-checking order.
+   * @returns {TypeDef[]}
+   */
+  function getTypes () {
+    return typeList.map(name => {
+      const type = typeMap.get(name)
+      return { name: type.name, test: type.test, isAny: type.isAny }
+    })
+  }
+
+  /**
+   * Return a snapshot of the registered conversions in registration order.
+   * @returns {ConversionDef[]}
+   */
+  function getConversions () {
+    return typeList
+      .flatMap(name => typeMap.get(name).conversionsTo)
+      .sort((a, b) => a.index - b.index)
+      .map(({ from, to, convert }) => ({ from, to, convert }))
+  }
+
+  /**
    * Find the type names that match a value.
    * @param {*} value
    * @return {string[]} Array of names of types for which
@@ -1842,6 +1864,8 @@ function create () {
   typed.clear = clear
   typed.clearConversions = clearConversions
   typed.addTypes = addTypes
+  typed.getTypes = getTypes
+  typed.getConversions = getConversions
   typed._findType = findType // For unit testing only
   typed.referTo = referTo
   typed.referToSelf = referToSelf
